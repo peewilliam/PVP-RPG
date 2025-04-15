@@ -1,0 +1,27 @@
+{
+  "name": "mmorpg-isometrico",
+  "version": "0.1.0",
+  "description": "MMORPG topdown isométrico com mecânicas em tempo real",
+  "type": "module",
+  "main": "server/src/index.js",
+  "scripts": {
+    "dev:server": "nodemon server/src/index.js",
+    "dev:client": "vite --host --port 8080",
+    "build": "vite build",
+    "start": "node server/src/index.js"
+  },
+  "dependencies": {
+    "@geckos.io/client": "^2.3.1",
+    "@geckos.io/server": "^2.3.1",
+    "three": "^0.158.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "nodemon": "^3.0.3",
+    "vite": "^5.0.12"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 
