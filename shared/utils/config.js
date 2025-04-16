@@ -15,6 +15,8 @@ export const config = {
       : (process.env.SERVER_URL || 'http://localhost')
   },
   game: {
-    tickRate: 50 // 20 ticks por segundo
+    // 20 ticks por segundo = 50ms por tick
+    // Este valor precisa estar sincronizado com velocidades de movimento e atualizações
+    tickRate: 50 
   }
 }; 

@@ -4,6 +4,54 @@
 
 O MMORPG isométrico segue uma arquitetura cliente-servidor onde o servidor é autoritativo e gerencia todos os aspectos do mundo do jogo.
 
+### Organização do Mundo
+- O mundo foi expandido para 200x200 unidades e dividido em biomas distintos:
+  - SPAWN (área inicial)
+  - FOREST_NORTH (floresta densa)
+  - FOREST_WEST (floresta)
+  - MOUNTAINS (montanhas)
+  - PLAINS (planícies)
+  - SWAMP (pântano)
+  - RUINS (ruínas)
+- Cada bioma possui densidades e escalas específicas para árvores, rochas e arbustos.
+- Casas e cercas foram removidas temporariamente, assim como estruturas especiais (vilas, ruínas, fazendas).
+- Objetos do mundo não se sobrepõem devido à verificação de colisão na geração.
+
+### Sistema de Spawn de Monstros
+- Áreas de spawn de monstros distribuídas por bioma, com diferentes quantidades, níveis e tempos de respawn.
+- Apenas goblins estão implementados no momento, mas o sistema é extensível para outros tipos.
+- O respawn é automático e balanceado por região.
+
+### Interface do Cliente
+- Exibe FPS e ping em tempo real no canto superior esquerdo.
+- Interface preparada para feedback de performance e debug.
+
+### Arquitetura MCP
+- **Model (servidor)**: Gerencia toda a lógica, entidades, colisão, spawn e estado do mundo.
+- **Controller (servidor)**: Interpreta comandos dos jogadores e orquestra a lógica de alto nível.
+- **Presenter (cliente)**: Renderiza o estado do jogo, processa eventos e inputs, exibe informações de performance.
+
+### Sistema de Colisão
+- Implementado para evitar sobreposição de objetos do mundo.
+- Cada entidade possui raio de colisão específico.
+- Monstros e jogadores respeitam colisão física.
+
+### Comunicação Cliente-Servidor
+- Utiliza geckos.io para eventos em tempo real.
+- Sincronização eficiente de entidades próximas ao jogador.
+
+### Padrões de Design
+- **Observer**: Eventos de atualização e sincronização.
+- **Component-Entity-System**: Entidades compostas por componentes reutilizáveis.
+- **State**: Gerenciamento de estados de entidades (idle, moving, attacking, dead).
+- **Factory**: Criação padronizada de entidades.
+- **Command**: Cliente envia comandos, servidor executa lógica.
+- **Timer**: Gerenciamento de respawn de monstros e ciclos de atualização.
+
+### Considerações
+- Estruturas especiais e construções podem ser reativadas conforme evolução do gameplay.
+- O sistema está pronto para expansão de tipos de monstros, habilidades e desafios.
+
 ### Diagrama de Alto Nível
 
 ```
@@ -71,6 +119,7 @@ Utilizamos geckos.io como sistema de comunicação em tempo real, que oferece:
 - `player:useAbility` - Uso de habilidades
 - `player:abilityUsed` - Confirmação de uso de habilidade
 - `world:update` - Atualizações do estado do mundo
+- `world:init` - Inicialização do estado do mundo
 - `entity:spawn` - Spawn de novas entidades
 
 ### Fluxo de Sincronização de Jogadores
@@ -90,65 +139,74 @@ A implementação atual segue um fluxo específico para garantir a sincronizaç�
    - O servidor processa os comandos, atualiza o estado do jogador
    - O servidor envia atualizações de posição para todos os clientes via `player:moved`
 
-4. **Desconexão**:
-   - O servidor detecta a desconexão de um jogador
-   - O servidor notifica todos os outros jogadores via `player:disconnected`
+## Sistema de Combate
 
-## Padrões de Design em Uso
+O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 
-### Padrão Observer
-- Utilizado para notificar o cliente sobre mudanças no estado do jogo
-- Implementado através do sistema de eventos do geckos.io
+### Arquitetura do Sistema de Combate
 
-### Padrão Component-Entity-System
-- Entidades do jogo (jogadores, monstros, elementos do mundo) são compostas por componentes reutilizáveis
-- Componentes comuns: Position, Health, MovementController, CombatStats
+1. **CombatSystem (Servidor)**
+   - Classe principal que processa todas as interações de combate
+   - Gerencia cálculos de dano, área de efeito e aplicação de efeitos
+   - Utiliza método `processAbilityUse` que recebe jogador, ID da habilidade e posição alvo
+   - Suporta diferentes tipos de habilidades: projétil, área, teleporte
+   - Implementa multiplicadores de dano para balancear PvP vs PvE
 
-### Padrão State
-- Utilizado para gerenciar estados de entidades (idle, moving, attacking, dead)
-- Facilita a transição entre comportamentos
+2. **Fluxo de Processamento de Habilidades**
+   ```
+   Cliente               Servidor                       Cliente
+   [Input] --------> [Validação] --------> [Evento de Confirmação]
+     ↓                   ↓                          ↓
+   [Cooldown      [Processamento         [Renderização do
+    Local]         de Combate]            Efeito Visual]
+                       ↓
+                  [Distribuição
+                   de Eventos de Dano]
+   ```
 
-### Padrão Factory
-- Utilizado para criar entidades e componentes de forma padronizada
-- Factories específicas para Player, Monster, WorldObject
+3. **Eventos de Rede para Combate**
+   - `PLAYER.USE_ABILITY`: Cliente informa servidor sobre uso de habilidade
+   - `PLAYER.ABILITY_USED`: Servidor confirma uso de habilidade para todos
+   - `COMBAT.DAMAGE_DEALT`: Servidor informa sobre dano causado
+   - `COMBAT.FLOATING_TEXT`: Controla textos flutuantes no cliente
+   - `PLAYER.DEATH`: Informa sobre morte de jogador
+   - `PLAYER.RESPAWN`: Informa sobre respawn de jogador
 
-### Padrão Command
-- Implementado para o sistema de movimento, onde o cliente envia comandos em vez de estado
-- Separa a intenção (comando) da execução (lógica de movimento no servidor)
+### Sistema de Habilidades
 
-## Relacionamentos entre Componentes
+1. **Tipos de Habilidades**
+   - **Projétil**: Viaja em linha reta (ex: Bola de Fogo)
+   - **Área**: Afeta alvos em um raio (ex: Estacas de Gelo)
+   - **Mobilidade**: Move o jogador (ex: Teleporte)
+   - **Zona**: Efeito contínuo em área (ex: Chuva de Meteoros)
 
-### Servidor
-```
-GameServer
- ├── WorldManager
- │    ├── EntityManager
- │    ├── SpawnSystem
- │    └── CollisionSystem
- ├── PlayerManager
- │    ├── ConnectionHandler
- │    └── AuthenticationService
- └── GameLoop
-      ├── PhysicsSystem
-      ├── CombatSystem
-      └── AISystem
-```
+2. **Configuração de Habilidades**
+   - Centralizada em `shared/skills/skillsConfig.js`
+   - Cada habilidade possui ID, nome, descrição, tipo, cooldown, custo de mana, dano, etc.
+   - Fácil de estender para adicionar novas habilidades
 
-### Cliente
-```
-GameClient
- ├── InputManager
- │    ├── KeyboardHandler
- │    └── MouseHandler
- ├── RenderEngine
- │    ├── SceneManager
- │    ├── CameraController
- │    └── EntityRenderer
- ├── NetworkManager
- │    ├── ConnectionHandler
- │    └── SyncManager
- └── UIManager
-      ├── HUD
-      ├── InventoryUI
-      └── AbilityBar
-``` 
+3. **Feedback Visual**
+   - Sistema de textos flutuantes para mostrar dano, cura, etc.
+   - Efeitos visuais específicos para cada habilidade
+   - Feedback visual de morte e respawn
+
+### Sistema de Morte e Respawn
+
+1. **Processo de Morte**
+   - Jogador perde todo XP e nível ao morrer
+   - `resetAfterDeath()` restaura estatísticas base
+   - Jogador é teleportado para ponto de spawn
+
+2. **Interface do Usuário**
+   - Mensagem de morte é exibida na tela
+   - Controles são desativados temporariamente
+   - Efeito visual de respawn
+
+### Problemas Atuais
+
+- As habilidades não estão aplicando dano aos alvos corretamente
+- Precisamos verificar a integração entre o CombatSystem e os métodos takeDamage dos alvos
+
+## Sistema de Renderização
+
+[...resto do conteúdo existente...]

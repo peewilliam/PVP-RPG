@@ -16,6 +16,13 @@
    - Servidor atualiza posição, calcula rotação e notifica todos via `player:moved`
 5. **Desconexão**: Servidor notifica todos via `player:disconnected`
 
+### Sincronização de Entidades do Mundo
+1. **Inicialização do Mundo**: Servidor envia todos os objetos do mundo e monstros via `world:init`
+2. **Atualizações do Mundo**: Servidor envia apenas entidades próximas ao jogador via `world:update`
+3. **Processamento de Entidades**: Cliente usa presenters específicos para cada tipo de entidade:
+   - `MonsterPresenter` para monstros
+   - `WorldObjectPresenter` para objetos do mundo
+
 ## Padrões de Arquitetura
 
 ### MCP (Model-Controller-Presenter)
@@ -49,7 +56,14 @@
 
 ### Renderização com Three.js
 - Câmera isométrica usando OrthographicCamera
-- Objetos temporários são representados como cubos coloridos
+- Cada tipo de entidade possui sua própria representação visual:
+  - Jogadores: cubos azuis com cone verde indicando direção
+  - Monstros: cubos vermelhos com cone laranja indicando direção
+  - Árvores: cilindro marrom (tronco) com cone verde (copa)
+  - Rochas: esfera irregular cinza
+  - Arbustos: esfera verde
+  - Casas: cubo com telhado triangular
+  - Cercas: caixa fina e comprida
 - A câmera segue o jogador mantendo vista isométrica
 
 ### Movimento
@@ -77,6 +91,62 @@
 - O servidor envia a rotação calculada junto com a atualização de posição
 - O mouse será usado apenas para apontar habilidades, não para rotacionar o personagem
 
+### Sistema de Colisão
+- Implementado pelo `CollisionSystem` no servidor
+- Usa camadas de colisão (layers) para definir quais entidades colidem entre si
+- Matriz de colisão define interações: jogadores colidem com monstros e objetos do mundo, mas não entre si
+- Raios de colisão específicos para cada tipo de entidade:
+  - Jogadores: 0.5 unidades
+  - Monstros: 0.6 unidades
+  - Objetos do mundo: variável por tipo (árvores: 0.8, rochas: 1.2, etc.)
+- Resolução de colisão empurra entidades para fora umas das outras
+- Sistema de depuração via variável de ambiente `DEBUG_COLLISIONS`
+
 ### Sincronização de Estado
 - O loop do servidor roda a 20 ticks por segundo (50ms)
-- Atualizações de estado são enviadas apenas quando houver mudanças 
+- Atualizações de estado são enviadas apenas quando houver mudanças
+- Estado do mundo é enviado apenas para entidades próximas ao jogador (otimização)
+
+## Sistema de Combate
+
+1. O sistema de combate usa o padrão `CombatSystem` que processa todas as interações de dano entre entidades.
+
+2. Atualmente as habilidades não estão aplicando dano aos alvos. Este é um bug conhecido que precisa ser corrigido, provavelmente na integração entre `CombatSystem` e os métodos `takeDamage` das entidades.
+
+3. Habilidades são configuradas em `shared/skills/skillsConfig.js`:
+   - ID 1: FIREBALL (Bola de Fogo) - Tipo projétil
+   - ID 2: TELEPORT (Teleporte) - Tipo mobilidade
+   - ID 3: FROST_SPIKES (Estacas de Gelo) - Tipo área
+   - ID 4: METEOR_STORM (Chuva de Meteoros) - Tipo zona
+
+4. A morte do jogador resulta em perda de todo progresso (XP e nível) e respawn no ponto inicial.
+
+## Sistema de Rede
+
+1. Eventos para o sistema de combate:
+   - `player:useAbility` (cliente → servidor)
+   - `player:abilityUsed` (servidor → cliente)
+   - `combat:damageDealt` (servidor → cliente)
+   - `combat:floatingText` (servidor → cliente)
+   - `player:death` (servidor → cliente)
+   - `player:respawn` (servidor → cliente)
+
+2. O servidor é a única fonte de verdade para o estado do jogo. O cliente envia apenas intenções/comandos.
+
+## Convenções de Implementação
+
+1. Presenters no cliente são acessados com métodos consistentes:
+   - `playerPresenter.getPlayer(id)` - Retorna o mesh de um jogador
+   - `monsterPresenter.getMonster(id)` - Retorna o mesh de um monstro
+
+2. Quando mexer no sistema de combate, verificar a integração completa:
+   - Processamento no servidor (`CombatSystem`)
+   - Aplicação de dano (`takeDamage` nas entidades)
+   - Emissão de eventos (`COMBAT.DAMAGE_DEALT`, etc.)
+   - Processamento visual no cliente (`FloatingTextManager`)
+
+3. Quando implementar novas habilidades, seguir o padrão existente e garantir que todas as camadas estejam implementadas de forma consistente.
+
+## Outras Convenções
+
+[...Manter o conteúdo existente...] 

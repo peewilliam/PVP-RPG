@@ -1,0 +1,221 @@
+import { v4 as uuidv4 } from 'uuid';
+import { Player } from './Player.js';
+import { Monster } from './Monster.js';
+
+/**
+ * Gerenciador de entidades que controla todas as entidades do jogo
+ */
+export class EntityManager {
+  constructor() {
+    this.entities = new Map(); // Map de ID -> Entidade
+    this.players = new Map();  // Map de ID -> Player (para acesso rápido)
+    this.monsters = new Map(); // Map de ID -> Monster (para acesso rápido)
+    this.worldObjects = new Map(); // Map de ID -> WorldObject (futuro)
+  }
+  
+  /**
+   * Cria e adiciona um novo jogador ao gerenciador
+   * @param {Object} channel - Canal de comunicação geckos.io
+   * @param {Object} position - Posição inicial do jogador
+   * @returns {Player} - Instância do jogador criado
+   */
+  createPlayer(channel, position = { x: 0, y: 0, z: 0 }) {
+    const id = channel.id.toString();
+    
+    // Verifica se o jogador já existe
+    if (this.players.has(id)) {
+      return this.players.get(id);
+    }
+    
+    // Cria o jogador
+    const player = new Player(id, channel, position);
+    
+    // Adiciona às coleções
+    this.entities.set(id, player);
+    this.players.set(id, player);
+    
+    return player;
+  }
+  
+  /**
+   * Cria e adiciona um novo monstro ao gerenciador
+   * @param {string} type - Tipo do monstro (ex: 'GOBLIN')
+   * @param {Object} position - Posição inicial do monstro
+   * @param {number} level - Nível do monstro
+   * @returns {Monster} - Instância do monstro criado
+   */
+  createMonster(type, position = { x: 0, y: 0, z: 0 }, level = 1) {
+    const id = `monster-${uuidv4()}`;
+    
+    // Cria o monstro
+    const monster = new Monster(id, type, position, level);
+    
+    // Adiciona às coleções
+    this.entities.set(id, monster);
+    this.monsters.set(id, monster);
+    
+    return monster;
+  }
+  
+  /**
+   * Remove uma entidade do gerenciador
+   * @param {string} id - ID da entidade a remover
+   * @returns {boolean} - true se a entidade foi removida, false caso contrário
+   */
+  removeEntity(id) {
+    const entity = this.entities.get(id);
+    
+    if (!entity) return false;
+    
+    // Verifica se é um monstro e notifica o mundo do jogo
+    // Este bloco não é necessário se o monstro já chama gameWorld.monsterDied no método die()
+    /*
+    if (entity.type === 'monster' && entity.active === false && global.gameWorld) {
+      // Evita duplicidade de chamadas se já foi removido pelo método die()
+      // Apenas como fallback caso algum monstro seja removido sem chamar die()
+      global.gameWorld.monsterDied(id);
+    }
+    */
+    
+    // Remove das coleções apropriadas
+    this.entities.delete(id);
+    
+    if (entity.type === 'player') {
+      this.players.delete(id);
+    } else if (entity.type === 'monster') {
+      this.monsters.delete(id);
+    } else if (entity.type === 'worldObject') {
+      this.worldObjects.delete(id);
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Obtém uma entidade pelo ID
+   * @param {string} id - ID da entidade
+   * @returns {Entity|null} - Entidade encontrada ou null
+   */
+  getEntity(id) {
+    return this.entities.get(id) || null;
+  }
+  
+  /**
+   * Obtém um jogador pelo ID
+   * @param {string} id - ID do jogador
+   * @returns {Player|null} - Jogador encontrado ou null
+   */
+  getPlayer(id) {
+    return this.players.get(id) || null;
+  }
+  
+  /**
+   * Obtém um monstro pelo ID
+   * @param {string} id - ID do monstro
+   * @returns {Monster|null} - Monstro encontrado ou null
+   */
+  getMonster(id) {
+    return this.monsters.get(id) || null;
+  }
+  
+  /**
+   * Atualiza todas as entidades
+   * @param {number} deltaTime - Tempo desde a última atualização
+   */
+  update(deltaTime) {
+    // Converte jogadores para array para uso na IA dos monstros
+    const playersArray = Array.from(this.players.values());
+    
+    // Atualiza os monstros com a lista de jogadores para IA
+    for (const monster of this.monsters.values()) {
+      if (monster.active) {
+        monster.update(deltaTime, playersArray);
+      }
+    }
+    
+    // Atualiza os jogadores
+    for (const player of this.players.values()) {
+      if (player.active) {
+        player.update(deltaTime);
+      }
+    }
+    
+    // Atualiza outros objetos do mundo (futuro)
+    for (const worldObject of this.worldObjects.values()) {
+      if (worldObject.active) {
+        worldObject.update(deltaTime);
+      }
+    }
+  }
+  
+  /**
+   * Obtém todas as entidades serializadas para envio ao cliente
+   * @returns {Array} - Array de entidades serializadas
+   */
+  getSerializedEntities() {
+    const serialized = [];
+    
+    for (const entity of this.entities.values()) {
+      if (entity.active) {
+        serialized.push(entity.serialize());
+      }
+    }
+    
+    return serialized;
+  }
+  
+  /**
+   * Obtém todos os jogadores serializados para envio ao cliente
+   * @returns {Array} - Array de jogadores serializados
+   */
+  getSerializedPlayers() {
+    const serialized = [];
+    
+    for (const player of this.players.values()) {
+      if (player.active) {
+        serialized.push(player.serialize());
+      }
+    }
+    
+    return serialized;
+  }
+  
+  /**
+   * Obtém todos os monstros serializados para envio ao cliente
+   * @returns {Array} - Array de monstros serializados
+   */
+  getSerializedMonsters() {
+    const serialized = [];
+    
+    for (const monster of this.monsters.values()) {
+      if (monster.active) {
+        serialized.push(monster.serialize());
+      }
+    }
+    
+    return serialized;
+  }
+  
+  /**
+   * Verifica se há colisão entre entidades
+   * @param {Entity} entity - Entidade para verificar colisão
+   * @param {number} radius - Raio de colisão
+   * @returns {Entity|null} - Entidade colidindo ou null
+   */
+  checkCollision(entity, radius = 1) {
+    for (const other of this.entities.values()) {
+      // Não verifica colisão com a própria entidade ou entidades inativas
+      if (other.id === entity.id || !other.active) continue;
+      
+      // Verifica distância entre entidades
+      const distance = entity.distanceTo(other);
+      
+      // Se a distância for menor que o raio, há colisão
+      if (distance < radius) {
+        return other;
+      }
+    }
+    
+    return null;
+  }
+} 

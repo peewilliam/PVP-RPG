@@ -1,7 +1,7 @@
 // Arquivo principal do servidor
 import geckos from '@geckos.io/server';
-import { v4 as uuidv4 } from 'uuid';
-import { SERVER, EVENTS } from '../../shared/constants/gameConstants.js';
+import { SERVER, EVENTS, WORLD } from '../../shared/constants/gameConstants.js';
+import { GameWorld } from './models/GameWorld.js';
 
 // Inicializa o servidor geckos.io com configurações para desenvolvimento
 const io = geckos({
@@ -12,50 +12,62 @@ const io = geckos({
   }
 });
 
-// Lista de jogadores conectados
-const connectedPlayers = new Map();
+// Inicializa o mundo do jogo
+const gameWorld = new GameWorld();
+
+// Define a referência global para o GameWorld para ser acessada por outras classes
+global.gameWorld = gameWorld;
 
 // Inicia o servidor na porta configurada
 io.listen(SERVER.PORT);
 
 console.log(`Servidor iniciado na porta ${SERVER.PORT}`);
 
+// Inicializa o mundo com objetos e áreas de spawn
+gameWorld.initialize();
+
 // Gerenciamento de conexões
 io.onConnection(channel => {
   try {
-    // Gera ID único para o jogador
-    const playerId = uuidv4();
+    console.log(`Novo jogador conectado: ${channel.id}`);
     
-    console.log(`Novo jogador conectado: ${playerId}`);
-    
-    // Adiciona jogador à lista de conectados
-    const newPlayer = {
-      id: playerId,
-      position: { x: 0, y: 0, z: 0 },
-      rotation: 0,
-      channel
-    };
-    
-    connectedPlayers.set(channel.id, newPlayer);
+    // Adiciona jogador ao mundo do jogo
+    const player = gameWorld.addPlayer(channel);
     
     // Envia ID para o cliente
-    channel.emit(EVENTS.PLAYER.INIT, { id: playerId });
+    channel.emit(EVENTS.PLAYER.INIT, { id: player.id });
+    
+    // Envia informações sobre objetos do mundo para o novo jogador
+    channel.emit(EVENTS.WORLD.INIT, {
+      worldObjects: gameWorld.getSerializedWorldObjects(),
+      monsters: gameWorld.getSerializedMonsters()
+    });
     
     // Informa outros jogadores sobre o novo jogador que entrou
-    for (const [id, p] of connectedPlayers.entries()) {
-      if (id !== channel.id) {
+    // e envia informações sobre jogadores existentes para o novo jogador
+    const allPlayers = gameWorld.getSerializedPlayers();
+    
+    for (const p of allPlayers) {
+      if (p.id !== player.id) {
         // Notifica os outros jogadores sobre o novo jogador
-        p.channel.emit(EVENTS.PLAYER.JOINED, {
-          id: playerId,
-          position: newPlayer.position,
-          rotation: newPlayer.rotation
-        });
+        const otherPlayer = gameWorld.entityManager.getPlayer(p.id);
+        if (otherPlayer && otherPlayer.channel) {
+          otherPlayer.channel.emit(EVENTS.PLAYER.JOINED, {
+            id: player.id,
+            position: player.position,
+            rotation: player.rotation,
+            stats: player.stats,
+            level: player.level
+          });
+        }
         
         // Envia informações sobre jogadores existentes para o novo jogador
         channel.emit(EVENTS.PLAYER.EXISTING, {
           id: p.id,
           position: p.position,
-          rotation: p.rotation
+          rotation: p.rotation,
+          stats: p.stats,
+          level: p.level
         });
       }
     }
@@ -63,10 +75,13 @@ io.onConnection(channel => {
     // Gerencia desconexão
     channel.onDisconnect(() => {
       try {
-        console.log(`Jogador desconectado: ${playerId}`);
-        connectedPlayers.delete(channel.id);
+        console.log(`Jogador desconectado: ${player.id}`);
+        
+        // Remove o jogador do mundo
+        gameWorld.removePlayer(player.id);
+        
         // Notifica outros jogadores sobre a desconexão
-        io.emit(EVENTS.PLAYER.DISCONNECTED, { id: playerId });
+        io.emit(EVENTS.PLAYER.DISCONNECTED, { id: player.id });
       } catch (error) {
         console.error('Erro no tratamento de desconexão:', error);
       }
@@ -81,150 +96,113 @@ io.onConnection(channel => {
           return;
         }
         
-        // Recupera o jogador do mapa de jogadores conectados
-        const player = connectedPlayers.get(channel.id);
-        if (player) {
-          // Processa os comandos de movimento
-          const input = data.input;
-          const speed = 0.1; // Velocidade de movimento
-          let moved = false;
-          let directionX = 0;
-          let directionZ = 0;
-          
-          // Verifica se o movimento é relativo à câmera isométrica
-          if (data.isRelativeToCamera) {
-            // Movimento relativo à câmera isométrica
-            
-            // Em uma visão isométrica típica:
-            // - Forward (W): mover na direção (x-1, z-1)
-            // - Backward (S): mover na direção (x+1, z+1)
-            // - Left (A): mover na direção (x-1, z+1)
-            // - Right (D): mover na direção (x+1, z-1)
-            
-            if (input.forward) {
-              player.position.x -= speed * 0.7; // Ajustado para manter a mesma velocidade total
-              player.position.z -= speed * 0.7;
-              directionX -= 1;
-              directionZ -= 1;
-              moved = true;
-            }
-            if (input.backward) {
-              player.position.x += speed * 0.7;
-              player.position.z += speed * 0.7;
-              directionX += 1;
-              directionZ += 1;
-              moved = true;
-            }
-            if (input.left) {
-              player.position.x -= speed * 0.7;
-              player.position.z += speed * 0.7;
-              directionX -= 1;
-              directionZ += 1;
-              moved = true;
-            }
-            if (input.right) {
-              player.position.x += speed * 0.7;
-              player.position.z -= speed * 0.7;
-              directionX += 1;
-              directionZ -= 1;
-              moved = true;
-            }
-          } else {
-            // Movimento absoluto no mundo (antigo sistema)
-            if (input.up) {
-              player.position.z -= speed;
-              directionZ -= 1;
-              moved = true;
-            }
-            if (input.down) {
-              player.position.z += speed;
-              directionZ += 1;
-              moved = true;
-            }
-            if (input.left) {
-              player.position.x -= speed;
-              directionX -= 1;
-              moved = true;
-            }
-            if (input.right) {
-              player.position.x += speed;
-              directionX += 1;
-              moved = true;
-            }
-          }
-          
-          // Se o jogador se moveu, atualizamos a rotação e emitimos a nova posição/rotação
-          if (moved) {
-            // Calcular a rotação baseada na direção do movimento
-            let rotation = calculateRotation(directionX, directionZ);
-            
-            // Atualiza a rotação do jogador
-            player.rotation = rotation;
-            
-            // Aplica verificações e restrições de movimento (ex: colisões) - a ser implementado
-            
-            // Cria mensagem com nova posição e rotação
-            const updateMessage = {
-              id: player.id,
-              position: player.position,
-              rotation: player.rotation
-            };
-            
-            // Envia para o jogador que se moveu
-            channel.emit(EVENTS.PLAYER.MOVED, updateMessage);
-            
-            // Propaga o movimento para outros jogadores
-            for (const [id, p] of connectedPlayers.entries()) {
-              if (id !== channel.id) {
-                p.channel.emit(EVENTS.PLAYER.MOVED, updateMessage);
-              }
-            }
-          }
+        // Recupera o jogador do mundo
+        const player = gameWorld.entityManager.getPlayer(channel.id);
+        
+        if (!player) {
+          console.error(`Jogador não encontrado para ID: ${channel.id}`);
+          return;
         }
+        
+        // Atualiza o estado de movimento do jogador com base nos inputs
+        player.movementState.forward = data.input.forward || false;
+        player.movementState.backward = data.input.backward || false;
+        player.movementState.left = data.input.left || false;
+        player.movementState.right = data.input.right || false;
+        
+        // O movimento será processado no próximo update do loop do jogo
+        // e a rotação será calculada automaticamente com base na direção
       } catch (error) {
         console.error('Erro no tratamento de movimento:', error);
       }
     });
     
-    // Função para calcular a rotação baseada na direção do movimento
-    function calculateRotation(directionX, directionZ) {
-      // Se não há movimento, mantém a rotação atual
-      if (directionX === 0 && directionZ === 0) {
-        return 0;
+    // Processa uso de habilidades (action)
+    channel.on(EVENTS.PLAYER.USE_ABILITY, data => {
+      try {
+        if (!data || !data.abilityId || !data.targetPosition) {
+          console.error('Dados de habilidade inválidos:', data);
+          return;
+        }
+        
+        const player = gameWorld.entityManager.getPlayer(channel.id);
+        if (!player) return;
+        
+        const ability = player.getAbilityById(data.abilityId);
+        if (!ability) return;
+        
+        // Verifica cooldown e mana no método useAbility
+        if (!player.useAbility(data.abilityId, data.targetPosition)) {
+          return; // Se não puder usar a habilidade, retorna
+        }
+        
+        // Processa a habilidade usando o sistema de combate
+        const result = gameWorld.processAbilityUse(player, data.abilityId, data.targetPosition);
+        
+        // Se a habilidade não teve sucesso, retorna
+        if (!result.success) return;
+        
+        // Notifica o cliente que a habilidade foi usada
+        channel.emit(EVENTS.PLAYER.ABILITY_USED, {
+          abilityId: data.abilityId,
+          position: player.position,
+          targetPosition: data.targetPosition,
+          teleport: result.teleportPosition ? true : false,
+          teleportPosition: result.teleportPosition,
+          areaEffect: result.areaEffect
+        });
+        
+        // Notifica outros jogadores sobre a habilidade usada
+        for (const otherPlayer of gameWorld.entityManager.players.values()) {
+          if (otherPlayer.id !== player.id && otherPlayer.channel && 
+              otherPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE) {
+            otherPlayer.channel.emit(EVENTS.PLAYER.ABILITY_USED, {
+              playerId: player.id,
+              abilityId: data.abilityId,
+              position: player.position,
+              targetPosition: data.targetPosition,
+              teleport: result.teleportPosition ? true : false,
+              teleportPosition: result.teleportPosition,
+              areaEffect: result.areaEffect
+            });
+          }
+        }
+        
+        // Envia resultados do combate para todos os jogadores próximos
+        if (result.hits && result.hits.length > 0) {
+          for (const hit of result.hits) {
+            // Envia informações sobre o hit para jogadores na área
+            for (const nearbyPlayer of gameWorld.entityManager.players.values()) {
+              if (nearbyPlayer.channel && 
+                  (nearbyPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE || 
+                   (hit.position && nearbyPlayer.distanceTo({position: hit.position}) < WORLD.SIZE.VISIBLE_RANGE))) {
+                
+                // Envia evento de dano
+                nearbyPlayer.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+                  sourceId: player.id,
+                  targetId: hit.id,
+                  targetType: hit.type,
+                  damage: hit.damage,
+                  position: hit.position,
+                  abilityId: data.abilityId
+                });
+                
+                // Envia evento de texto flutuante para mostrar dano
+                nearbyPlayer.channel.emit(EVENTS.COMBAT.FLOATING_TEXT, {
+                  text: hit.damage.toString(),
+                  position: hit.position,
+                  color: '#ff0000', // Vermelho para dano
+                  size: 1.0 + (hit.damage / 20), // Tamanho baseado no dano
+                  duration: 1000 // 1 segundo
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao processar uso de habilidade:', error);
       }
-      
-      // Mapeamento CORRIGIDO de direções para ângulos de rotação em radianos
-      // Em visão isométrica:
-      
-      if (directionX < 0 && directionZ < 0) {
-        // W: Movendo para frente/cima na isométrica (Noroeste)
-        return Math.PI * 1.25; // Aponta para SE (oposto a NW)
-      } else if (directionX > 0 && directionZ > 0) {
-        // S: Movendo para trás/baixo na isométrica (Sudeste)
-        return Math.PI * 0.25; // Aponta para NW (oposto a SE)
-      } else if (directionX < 0 && directionZ > 0) {
-        // A: Movendo para esquerda na isométrica (Sudoeste)
-        return Math.PI * 1.75; // Aponta para NE (oposto a SW)
-      } else if (directionX > 0 && directionZ < 0) {
-        // D: Movendo para direita na isométrica (Nordeste)
-        return Math.PI * 0.75; // Aponta para SW (oposto a NE)
-      } else if (directionX === 0 && directionZ < 0) {
-        // W+D: Movendo para Norte
-        return Math.PI * 1.0; // Aponta para Sul (oposto)
-      } else if (directionX < 0 && directionZ === 0) {
-        // W+A: Movendo para Oeste
-        return Math.PI * 1.5; // Aponta para Leste (oposto)
-      } else if (directionX === 0 && directionZ > 0) {
-        // S+A: Movendo para Sul
-        return Math.PI * 0.0; // Aponta para Norte (oposto)
-      } else if (directionX > 0 && directionZ === 0) {
-        // S+D: Movendo para Leste
-        return Math.PI * 0.5; // Aponta para Oeste (oposto)
-      }
-      
-      // Caso padrão (não deveria chegar aqui)
-      return 0;
-    }
+    });
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
   }
@@ -240,12 +218,92 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Promessa rejeitada não tratada:', reason);
 });
 
-// Loop básico do jogo (20 ticks por segundo)
+// Função para enviar atualizações aos clientes
+function broadcastUpdates() {
+  try {
+    // Serializa o estado atual de todos os jogadores para envio eficiente
+    const serializedPlayers = {};
+    
+    // Pré-serializa todos os jogadores para evitar fazer isso várias vezes
+    for (const player of gameWorld.entityManager.players.values()) {
+      if (player.active) {
+        serializedPlayers[player.id] = {
+          id: player.id,
+          position: { ...player.position },
+          rotation: player.rotation,
+          stats: { ...player.stats }
+        };
+      }
+    }
+    
+    // Para cada jogador, envia as atualizações relevantes
+    for (const player of gameWorld.entityManager.players.values()) {
+      if (!player.active || !player.channel) continue;
+      
+      // Envia a posição atualizada do próprio jogador
+      player.channel.emit(EVENTS.PLAYER.MOVED, serializedPlayers[player.id]);
+      
+      // Envia posições de outros jogadores
+      for (const otherPlayerId in serializedPlayers) {
+        if (otherPlayerId !== player.id) {
+          player.channel.emit(EVENTS.PLAYER.MOVED, serializedPlayers[otherPlayerId]);
+        }
+      }
+      
+      // Envia atualizações de entidades próximas (monstros e objetos do mundo)
+      const nearbyMonsters = [];
+      const nearbyWorldObjects = [];
+      
+      // Coleta monstros próximos
+      for (const monster of gameWorld.entityManager.monsters.values()) {
+        if (monster.active && player.distanceTo(monster) < 30) {
+          nearbyMonsters.push(monster.serialize());
+        }
+      }
+      
+      // Coleta objetos do mundo próximos
+      for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
+        if (worldObject.active && player.distanceTo(worldObject) < 40) {
+          nearbyWorldObjects.push(worldObject.serialize());
+        }
+      }
+      
+      // Envia atualização do mundo se houver entidades para enviar
+      if (nearbyMonsters.length > 0 || nearbyWorldObjects.length > 0) {
+        player.channel.emit(EVENTS.WORLD.UPDATE, {
+          monsters: nearbyMonsters,
+          worldObjects: nearbyWorldObjects
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao enviar atualizações:', error);
+  }
+}
+
+// Loop do jogo (20 ticks por segundo)
+const TICK_RATE = SERVER.TICK_RATE;
 setInterval(() => {
   try {
-    // Implementação futura: lógica de jogo como movimentação de monstros, 
-    // verificação de colisão, combate, etc.
+    // Atualiza o mundo do jogo
+    gameWorld.update();
+    
+    // Envia atualizações aos clientes
+    broadcastUpdates();
   } catch (error) {
     console.error('Erro no loop do jogo:', error);
   }
-}, SERVER.TICK_RATE); 
+}, TICK_RATE);
+
+// Limpeza adequada ao encerrar o servidor
+process.on('SIGINT', () => {
+  console.log('Encerrando servidor...');
+  gameWorld.cleanup();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('Encerrando servidor...');
+  gameWorld.cleanup();
+  process.exit(0);
+}); 

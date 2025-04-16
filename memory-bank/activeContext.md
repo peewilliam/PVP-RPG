@@ -2,79 +2,102 @@
 
 ## Foco de Trabalho Atual
 Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
-1. ✅ Estabelecer a estrutura básica do projeto
-2. ✅ Configurar a comunicação cliente-servidor usando geckos.io
-3. ✅ Implementar o sistema básico de movimentação do personagem (servidor autoritativo)
-4. ✅ Criar o ambiente visual básico com Three.js
-5. ✅ Implementar sincronização inicial de jogadores entre clientes
+1. ✅ Estrutura básica do projeto e comunicação cliente-servidor
+2. ✅ Sincronização e movimentação autoritativa de jogadores
+3. ✅ Renderização isométrica e arquitetura MCP
+4. ✅ Sincronização e renderização de monstros e objetos do mundo
+5. ✅ Sistema de colisão robusto
+6. ✅ Organização do mundo em biomas distintos (SPAWN, FOREST_NORTH, FOREST_WEST, MOUNTAINS, PLAINS, SWAMP, RUINS)
+7. ✅ Aumento do mundo para 200x200 unidades
+8. ✅ Objetos do mundo limitados a árvores, rochas e arbustos (casas/cercas removidas temporariamente)
+9. ✅ Estruturas especiais desativadas temporariamente
+10. ✅ Spawns de monstros distribuídos por bioma, com diferentes níveis e quantidades
+11. ✅ Sistema de FPS e ping na UI do cliente
+12. 🚧 Próximo passo: sistema de combate
 
 ## Mudanças Recentes
-- ✅ Definição inicial dos requisitos do projeto
-- ✅ Configuração do Memory Bank para documentação do projeto
-- ✅ Criação da estrutura de diretórios cliente/servidor
-- ✅ Inicialização do projeto NPM e configuração do package.json
-- ✅ Implementação básica do servidor com geckos.io
-- ✅ Implementação básica do cliente com Three.js
-- ✅ Correção da arquitetura de movimentação para seguir o padrão MCP (servidor autoritativo)
-- ✅ Implementação de eventos específicos para novos jogadores e jogadores existentes
-- ✅ Correção de bugs na comunicação cliente-servidor
-- ✅ Implementação da rotação do personagem baseada no movimento WASD
-- ✅ Implementação de movimentação relativa à orientação da câmera isométrica
-- ✅ Correção dos ângulos de rotação para visão isométrica
-- ✅ Melhorias nos indicadores visuais de direção dos personagens
-- ✅ Correção do alinhamento entre movimentação e rotação
-- ✅ Movimentação do cálculo de rotação para o servidor (servidor totalmente autoritativo)
-- ✅ Correção final da rotação para que o personagem aponte na direção oposta ao movimento
+- ✅ Organização dos biomas e distribuição de objetos por região
+- ✅ Remoção temporária de casas e cercas
+- ✅ Estruturas especiais desativadas
+- ✅ Sistema de spawn de monstros revisado e distribuído
+- ✅ FPS e ping adicionados à interface do cliente
 
 ## Próximos Passos
-1. **Instalação de Dependências**:
-   - Executar `npm install` para instalar todas as dependências necessárias
-
-2. **Aprimoramento do Servidor**:
-   - ✅ Implementar lógica de movimento no servidor
-   - ✅ Implementar sincronização de jogadores entre clientes
-   - Implementar classes Model para entidades (Player, Monster)
-   - Desenvolver sistema de colisão básico
-   - Implementar lógica de spawn de monstros
-
-3. **Aprimoramento do Cliente**:
-   - Melhorar a câmera isométrica
-   - ✅ Implementar rotação do personagem com o mouse
-   - Adicionar elementos visuais básicos (árvores, rochas)
-
-4. **Implementação de Habilidades**:
-   - Criar sistema básico de habilidades no servidor
-   - Implementar interface para habilidades no cliente
-   - Desenvolver efeitos visuais para habilidades
-
-5. **Sistema de Combate**:
-   - Implementar lógica de combate no servidor
-   - Desenvolver sistema de dano e morte
-   - Implementar sistema de XP e nível
+- Implementar sistema de combate (dano, morte, XP)
+- Reavaliar retorno de casas/cercas e estruturas especiais
+- Adicionar novos tipos de monstros e desafios
+- Melhorar feedback visual e efeitos
 
 ## Decisões e Considerações Ativas
+- Mundo grande, explorável, com biomas distintos
+- Objetos do mundo não se sobrepõem (verificação de colisão)
+- Spawns de monstros balanceados por região
+- Interface do cliente com feedback de performance (FPS/ping)
+- Estruturas especiais podem ser reativadas conforme evolução do gameplay 
 
-### Arquitetura
-- **Padrão MCP**: Estrutura inicial implementada com separação clara entre servidor e cliente.
-- **Sincronização de Estado**: ✅ Implementada arquitetura autoritativa onde o servidor controla toda a lógica do jogo e o cliente apenas envia comandos e renderiza o estado.
-- **Validação de Dados**: Adicionado tratamento de erros e validação de dados em todas as comunicações.
-- **Eventos Específicos**: Criados eventos específicos (JOINED, EXISTING) para lidar com a sincronização inicial de jogadores.
-- **Rotação com WASD**: ✅ Implementada rotação baseada na direção do movimento WASD, com ângulos alinhados à perspectiva da câmera isométrica. Cálculo de rotação foi movido para o servidor para garantir consistência.
+# Contexto Ativo do PVP-RPG
 
-### Tecnologia
-- **ESM vs CJS**: Configurado para usar ESM conforme definido nos requisitos.
-- **Câmera Isométrica**: Implementada usando THREE.OrthographicCamera.
-- **Geckos.io**: Implementada comunicação client-servidor resiliente, com tratamento adequado de erros.
-- **Three.js Raycasting**: Utilizado para calcular a interseção do mouse com o mundo 3D.
+## Trabalho Atual
 
-### Gameplay
-- **Movimentação**: ✅ Implementada arquitetura autoritativa onde o cliente envia comandos e o servidor processa e atualiza as posições. Movimentação é relativa à câmera isométrica.
-- **Representação Visual**: Temporariamente usando cubos para representar jogadores, com indicadores de direção em forma de cone.
-- **Multi-jogador**: ✅ Implementada sincronização de jogadores para visualização mútua.
-- **Rotação**: ✅ Implementada rotação do personagem baseada na direção do movimento, com abordagem onde o personagem aponta na direção oposta ao movimento para corresponder à convenção esperada na visão isométrica.
+Estamos implementando um sistema de combate completo para o jogo, que permite aos jogadores usar habilidades (slots 1-4) para atacar monstros e outros jogadores. O sistema inclui:
 
-### Desenvolvimento
-- Estrutura de arquivos organizada conforme padrões definidos
-- Sistema de comunicação cliente-servidor implementado usando geckos.io
-- Interface básica de usuário preparada com slots para habilidades e barras de status
-- Implementado sistema robusto de tratamento de erros para evitar crashes 
+1. **Sistema de Combate no Servidor**: 
+   - `CombatSystem.js` gerencia todas as interações de combate
+   - Suporta combate PvE (jogador vs. monstros) e PvP (jogador vs. jogador)
+   - Calcula dano baseado nos stats dos personagens
+
+2. **Habilidades Implementadas**:
+   - **Bola de Fogo** (ID: 1): Projétil que causa dano direto e em área
+   - **Teleporte** (ID: 2): Permite o jogador se teleportar instantaneamente
+   - **Estacas de Gelo** (ID: 3): Ataque em área que causa dano e aplicaria lentidão
+   - **Chuva de Meteoros** (ID: 4): Ataque em área contínuo com múltiplos meteoros
+
+3. **Feedback Visual**:
+   - Textos flutuantes para mostrar dano
+   - Efeitos visuais para cada habilidade
+   - Feedback visual de morte e respawn
+
+## Problemas Atuais
+
+1. **Dano das Habilidades**: As habilidades estão ativando e mostrando efeitos visuais, mas não estão causando dano nos alvos. Precisamos verificar a lógica no servidor que processa o dano.
+
+2. **Interação com o CombatSystem**: O servidor está recebendo e processando o uso de habilidades, mas parece que há um problema na aplicação do dano aos alvos.
+
+## Próximos Passos
+
+1. **Corrigir Sistema de Dano**: 
+   - Verificar se o resultado do `processAbilityUse` no `CombatSystem` está sendo corretamente aplicado
+   - Confirmar se os eventos `COMBAT.DAMAGE_DEALT` estão sendo emitidos para os clientes
+
+2. **Melhorar Feedback de Habilidades**:
+   - Adicionar efeitos visuais mais detalhados para cada habilidade
+   - Implementar indicadores visuais de dano crítico
+
+3. **Balanceamento**:
+   - Ajustar valores de dano, cooldown e custo de mana para melhor balanceamento
+
+4. **Implementar Sistema de Morte e Respawn**:
+   - Quando um jogador morre, ele perde todo seu XP e nível, e respawna no ponto inicial
+   - Adicionar animação e efeitos visuais para morte e respawn
+
+## Componentes Principais
+
+- `server/src/systems/CombatSystem.js`: Sistema principal de combate
+- `server/src/models/Player.js`: Implementa `takeDamage` e `resetAfterDeath`
+- `client/src/effects/FloatingTextManager.js`: Gerencia textos flutuantes de dano
+- `client/src/skills/SkillManager.js`: Gerencia as habilidades no cliente
+- `shared/skills/skillsConfig.js`: Configuração de todas as habilidades
+
+## Decisões Recentes
+
+1. Decidimos implementar um sistema de combate baseado em habilidades, onde o jogador seleciona um alvo com o mouse e usa habilidades com as teclas 1-4.
+
+2. O sistema suporta tanto PvE quanto PvP, com diferentes multiplicadores de dano para balanceamento.
+
+3. Implementamos um sistema de textos flutuantes para feedback visual de dano.
+
+4. O teleporte foi implementado como um caso especial que move o jogador instantaneamente.
+
+5. Implementamos efeitos visuais para habilidades de área (Estacas de Gelo e Chuva de Meteoros).
+
+6. Corrigimos problemas de referência e implementação para que as habilidades possam ser usadas, mas ainda falta resolver o problema do dano não ser aplicado aos alvos. 

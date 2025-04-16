@@ -1,5 +1,34 @@
 # Regras e Convenções do Projeto MMORPG Topdown Isométrico
 
+## Organização do Mundo
+- O mundo possui 200x200 unidades, dividido em biomas: SPAWN, FOREST_NORTH, FOREST_WEST, MOUNTAINS, PLAINS, SWAMP, RUINS
+- Cada bioma tem densidade e escala própria para árvores, rochas e arbustos
+- Objetos do mundo não se sobrepõem (verificação de colisão na geração)
+- Casas, cercas e estruturas especiais estão removidas temporariamente
+
+## Spawns de Monstros
+- Áreas de spawn distribuídas por bioma, com diferentes quantidades, níveis e tempos de respawn
+- Apenas goblins implementados no momento
+- Respawn automático e balanceado por região
+
+## Interface do Cliente
+- Exibe FPS e ping em tempo real no canto superior esquerdo
+
+## Sistema de Colisão
+- Implementado para evitar sobreposição de objetos do mundo
+- Cada entidade possui raio de colisão específico
+
+## Arquitetura
+- MCP (Model-Controller-Presenter) consolidado
+- Sincronização eficiente de entidades próximas ao jogador
+- Cliente envia comandos, servidor executa lógica
+
+## Próximos Passos
+- Implementar sistema de combate (dano, morte, XP)
+- Reavaliar retorno de casas/cercas e estruturas especiais
+- Adicionar novos tipos de monstros
+- Melhorar feedback visual e efeitos
+
 ## Padrões de Comunicação
 
 ### Eventos de Rede
@@ -15,6 +44,13 @@
    - Cliente envia comandos (não posições) via `player:move`
    - Servidor atualiza posição, calcula rotação e notifica todos via `player:moved`
 5. **Desconexão**: Servidor notifica todos via `player:disconnected`
+
+### Sincronização de Entidades do Mundo
+1. **Inicialização do Mundo**: Servidor envia todos os objetos do mundo e monstros via `world:init`
+2. **Atualizações do Mundo**: Servidor envia apenas entidades próximas ao jogador via `world:update`
+3. **Processamento de Entidades**: Cliente usa presenters específicos para cada tipo de entidade:
+   - `MonsterPresenter` para monstros
+   - `WorldObjectPresenter` para objetos do mundo
 
 ## Padrões de Arquitetura
 
@@ -49,7 +85,14 @@
 
 ### Renderização com Three.js
 - Câmera isométrica usando OrthographicCamera
-- Objetos temporários são representados como cubos coloridos
+- Cada tipo de entidade possui sua própria representação visual:
+  - Jogadores: cubos azuis com cone verde indicando direção
+  - Monstros: cubos vermelhos com cone laranja indicando direção
+  - Árvores: cilindro marrom (tronco) com cone verde (copa)
+  - Rochas: esfera irregular cinza
+  - Arbustos: esfera verde
+  - Casas: cubo com telhado triangular
+  - Cercas: caixa fina e comprida
 - A câmera segue o jogador mantendo vista isométrica
 
 ### Movimento
@@ -65,18 +108,44 @@
 ### Rotação
 - Rotação do personagem é calculada pelo servidor com base na direção do movimento
 - A direção de movimento determina o ângulo de rotação em incrementos de 45 graus (8 direções)
-- Em visão isométrica, os ângulos de rotação são ajustados para corresponder visualmente à direção do movimento:
-  - W (frente): rotação para diagonal superior-direita (1.75π radianos) - Noroeste
-  - S (trás): rotação para diagonal inferior-esquerda (0.75π radianos) - Sudeste
-  - A (esquerda): rotação para diagonal superior-esquerda (1.25π radianos) - Sudoeste
-  - D (direita): rotação para diagonal inferior-direita (0.25π radianos) - Nordeste
-  - W+D: rotação para cima (0 radianos) - Norte
-  - W+A: rotação para esquerda (1.5π radianos) - Oeste
-  - S+D: rotação para direita (0.5π radianos) - Leste
-  - S+A: rotação para baixo (1.0π radianos) - Sul
+- Em visão isométrica, os ângulos de rotação são ajustados para que o personagem aponte na direção oposta ao movimento:
+  - W (frente): mover para Noroeste, apontar para Sudeste (1.25π radianos)
+  - S (trás): mover para Sudeste, apontar para Noroeste (0.25π radianos)
+  - A (esquerda): mover para Sudoeste, apontar para Nordeste (1.75π radianos)
+  - D (direita): mover para Nordeste, apontar para Sudoeste (0.75π radianos)
+  - W+D: mover para Norte, apontar para Sul (1.0π radianos)
+  - W+A: mover para Oeste, apontar para Leste (1.5π radianos)
+  - S+D: mover para Leste, apontar para Oeste (0.5π radianos)
+  - S+A: mover para Sul, apontar para Norte (0.0π radianos)
 - O servidor envia a rotação calculada junto com a atualização de posição
 - O mouse será usado apenas para apontar habilidades, não para rotacionar o personagem
 
+### Sistema de Colisão
+- Implementado pelo `CollisionSystem` no servidor
+- Usa camadas de colisão (layers) para definir quais entidades colidem entre si
+- Matriz de colisão define interações: jogadores colidem com monstros e objetos do mundo, mas não entre si
+- Raios de colisão específicos para cada tipo de entidade:
+  - Jogadores: 0.5 unidades
+  - Monstros: 0.6 unidades
+  - Objetos do mundo: variável por tipo (árvores: 0.8, rochas: 1.2, etc.)
+- Resolução de colisão empurra entidades para fora umas das outras
+- Sistema de depuração via variável de ambiente `DEBUG_COLLISIONS`
+
+### Sistema de Spawn de Monstros
+- Gerenciado pelo `SpawnSystem` no servidor
+- Áreas de spawn têm parâmetros configuráveis:
+  - ID único da área
+  - Tipo de monstro
+  - Posição central e raio
+  - Número máximo de monstros
+  - Nível mínimo e máximo dos monstros
+  - Tempo de respawn
+- Inicialização do servidor cria imediatamente todos os monstros em todas as áreas
+- Quando um monstro morre, o método `die()` notifica o GameWorld, que agenda o respawn
+- Respawn ocorre após o tempo configurado, criando um novo monstro em posição aleatória dentro da área original
+- Sistema de segurança verifica periodicamente se o número correto de monstros está em cada área
+
 ### Sincronização de Estado
 - O loop do servidor roda a 20 ticks por segundo (50ms)
-- Atualizações de estado são enviadas apenas quando houver mudanças 
+- Atualizações de estado são enviadas apenas quando houver mudanças
+- Estado do mundo é enviado apenas para entidades próximas ao jogador (otimização) 
