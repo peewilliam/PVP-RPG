@@ -297,17 +297,17 @@ export class SpawnSystem {
       this.lastUpdateCheck = now;
       
       // Log detalhado das áreas de spawn
-      console.log('------ Status de Áreas de Spawn ------');
+      // console.log('------ Status de Áreas de Spawn ------');
       
       // Verifica se alguma área de spawn está abaixo do número máximo de monstros
       for (const spawnArea of this.spawnAreas) {
         const monstersInArea = this.countMonstersInArea(spawnArea);
-        console.log(`Área ${spawnArea.id}: ${monstersInArea}/${spawnArea.maxMonsters} monstros`);
+        // console.log(`Área ${spawnArea.id}: ${monstersInArea}/${spawnArea.maxMonsters} monstros`);
         
         if (monstersInArea < spawnArea.maxMonsters) {
           // Cria monstros faltantes
           const monstersToCreate = spawnArea.maxMonsters - monstersInArea;
-          console.log(`Criando ${monstersToCreate} monstros faltantes na área ${spawnArea.id}`);
+          // console.log(`Criando ${monstersToCreate} monstros faltantes na área ${spawnArea.id}`);
           
           for (let i = 0; i < monstersToCreate; i++) {
             // Gera uma posição aleatória dentro da área
@@ -329,12 +329,12 @@ export class SpawnSystem {
             // Adiciona metadata ao monstro para rastreamento
             monster.spawnAreaId = spawnArea.id;
             
-            console.log(`Monstro adicional criado: ${monster.id} (${spawnArea.monsterType}) em (${position.x.toFixed(2)}, ${position.z.toFixed(2)})`);
+            // console.log(`Monstro adicional criado: ${monster.id} (${spawnArea.monsterType}) em (${position.x.toFixed(2)}, ${position.z.toFixed(2)})`);
           }
         }
       }
       
-      console.log('-----------------------------------');
+      // console.log('-----------------------------------');
     }
   }
   

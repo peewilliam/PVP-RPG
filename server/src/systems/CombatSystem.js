@@ -2,6 +2,8 @@
  * Sistema de combate que gerencia interações de combate entre jogadores e monstros
  * Suporta tanto combate PvE (Player vs Environment) quanto PvP (Player vs Player)
  */
+import { WORLD, EVENTS } from '../../../shared/constants/gameConstants.js';
+
 export class CombatSystem {
   /**
    * @param {EntityManager} entityManager - Gerenciador de entidades
@@ -47,6 +49,10 @@ export class CombatSystem {
       success: true,
       hits: []
     };
+    
+    // Adicionar log para debug
+    console.log(`Processando habilidade ${ability.NAME} (ID: ${abilityId}) do jogador ${player.id}`);
+    console.log(`Parâmetros da habilidade:`, effect);
     
     // Trata cada tipo de habilidade de forma diferente
     if (ability.TYPE === 'mobility' && ability.ID === 2) { // Teleporte
@@ -102,6 +108,9 @@ export class CombatSystem {
       this._applyAreaEffect(targetPosition, effect.areaRadius, effect.damage, player, result);
     }
     
+    // Log do resultado
+    console.log(`Resultado da habilidade ${ability.NAME}:`, { hits: result.hits.length });
+    
     return result;
   }
   
@@ -136,8 +145,12 @@ export class CombatSystem {
         const damageModifier = this.damageMultipliers[source.type]?.[entityType] || 1.0;
         const damage = Math.round(effect.damage * damageModifier);
         
+        console.log(`Aplicando dano de ${damage} ao ${entityType} ${entity.id} (HP atual: ${entity.stats.hp})`);
+        
         // Aplica o dano à entidade
         const died = entity.takeDamage(damage, source);
+        
+        console.log(`Após dano: ${entityType} ${entity.id} HP: ${entity.stats.hp}, Morreu: ${died}`);
         
         // Registra o resultado do ataque
         result.hits.push({
@@ -159,6 +172,8 @@ export class CombatSystem {
    * @private
    */
   _applyAreaEffect(center, radius, baseDamage, source, result) {
+    console.log(`Aplicando efeito de área (raio: ${radius}, dano base: ${baseDamage})`);
+    
     // Verifica dano em monstros dentro da área
     this._applyAreaDamageToEntities(
       center, radius, baseDamage, source, result, 
@@ -183,6 +198,8 @@ export class CombatSystem {
    * @private
    */
   _applyAreaDamageToEntities(center, radius, baseDamage, source, result, entities, entityType) {
+    let entitiesFound = 0;
+    
     for (const entity of entities) {
       // Ignora entidades inativas, mortas ou o próprio jogador que lançou a habilidade
       if (!entity.active || entity.stats.hp <= 0 || entity.id === source.id) continue;
@@ -193,6 +210,9 @@ export class CombatSystem {
         Math.pow(entity.position.z - center.z, 2)
       );
       
+      // Debug de distância
+      entitiesFound++;
+      
       // Verifica se a entidade está dentro do raio da área
       if (dist <= radius) {
         // Dano diminui com a distância do centro (100% no centro, 50% na borda)
@@ -202,8 +222,12 @@ export class CombatSystem {
         const damageModifier = this.damageMultipliers[source.type]?.[entityType] || 1.0;
         const damage = Math.round(baseDamage * distanceFactor * damageModifier);
         
+        console.log(`Aplicando dano de área de ${damage} ao ${entityType} ${entity.id} (HP atual: ${entity.stats.hp})`);
+        
         // Aplica o dano à entidade
         const died = entity.takeDamage(damage, source);
+        
+        console.log(`Após dano de área: ${entityType} ${entity.id} HP: ${entity.stats.hp}, Morreu: ${died}`);
         
         // Registra o resultado do ataque
         result.hits.push({
@@ -215,52 +239,41 @@ export class CombatSystem {
         });
       }
     }
+    
+    console.log(`Encontradas ${entitiesFound} entidades do tipo ${entityType} na verificação de área`);
   }
   
   /**
    * Processa a morte de um jogador
    * @param {Player} player - Jogador que morreu
-   * @param {Entity} killer - Entidade que matou o jogador (opcional)
+   * @param {Entity} killer - Entidade que matou o jogador
    */
   handlePlayerDeath(player, killer) {
-    if (!player) return;
+    console.log(`Processando morte do jogador ${player.id}`);
     
-    console.log(`Jogador ${player.id} morreu${killer ? ` morto por ${killer.id} (${killer.type})` : ''}`);
-    
-    // Reinicia os atributos do jogador para os valores iniciais
+    // Reset do jogador após morte
     player.resetAfterDeath();
     
-    // Teleporta o jogador para o ponto de spawn
-    this._respawnPlayerAtSpawnPoint(player);
-    
-    // Notifica o cliente sobre o respawn
-    if (player.channel) {
-      player.channel.emit('player:respawn', {
-        position: player.position,
-        stats: player.stats,
-        level: player.level,
-        xp: player.xp
-      });
-    }
-  }
-  
-  /**
-   * Reposiciona o jogador no ponto de spawn
-   * @private
-   */
-  _respawnPlayerAtSpawnPoint(player) {
-    // Usa a zona de spawn definida nas constantes do jogo
-    const spawnZone = {
-      X_MIN: -5, X_MAX: 5,
-      Z_MIN: -5, Z_MAX: 5
-    };
-    
-    // Posição aleatória na zona de spawn
+    // Teleporta de volta para o spawn
+    const spawnZone = WORLD.ZONES.SPAWN;
     player.position.x = spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN);
     player.position.z = spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN);
     
-    // Reseta velocidade
-    player.velocity.x = 0;
-    player.velocity.z = 0;
+    // Notifica todos sobre a morte
+    if (player.channel) {
+      player.channel.emit(EVENTS.PLAYER.DEATH, {
+        id: player.id,
+        killerId: killer ? killer.id : null
+      });
+      
+      // Notifica sobre o respawn
+      setTimeout(() => {
+        player.channel.emit(EVENTS.PLAYER.RESPAWN, {
+          position: { ...player.position },
+          stats: { ...player.stats },
+          level: player.level
+        });
+      }, 2000); // 2 segundos de "tela de morte"
+    }
   }
 } 

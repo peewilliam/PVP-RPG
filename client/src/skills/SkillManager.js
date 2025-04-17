@@ -4,7 +4,7 @@ import { SKILLS } from '../../../shared/skills/skillsConfig.js';
 import { spawnFireballEffect, updateFireballProjectiles } from './FireballSkill.js';
 import { spawnIceSpikeEffect, updateIceSpikeProjectiles } from './IceSpikeSkill.js';
 import { spawnTeleportEffect } from './TeleportSkill.js';
-import { spawnLightningBoltEffect } from './LightningBoltSkill.js';
+import { spawnMeteorStormEffect } from './MeteorStormSkill.js';
 
 /**
  * Gerencia todas as habilidades do jogo no cliente
@@ -119,13 +119,20 @@ export class SkillManager {
         case 2: // TELEPORT
           return spawnTeleportEffect(origin, target, this.scene, caster, effect);
         case 3: // FROST_SPIKES
-          // Se não tiver implementação específica, cria um efeito genérico
-          this.createSimpleEffect(origin, target, 0x00ffff, caster); // Azul claro
-          return { success: true };
+          // Atualizado: Usa a nova implementação 3D detalhada da estaca de gelo
+          return spawnIceSpikeEffect(
+            origin,
+            target,
+            this.scene,
+            caster,
+            {
+              radius: SKILLS.FROST_SPIKES.AREA_RADIUS,
+              delay: SKILLS.FROST_SPIKES.DELAY,
+              spikeCount: 12 // Número de estacas a criar
+            }
+          );
         case 4: // METEOR_STORM
-          // Se não tiver implementação específica, cria um efeito genérico
-          this.createSimpleEffect(origin, target, 0xff6600, caster); // Laranja
-          return { success: true };
+          return spawnMeteorStormEffect(origin, target, this.scene, effect);
         default:
           console.warn(`Implementação visual para habilidade ID ${abilityId} não encontrada!`);
           return null;
@@ -181,5 +188,43 @@ export class SkillManager {
     };
     
     animate();
+  }
+
+  useAbility(abilityIndex) {
+    const abilityId = this.abilitiesInSlots[abilityIndex];
+    
+    if (!abilityId) {
+      console.warn(`Não há habilidade no slot ${abilityIndex + 1}`);
+      return false;
+    }
+
+    const ability = this.abilitiesConfig.find(a => a.id === abilityId);
+    
+    if (!ability) {
+      console.warn(`Configuração não encontrada para habilidade ID ${abilityId}`);
+      return false;
+    }
+
+    // Verifica se a habilidade está em cooldown
+    if (this.cooldowns[abilityIndex] > 0) {
+      console.log(`Habilidade ${ability.name} ainda está em cooldown: ${this.cooldowns[abilityIndex].toFixed(1)}s`);
+      return false;
+    }
+
+    // Verifica se o jogador tem mana suficiente
+    const currentStats = this.playerManager.getCurrentStats();
+    if (currentStats.mana < ability.mana) {
+      console.log(`Mana insuficiente para usar ${ability.name}. Necessário: ${ability.mana}, Atual: ${currentStats.mana.toFixed(1)}`);
+      return false;
+    }
+
+    // Envia evento para o servidor
+    this.socket.emit(EVENTS.PLAYER.USE_ABILITY, {
+      abilityId: abilityId,
+      targetPosition: this.getMouseTargetPosition(),
+      currentPosition: this.playerManager.getPlayerPosition()
+    });
+
+    // Define o cooldown visual (o servidor definirá o cooldown real)
   }
 } 

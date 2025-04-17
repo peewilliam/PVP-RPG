@@ -113,7 +113,7 @@ export class WorldManager {
     // Povoa cada bioma com seus objetos característicos
     for (const biomeName in this.biomes) {
       const biome = this.biomes[biomeName];
-      console.log(`Populando bioma ${biomeName}...`);
+      // console.log(`Populando bioma ${biomeName}...`);
       
       // Cria os objetos específicos deste bioma
       for (const objectType in biome.objects) {

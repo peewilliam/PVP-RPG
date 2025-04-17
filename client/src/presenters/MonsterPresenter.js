@@ -81,7 +81,7 @@ export class MonsterPresenter {
     // Armazena referência ao objeto
     this.monsters.set(id, monster);
     
-    console.log(`Monstro criado: ${id}, tipo: ${monster.userData.monsterType}`);
+    // console.log(`Monstro criado: ${id}, tipo: ${monster.userData.monsterType}`);
   }
 
   /**

@@ -192,8 +192,8 @@ io.onConnection(channel => {
                   text: hit.damage.toString(),
                   position: hit.position,
                   color: '#ff0000', // Vermelho para dano
-                  size: 1.0 + (hit.damage / 20), // Tamanho baseado no dano
-                  duration: 1000 // 1 segundo
+                  size: Math.min(0.7 + (hit.damage / 50), 1.5), // Tamanho mais controlado baseado no dano
+                  duration: 1200 // Reduzido de 1000 para 1200 ms
                 });
               }
             }

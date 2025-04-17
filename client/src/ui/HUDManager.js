@@ -215,6 +215,10 @@ export class HUDManager {
     document.getElementById('hud-mp').style.width = `${(mp / maxMp) * 100}%`;
     document.getElementById('hud-mp-text').textContent = `${mp} / ${maxMp}`;
     document.getElementById('hud-level').textContent = `${level || 1}`;
+    
+    // Atualiza o estado visual das habilidades baseado na mana atual
+    this.updateAbilityStates(mp);
+    
     // XP na borda do losango
     if (typeof xp === 'number' && typeof nextLevelXp === 'number' && nextLevelXp > 0) {
       const xpPerc = Math.min(1, xp / nextLevelXp);
@@ -367,6 +371,41 @@ export class HUDManager {
       healthText.textContent = maxHealth !== undefined 
         ? `${Math.floor(currentHealth)}/${Math.floor(maxHealth)}`
         : `${Math.floor(currentHealth)}`;
+    }
+  }
+
+  /**
+   * Atualiza o estado visual das habilidades baseado na mana disponível
+   * @param {number} currentMana - Mana atual do jogador
+   */
+  updateAbilityStates(currentMana) {
+    for (let i = 0; i < 4; i++) {
+      const abilityId = this.abilitySlots[i];
+      const ability = this.abilities.find(a => a.id === abilityId);
+      if (!ability) continue;
+      
+      const slotDiv = document.getElementById(`slot-${i + 1}`);
+      if (!slotDiv) continue;
+      
+      const iconSpan = slotDiv.querySelector('span:not(.cooldown-overlay)');
+      if (!iconSpan) continue;
+      
+      // Se está em cooldown, não altera a aparência
+      if (this.cooldowns[i] > 0) continue;
+      
+      // Verifica se tem mana suficiente
+      const hasMana = currentMana >= ability.mana;
+      
+      // Atualiza a aparência do ícone
+      if (hasMana) {
+        iconSpan.style.color = ''; // Remove qualquer estilo específico
+        iconSpan.style.opacity = '1';
+        slotDiv.style.background = '#2226';
+      } else {
+        iconSpan.style.color = '#999'; // Tom cinza
+        iconSpan.style.opacity = '0.6';
+        slotDiv.style.background = '#1a1a1a80'; // Fundo mais escuro
+      }
     }
   }
 } 

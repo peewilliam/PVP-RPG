@@ -116,11 +116,11 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
       const slot = hudManager.abilitySlots.indexOf(data.abilityId) + 1;
       if (slot > 0) {
         const now = Date.now();
-        const cd = Math.max(0, data.cooldown - now);
+        const cd = data.cooldown; // Valor absoluto do cooldown (em ms)
         hudManager.setCooldown(slot, cd, cd);
       }
       // Atualiza o cooldown no skill manager e a mana
-      skillManager.startCooldown(data.abilityId, data.cooldown - data.cooldown % 1000);
+      skillManager.startCooldown(data.abilityId, data.cooldown);
       skillManager.updateMana(data.mana);
     }
   }
@@ -151,26 +151,49 @@ function getMouseWorldPosition() {
 // Efeito de dano flutuante
 function showFloatingDamage(targetMesh, damage) {
   if (!targetMesh) return;
+  
+  // Limita o tamanho baseado no dano
+  const damageValue = parseInt(damage) || 0;
+  const scale = Math.min(0.7 + (damageValue / 50), 1.5);
+  
   // Cria um sprite de texto para o dano
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 64;
   const ctx = canvas.getContext('2d');
-  ctx.font = 'bold 32px Arial';
+  
+  // Reduz o tamanho da fonte
+  ctx.font = 'bold 28px Arial'; // Reduzido de 32px
   ctx.fillStyle = '#ff4444';
   ctx.strokeStyle = '#000';
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   ctx.textAlign = 'center';
-  ctx.strokeText(damage, 64, 48);
-  ctx.fillText(damage, 64, 48);
+  ctx.strokeText(damage, 64, 32);
+  ctx.fillText(damage, 64, 32);
+  
   const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const material = new THREE.SpriteMaterial({ 
+    map: texture, 
+    transparent: true,
+    depthTest: false, // Não testamos profundidade para garantir visibilidade
+    depthWrite: false // Não escrevemos no buffer de profundidade
+  });
+  
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(2, 1, 1);
-  // Posição inicial acima do alvo
-  sprite.position.set(0, 2, 0);
+  
+  // Escala mais controlada
+  sprite.scale.set(scale * 1.5, scale * 0.75, 1);
+  
+  // Posição acima do alvo, mais próxima
+  sprite.position.set(0, 1.5, 0);
+  
   targetMesh.add(sprite);
-  floatingDamages.push({ sprite, targetMesh, startTime: performance.now() });
+  floatingDamages.push({ 
+    sprite, 
+    targetMesh, 
+    startTime: performance.now(),
+    duration: 1200 // Duração reduzida, para consistência
+  });
 }
 
 // Atualiza e remove danos flutuantes
@@ -179,14 +202,34 @@ function updateFloatingDamages() {
   for (let i = floatingDamages.length - 1; i >= 0; i--) {
     const fd = floatingDamages[i];
     const elapsed = now - fd.startTime;
-    if (elapsed > 1200) {
-      fd.targetMesh.remove(fd.sprite);
+    const duration = fd.duration || 1200; // Usa a duração personalizada ou 1200ms como padrão
+    
+    if (elapsed > duration) {
+      // Remove quando o tempo expirar
+      if (fd.targetMesh && fd.sprite) {
+        fd.targetMesh.remove(fd.sprite);
+        
+        // Libera recursos
+        if (fd.sprite.material) {
+          fd.sprite.material.dispose();
+          if (fd.sprite.material.map) {
+            fd.sprite.material.map.dispose();
+          }
+        }
+      }
       floatingDamages.splice(i, 1);
       continue;
     }
-    // Move o sprite para cima e diminui a opacidade
-    fd.sprite.position.y = 2 + (elapsed / 400);
-    fd.sprite.material.opacity = 1 - (elapsed / 1200);
+    
+    // Move o sprite para cima mais lentamente
+    fd.sprite.position.y = 1.5 + (elapsed / 500); // Menor incremento de altura
+    
+    // Fade out baseado no tempo
+    const fadeStart = duration * 0.5; // Começa o fade na metade da duração
+    if (elapsed > fadeStart) {
+      const opacity = 1.0 - ((elapsed - fadeStart) / (duration - fadeStart));
+      fd.sprite.material.opacity = Math.max(0.1, opacity);
+    }
   }
 }
 
@@ -901,13 +944,6 @@ window.addEventListener('keydown', (e) => {
   
   const targetPosition = getMouseWorldPosition();
   
-  // Inicia o cooldown visual imediatamente
-  const ability = skillManager.getAbilityById(abilityId);
-  if (ability) {
-    skillManager.startCooldown(abilityId);
-    hudManager.setCooldown(slot, ability.COOLDOWN, ability.COOLDOWN);
-  }
-  
   // Envia o comando para o servidor
   channel.emit(EVENTS.PLAYER.USE_ABILITY, {
     abilityId,
@@ -1023,29 +1059,30 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
         data.areaEffect.center.z
       );
       
-      // Criar um efeito visual para indicar a área de efeito
-      // Vamos criar um círculo temporário no chão
-      const areaGeometry = new THREE.CircleGeometry(data.areaEffect.radius, 32);
-      const areaMaterial = new THREE.MeshBasicMaterial({
-        color: data.abilityId === 3 ? 0x00ffff : 0xff6600, // Azul para gelo, laranja para meteoros
-        transparent: true,
-        opacity: 0.4
-      });
-      
-      const areaMesh = new THREE.Mesh(areaGeometry, areaMaterial);
-      areaMesh.position.set(areaCenter.x, 0.1, areaCenter.z); // Ligeiramente acima do chão
-      areaMesh.rotation.x = -Math.PI / 2; // Rotaciona para ficar horizontal
-      scene.add(areaMesh);
-      
-      // Adiciona efeito de partículas/sprites na área
-      if (data.abilityId === 3) { // FROST_SPIKES
-        // Adiciona alguns sprites de flocos de neve na área
-        for (let i = 0; i < 10; i++) {
-          const angle = Math.random() * Math.PI * 2;
-          const distance = Math.random() * data.areaEffect.radius;
+      // Para FROST_SPIKES (ID 3), mantemos o código existente
+      if (data.abilityId === 3) {
+        // Criar um círculo temporário no chão
+        const areaGeometry = new THREE.CircleGeometry(data.areaEffect.radius, 32);
+        const areaMaterial = new THREE.MeshBasicMaterial({
+          color: 0x00ffff, // Azul para gelo
+          transparent: true,
+          opacity: 0.4
+        });
+        
+        const areaMesh = new THREE.Mesh(areaGeometry, areaMaterial);
+        areaMesh.position.set(areaCenter.x, 0.1, areaCenter.z); // Ligeiramente acima do chão
+        areaMesh.rotation.x = -Math.PI / 2; // Rotaciona para ficar horizontal
+        scene.add(areaMesh);
+        
+        // Adiciona efeito de estacas de gelo
+        const spikeCount = 8;
+        for (let i = 0; i < spikeCount; i++) {
+          const angle = (i / spikeCount) * Math.PI * 2;
+          const distance = (Math.random() * 0.7 + 0.3) * data.areaEffect.radius; // Entre 30% e 100% do raio
           const x = areaCenter.x + Math.cos(angle) * distance;
           const z = areaCenter.z + Math.sin(angle) * distance;
           
+          // Cria texto flutuante para representar estacas de gelo
           floatingTextManager.createFloatingText({
             text: '❄️',
             position: { x, y: 0.5, z },
@@ -1055,55 +1092,17 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
             type: 'default'
           });
         }
-      } 
-      else if (data.abilityId === 4) { // METEOR_STORM
-        // Adiciona efeito de meteoros caindo na área
-        const meteorCount = 8;
-        let meteorIndex = 0;
         
-        const dropMeteor = () => {
-          if (meteorIndex >= meteorCount) return;
-          
-          const angle = Math.random() * Math.PI * 2;
-          const distance = Math.random() * data.areaEffect.radius * 0.8;
-          const x = areaCenter.x + Math.cos(angle) * distance;
-          const z = areaCenter.z + Math.sin(angle) * distance;
-          
-          floatingTextManager.createFloatingText({
-            text: '☄️',
-            position: { x, y: 10, z }, // Começa alto
-            color: '#ffffff',
-            size: 2.0 + Math.random(),
-            duration: 1000,
-            type: 'default'
-          });
-          
-          // Após 1 segundo, mostre explosão e dano
-          setTimeout(() => {
-            floatingTextManager.createFloatingText({
-              text: '💥',
-              position: { x, y: 0.5, z },
-              color: '#ff6600',
-              size: 2.0,
-              duration: 1000,
-              type: 'default'
-            });
-          }, 1000);
-          
-          meteorIndex++;
-          setTimeout(dropMeteor, 500); // Solta o próximo meteoro após 500ms
-        };
-        
-        // Inicia a chuva de meteoros
-        dropMeteor();
+        // Remove a visualização da área após alguns segundos
+        setTimeout(() => {
+          scene.remove(areaMesh);
+          areaMesh.geometry.dispose();
+          areaMaterial.dispose();
+        }, 5000);
       }
       
-      // Remove a visualização da área após alguns segundos
-      setTimeout(() => {
-        scene.remove(areaMesh);
-        areaMesh.geometry.dispose();
-        areaMesh.material.dispose();
-      }, 5000);
+      // Nota: Removemos o código específico para METEOR_STORM (ID 4) 
+      // pois agora usamos o MeteorStormSkill.js
     }
   } catch (error) {
     console.error('Erro ao processar habilidade:', error);
@@ -1136,25 +1135,30 @@ function initServerEvents() {
       // Obtém a posição do alvo
       const targetPosition = {
         x: targetEntity.position.x,
-        y: targetEntity.position.y + 1.5, // Um pouco acima da cabeça
+        y: targetEntity.position.y + 1.0, // Reduzido de 1.5 para 1.0, mais próximo da cabeça
         z: targetEntity.position.z
       };
+      
+      // Calcula um tamanho limitado para o texto flutuante de dano
+      // Limita o crescimento do tamanho baseado no dano
+      const damageValue = parseInt(data.damage) || 0;
+      const sizeMultiplier = Math.min(0.7 + (damageValue / 50), 1.5);
       
       // Cria texto flutuante de dano
       floatingTextManager.createFloatingText({
         text: data.damage.toString(),
         position: targetPosition,
         color: '#ff0000',
-        size: 1.0 + (data.damage / 20),
-        duration: 1500,
+        size: sizeMultiplier,  // Tamanho mais controlado
+        duration: 1200,        // Reduzido de 1500 para 1200ms
         type: 'damage'
       });
       
       // Efeito visual de hit no alvo (tremor ou flash)
       if (targetEntity) {
-        // Aplica um efeito visual temporário
+        // Aplica um efeito visual temporário - reduz o multiplicador
         const originalScale = targetEntity.scale.clone();
-        targetEntity.scale.multiplyScalar(1.2); // Aumenta brevemente o tamanho
+        targetEntity.scale.multiplyScalar(1.1); // Reduzido de 1.2 para 1.1
         
         // Volta ao tamanho normal
         setTimeout(() => {

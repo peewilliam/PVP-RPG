@@ -2,15 +2,16 @@
 import * as THREE from 'three';
 import { SKILLS } from '../../../shared/skills/skillsConfig.js';
 
-// Lista de projéteis ativos para atualização
+// Lista de projéteis e efeitos ativos para atualização
 const activeProjectiles = [];
+const activeEffects = [];
 
 /**
  * Cria o efeito visual de uma estaca de gelo
  * @param {THREE.Vector3} origin - Posição de origem do projétil
  * @param {THREE.Vector3} target - Posição alvo do projétil
- * @param {THREE.Object3D} [caster=null] - Objeto que está conjurando a habilidade (opcional)
  * @param {THREE.Scene} scene - Cena do Three.js onde adicionar o projétil
+ * @param {THREE.Object3D} [caster=null] - Objeto que está conjurando a habilidade (opcional)
  * @param {Object} effect - Configurações adicionais do efeito
  * @returns {Object} Dados do projétil criado
  */
@@ -19,47 +20,323 @@ export function spawnIceSpikeEffect(origin, target, scene, caster = null, effect
   const originPos = origin instanceof THREE.Vector3 ? origin : new THREE.Vector3(origin.x, origin.y, origin.z);
   const targetPos = target instanceof THREE.Vector3 ? target : new THREE.Vector3(target.x, target.y, target.z);
   
-  // Cria a geometria da estaca de gelo
-  const geometry = new THREE.ConeGeometry(0.18, 0.8, 12);
-  const material = new THREE.MeshStandardMaterial({ 
-    color: effect.color || 0x66ccff, 
-    emissive: effect.color || 0x3399ff,
-    emissiveIntensity: 0.8,
+  // Criar indicador de área (círculo no chão)
+  const areaRadius = effect.radius || SKILLS.FROST_SPIKES.AREA_RADIUS || 5;
+  const areaGeometry = new THREE.CircleGeometry(areaRadius, 32);
+  const areaMaterial = new THREE.MeshBasicMaterial({
+    color: 0x66ccff, // Azul claro
     transparent: true,
-    opacity: 0.8
+    opacity: 0.3
   });
   
-  // Cria o mesh e posiciona na origem
-  const spike = new THREE.Mesh(geometry, material);
-  spike.position.copy(originPos);
+  const areaMesh = new THREE.Mesh(areaGeometry, areaMaterial);
+  areaMesh.position.set(targetPos.x, 0.1, targetPos.z); // Ligeiramente acima do chão
+  areaMesh.rotation.x = -Math.PI / 2; // Rotaciona para ficar horizontal
+  scene.add(areaMesh);
   
-  // Rotaciona para apontar na direção do alvo
-  spike.lookAt(targetPos);
-  // Adiciona 90 graus na rotação X para apontar o cone para frente
-  spike.rotateX(Math.PI / 2);
+  // Efeito de cristalização do chão
+  createCrystallizationEffect(targetPos, areaRadius, scene);
   
-  scene.add(spike);
+  // Duração do atraso antes das estacas surgirem
+  const delay = effect.delay || SKILLS.FROST_SPIKES.DELAY || 1000;
   
-  // Calcula o vetor direção normalizado
-  const dir = new THREE.Vector3().subVectors(targetPos, originPos).normalize();
+  // Número de estacas a criar
+  const spikeCount = effect.spikeCount || 12;
   
-  // Configura a velocidade e distância máxima
-  const speed = effect.speed || SKILLS.ICE_SPIKE.SPEED || 14;
-  const maxDist = effect.maxDist || SKILLS.ICE_SPIKE.RANGE || 30;
+  // Cronograma para remover o indicador de área
+  setTimeout(() => {
+    if (scene.getObjectById(areaMesh.id)) {
+      scene.remove(areaMesh);
+      areaMaterial.dispose();
+      areaGeometry.dispose();
+    }
+  }, delay + 500); // Remove após as estacas surgirem
   
-  // Adiciona o projétil à lista de projéteis ativos
-  const projectile = { 
-    mesh: spike, 
-    dir, 
-    speed, 
-    start: performance.now(), 
-    maxDist, 
-    origin: originPos.clone(),
-    type: 'ice_spike'
-  };
+  // Agenda a criação das estacas após o delay
+  setTimeout(() => {
+    createIceSpikes(targetPos, areaRadius, spikeCount, scene);
+  }, delay);
   
-  activeProjectiles.push(projectile);
-  return projectile;
+  return { success: true, areaMesh, delay };
+}
+
+/**
+ * Cria o efeito de cristalização do chão
+ * @param {THREE.Vector3} center - Centro da área de efeito
+ * @param {number} radius - Raio da área
+ * @param {THREE.Scene} scene - Cena do Three.js
+ */
+function createCrystallizationEffect(center, radius, scene) {
+  // Cria material com efeito de cristal de gelo
+  const iceMaterial = new THREE.MeshStandardMaterial({
+    color: 0xaaddff,
+    emissive: 0x3399ff,
+    emissiveIntensity: 0.3,
+    transparent: true,
+    opacity: 0.7,
+    roughness: 0.2,
+    metalness: 0.8
+  });
+  
+  // Cria 20-30 cristais pequenos espalhados pela área
+  const crystalCount = Math.floor(15 + Math.random() * 15);
+  const crystalGroup = new THREE.Group();
+  
+  for (let i = 0; i < crystalCount; i++) {
+    // Posição aleatória dentro do círculo
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * radius * 0.9; // 90% do raio
+    const x = center.x + Math.cos(angle) * distance;
+    const z = center.z + Math.sin(angle) * distance;
+    
+    // Tamanho e geometria variáveis
+    const size = 0.1 + Math.random() * 0.3;
+    let geometry;
+    
+    // Varia entre diferentes formas de cristais
+    const crystalType = Math.floor(Math.random() * 4);
+    switch (crystalType) {
+      case 0:
+        geometry = new THREE.ConeGeometry(size * 0.5, size, 6);
+        break;
+      case 1:
+        geometry = new THREE.OctahedronGeometry(size * 0.6);
+        break;
+      case 2:
+        geometry = new THREE.TetrahedronGeometry(size * 0.7);
+        break;
+      default:
+        geometry = new THREE.BoxGeometry(size * 0.6, size, size * 0.6);
+    }
+    
+    const crystal = new THREE.Mesh(geometry, iceMaterial.clone());
+    crystal.position.set(x, 0.02, z); // Ligeiramente acima do chão
+    crystal.rotation.y = Math.random() * Math.PI * 2;
+    crystal.rotation.x = Math.random() * 0.2;
+    crystal.rotation.z = Math.random() * 0.2;
+    
+    crystalGroup.add(crystal);
+  }
+  
+  scene.add(crystalGroup);
+  
+  // Anima a opacidade para fazer os cristais desaparecerem após um tempo
+  const duration = 4000; // ms
+  const startTime = Date.now();
+  
+  function animateCrystals() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    if (progress < 1) {
+      // Fade out gradual após a marca de 50% do tempo
+      if (progress > 0.5) {
+        const fadeProgress = (progress - 0.5) * 2; // 0 a 1
+        crystalGroup.children.forEach(crystal => {
+          crystal.material.opacity = 0.7 * (1 - fadeProgress);
+        });
+      }
+      
+      requestAnimationFrame(animateCrystals);
+    } else {
+      // Remove os cristais
+      scene.remove(crystalGroup);
+      
+      // Libera recursos
+      crystalGroup.children.forEach(crystal => {
+        crystal.geometry.dispose();
+        crystal.material.dispose();
+      });
+    }
+  }
+  
+  // Adiciona à lista de efeitos ativos
+  activeEffects.push({
+    group: crystalGroup,
+    animate: animateCrystals,
+    type: 'ice_crystals'
+  });
+  
+  // Inicia a animação
+  animateCrystals();
+}
+
+/**
+ * Cria as estacas de gelo que irrompem do chão
+ * @param {THREE.Vector3} center - Centro da área de efeito
+ * @param {number} radius - Raio da área
+ * @param {number} count - Número de estacas a criar
+ * @param {THREE.Scene} scene - Cena do Three.js
+ */
+function createIceSpikes(center, radius, count, scene) {
+  // Material das estacas com aparência de gelo cristalino
+  const spikeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x99ccff,
+    emissive: 0x3399ff,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.8,
+    roughness: 0.3,
+    metalness: 0.7
+  });
+  
+  // Grupo para todas as estacas
+  const spikeGroup = new THREE.Group();
+  
+  // Cria as estacas distribuídas pela área
+  for (let i = 0; i < count; i++) {
+    // Posição aleatória dentro do círculo (mais concentrada no centro)
+    const angle = Math.random() * Math.PI * 2;
+    const distanceFactor = Math.pow(Math.random(), 0.7); // Distribui mais estacas próximas ao centro
+    const distance = distanceFactor * radius * 0.95;
+    const x = center.x + Math.cos(angle) * distance;
+    const z = center.z + Math.sin(angle) * distance;
+    
+    // Tamanho variável para cada estaca
+    const spikeHeight = 1.5 + Math.random() * 1.5;
+    const spikeWidth = 0.2 + Math.random() * 0.3;
+    
+    // Criar estaca básica (combinação de formas geométricas)
+    const spikeBase = new THREE.Group();
+    
+    // Parte principal (cone afiado)
+    const mainSpike = new THREE.Mesh(
+      new THREE.ConeGeometry(spikeWidth, spikeHeight, 8),
+      spikeMaterial.clone()
+    );
+    mainSpike.position.y = spikeHeight / 2;
+    spikeBase.add(mainSpike);
+    
+    // Adicionar pequenos fragmentos de gelo na base
+    const fragmentCount = 2 + Math.floor(Math.random() * 3);
+    for (let j = 0; j < fragmentCount; j++) {
+      const fragSize = spikeWidth * (0.4 + Math.random() * 0.3);
+      const fragHeight = spikeHeight * (0.2 + Math.random() * 0.3);
+      
+      // Varia entre diferentes formas para os fragmentos
+      let fragGeometry;
+      if (Math.random() > 0.5) {
+        fragGeometry = new THREE.ConeGeometry(fragSize, fragHeight, 6);
+      } else {
+        fragGeometry = new THREE.TetrahedronGeometry(fragSize);
+      }
+      
+      const fragment = new THREE.Mesh(fragGeometry, spikeMaterial.clone());
+      
+      // Posiciona o fragmento ao redor da base principal
+      const fragAngle = Math.random() * Math.PI * 2;
+      const fragDistance = spikeWidth * 0.8;
+      fragment.position.x = Math.cos(fragAngle) * fragDistance;
+      fragment.position.z = Math.sin(fragAngle) * fragDistance;
+      fragment.position.y = fragHeight / 3;
+      
+      // Rotação aleatória para parecer mais natural
+      fragment.rotation.x = (Math.random() - 0.5) * 0.3;
+      fragment.rotation.y = Math.random() * Math.PI * 2;
+      fragment.rotation.z = (Math.random() - 0.5) * 0.3;
+      
+      spikeBase.add(fragment);
+    }
+    
+    // Posiciona a estaca
+    spikeBase.position.set(x, -spikeHeight, z);
+    spikeGroup.add(spikeBase);
+    
+    // Anima a estaca surgindo do chão
+    animateSpikeEmergence(spikeBase, spikeHeight);
+  }
+  
+  scene.add(spikeGroup);
+  
+  // Programa a remoção das estacas após um tempo
+  const duration = 3000; // 3 segundos
+  setTimeout(() => {
+    // Anima a retração das estacas para o chão
+    animateSpikeRetraction(spikeGroup, scene, duration);
+  }, duration);
+}
+
+/**
+ * Anima uma estaca emergindo do chão
+ * @param {THREE.Group} spike - Grupo da estaca
+ * @param {number} height - Altura final da estaca
+ */
+function animateSpikeEmergence(spike, height) {
+  const startY = spike.position.y;
+  const endY = 0; // Posição final no nível do chão
+  const duration = 300 + Math.random() * 200; // Duração ligeiramente variável para cada estaca
+  const startTime = Date.now();
+  
+  function animate() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    if (progress < 1) {
+      // Função de easing para movimento mais natural
+      const easedProgress = 1 - Math.pow(1 - progress, 3); // Easing de saída cúbica
+      spike.position.y = startY + (endY - startY) * easedProgress;
+      
+      requestAnimationFrame(animate);
+    } else {
+      spike.position.y = endY;
+    }
+  }
+  
+  // Inicia a animação
+  animate();
+}
+
+/**
+ * Anima a retração das estacas para o chão
+ * @param {THREE.Group} spikeGroup - Grupo de todas as estacas
+ * @param {THREE.Scene} scene - Cena do Three.js
+ * @param {number} delay - Atraso antes de iniciar a retração
+ */
+function animateSpikeRetraction(spikeGroup, scene, delay) {
+  const duration = 1000; // Duração da animação de retração
+  const startTime = Date.now();
+  
+  function animate() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    if (progress < 1) {
+      // Retrai as estacas de volta para o chão
+      spikeGroup.children.forEach((spike, index) => {
+        // Retração com leve variação no tempo
+        const spikeProgress = Math.min(progress * (1 + index * 0.05), 1);
+        const easedProgress = spikeProgress * spikeProgress; // Easing quadrático
+        
+        // Move para baixo e reduz a opacidade
+        const originalY = 0;
+        const targetY = -2 - Math.random(); // Variação na profundidade final
+        spike.position.y = originalY + (targetY - originalY) * easedProgress;
+        
+        // Reduz a opacidade
+        spike.children.forEach(part => {
+          if (part.material) {
+            part.material.opacity = 0.8 * (1 - easedProgress);
+          }
+        });
+      });
+      
+      requestAnimationFrame(animate);
+    } else {
+      // Remove o grupo de estacas
+      scene.remove(spikeGroup);
+      
+      // Libera recursos
+      spikeGroup.children.forEach(spike => {
+        spike.children.forEach(part => {
+          if (part.geometry) part.geometry.dispose();
+          if (part.material) part.material.dispose();
+        });
+      });
+    }
+  }
+  
+  // Inicia a animação
+  animate();
 }
 
 /**
@@ -68,6 +345,7 @@ export function spawnIceSpikeEffect(origin, target, scene, caster = null, effect
  * @param {THREE.Scene} scene - Cena do Three.js para remover projéteis expirados
  */
 export function updateIceSpikeProjectiles(delta, scene) {
+  // Atualiza projéteis
   for (let i = activeProjectiles.length - 1; i >= 0; i--) {
     const p = activeProjectiles[i];
     if (p.type !== 'ice_spike') continue;
@@ -81,6 +359,16 @@ export function updateIceSpikeProjectiles(delta, scene) {
       activeProjectiles.splice(i, 1);
     }
   }
+  
+  // Atualiza efeitos ativos
+  for (let i = activeEffects.length - 1; i >= 0; i--) {
+    const effect = activeEffects[i];
+    
+    // Executa a função de animação associada
+    if (typeof effect.animate === 'function') {
+      effect.animate();
+    }
+  }
 }
 
 /**
@@ -88,11 +376,23 @@ export function updateIceSpikeProjectiles(delta, scene) {
  * @param {THREE.Scene} scene - Cena do Three.js para remover projéteis
  */
 export function clearIceSpikeProjectiles(scene) {
+  // Limpa projéteis
   for (let i = activeProjectiles.length - 1; i >= 0; i--) {
     const p = activeProjectiles[i];
     if (p.type === 'ice_spike') {
       scene.remove(p.mesh);
       activeProjectiles.splice(i, 1);
+    }
+  }
+  
+  // Limpa efeitos
+  for (let i = activeEffects.length - 1; i >= 0; i--) {
+    const effect = activeEffects[i];
+    if (effect.type.includes('ice_')) {
+      if (effect.group) {
+        scene.remove(effect.group);
+      }
+      activeEffects.splice(i, 1);
     }
   }
 }

@@ -220,7 +220,7 @@ export class WorldObjectPresenter {
     // Remove do mapa
     this.worldObjects.delete(id);
     
-    console.log(`Objeto do mundo removido: ${id}`);
+    // console.log(`Objeto do mundo removido: ${id}`);
   }
 
   /**

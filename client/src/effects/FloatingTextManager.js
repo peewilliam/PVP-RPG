@@ -41,34 +41,37 @@ export class FloatingTextManager {
       type = 'default'
     } = options;
     
+    // Limita o tamanho para evitar textos gigantes
+    const limitedSize = Math.min(size, 2.5);
+    
     // Desenha o texto no canvas
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
     // Estilo baseado no tipo
     switch (type) {
       case 'damage':
-        this.context.font = 'bold 48px Arial';
+        this.context.font = 'bold 36px Arial'; // Reduzido de 48px para 36px
         this.context.fillStyle = color || '#ff0000';
         this.context.strokeStyle = '#000000';
-        this.context.lineWidth = 4;
+        this.context.lineWidth = 3; // Reduzido de 4 para 3
         break;
       case 'heal':
-        this.context.font = 'bold 48px Arial';
+        this.context.font = 'bold 36px Arial'; // Reduzido de 48px para 36px
         this.context.fillStyle = color || '#00ff00';
         this.context.strokeStyle = '#000000';
-        this.context.lineWidth = 4;
+        this.context.lineWidth = 3; // Reduzido de 4 para 3
         break;
       case 'xp':
-        this.context.font = '36px Arial';
+        this.context.font = '32px Arial'; // Reduzido de 36px para 32px
         this.context.fillStyle = color || '#ffff00';
         this.context.strokeStyle = '#000000';
-        this.context.lineWidth = 3;
+        this.context.lineWidth = 2; // Reduzido de 3 para 2
         break;
       default:
-        this.context.font = '32px Arial';
+        this.context.font = '28px Arial'; // Reduzido de 32px para 28px
         this.context.fillStyle = color || '#ffffff';
         this.context.strokeStyle = '#000000';
-        this.context.lineWidth = 3;
+        this.context.lineWidth = 2; // Reduzido de 3 para 2
     }
     
     // Desenha texto com borda
@@ -85,13 +88,20 @@ export class FloatingTextManager {
     const material = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      opacity: 1.0
+      opacity: 1.0,
+      depthTest: false, // Não testamos profundidade para garantir visibilidade
+      depthWrite: false // Não escrevemos no buffer de profundidade
     });
     
     // Cria o sprite
     const sprite = new THREE.Sprite(material);
-    sprite.position.set(position.x, position.y + 1.5, position.z);
-    sprite.scale.set(size * 2, size, 1);
+    
+    // Posiciona o sprite - limitamos a altura para evitar problemas de visibilidade
+    const posY = position.y !== undefined ? Math.min(position.y + 1.0, 5.0) : 2.0;
+    sprite.position.set(position.x, posY, position.z);
+    
+    // Escala inicial mais conservadora
+    sprite.scale.set(limitedSize * 1.5, limitedSize * 0.75, 1);
     
     // Adiciona à cena
     this.scene.add(sprite);
@@ -102,8 +112,10 @@ export class FloatingTextManager {
       createdAt: performance.now(),
       duration,
       fadeOut,
-      velocity: { y: 0.005 }, // Move para cima lentamente
-      distanceScale: true     // Mantém tamanho consistente na tela
+      velocity: { y: 0.003 }, // Move para cima mais lentamente (reduzido de 0.005)
+      distanceScale: true,    // Mantém tamanho consistente na tela
+      baseScale: limitedSize, // Armazena a escala base para referência
+      type                    // Armazena o tipo para comportamentos específicos
     };
     
     // Adiciona à lista de textos
@@ -139,27 +151,37 @@ export class FloatingTextManager {
       
       // Fade out gradual
       if (text.fadeOut) {
-        const fadeStart = text.duration * 0.6; // Começa a desvanecer após 60% do tempo
+        const fadeStart = text.duration * 0.5; // Começa a desvanecer após 50% do tempo (antes era 60%)
         if (age > fadeStart) {
           const fadeAmount = 1.0 - (age - fadeStart) / (text.duration - fadeStart);
           text.sprite.material.opacity = Math.max(0, fadeAmount);
         }
       }
       
-      // Ajusta escala com base na distância da câmera
+      // Ajusta escala com base na distância da câmera - limitamos muito mais agora
       if (text.distanceScale && this.camera) {
-        // Faz o sprite olhar para a câmera
-        const vector = new THREE.Vector3();
-        vector.subVectors(this.camera.position, text.sprite.position);
-        vector.normalize();
-        
-        // Mantém tamanho consistente independente da distância
+        // Calcula distância da câmera
         const distance = this.camera.position.distanceTo(text.sprite.position);
-        const baseScale = text.sprite.scale.x / 2; // Recupera a escala base (dividido por 2 por causa da linha 102)
         
-        // Ajusta escala para maior visibilidade
-        const scaleFactor = Math.min(distance * 0.15, 3.0);
-        text.sprite.scale.set(baseScale * scaleFactor, baseScale * 0.5 * scaleFactor, 1);
+        // Escala muito mais conservadora baseada na distância
+        // Limitamos muito mais o crescimento, especialmente para efeitos de dano
+        let scaleFactor;
+        
+        if (text.type === 'damage') {
+          // Dano tem um escalonamento mais controlado para evitar textos gigantes
+          scaleFactor = Math.min(1.0 + (distance * 0.04), 1.5);
+        } else {
+          // Outros textos podem ter um escalonamento um pouco mais agressivo, mas ainda limitado
+          scaleFactor = Math.min(1.0 + (distance * 0.05), 1.8);
+        }
+        
+        // Aplicamos a escala, mantendo proporção largura/altura
+        const baseScale = text.baseScale || 1.0;
+        text.sprite.scale.set(
+          baseScale * 1.5 * scaleFactor, 
+          baseScale * 0.75 * scaleFactor, 
+          1
+        );
       }
     }
   }
