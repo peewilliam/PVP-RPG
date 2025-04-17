@@ -160,12 +160,37 @@ export class Player extends Entity {
    * @param {number} deltaTime - Tempo desde a última atualização em ms
    */
   regenerate(deltaTime) {
-    // Exemplo: Regenera 1% dos atributos máximos por segundo
-    const hpRegen = this.stats.maxHp * 0.01 * (deltaTime / 1000);
-    const manaRegen = this.stats.maxMana * 0.01 * (deltaTime / 1000);
+    // Usa as constantes de regeneração configuradas em PLAYER.REGENERATION
+    const hpRegen = this.stats.maxHp * PLAYER.REGENERATION.HP_PERCENT * (deltaTime / 1000);
+    const manaRegen = this.stats.maxMana * PLAYER.REGENERATION.MANA_PERCENT * (deltaTime / 1000);
+    
+    const oldHp = this.stats.hp;
+    const oldMana = this.stats.mana;
     
     this.stats.hp = Math.min(this.stats.hp + hpRegen, this.stats.maxHp);
     this.stats.mana = Math.min(this.stats.mana + manaRegen, this.stats.maxMana);
+    
+    // Debug: Verificar regeneração significativa (1 unidade ou mais)
+    const hpDiff = this.stats.hp - oldHp;
+    const manaDiff = this.stats.mana - oldMana;
+    
+    // Notifica o cliente sobre a atualização de recursos quando:
+    // 1. Um ponto inteiro foi regenerado
+    // 2. O recurso está abaixo do limiar configurado
+    // 3. A mana estava abaixo do limiar e aumentou acima dele
+    if (Math.floor(this.stats.mana) > Math.floor(oldMana) || 
+        this.stats.mana < (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD) ||
+        (oldMana < (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD) && 
+         this.stats.mana >= (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD))) {
+      if (this.channel) {
+        this.channel.emit(EVENTS.PLAYER.MOVED, {
+          id: this.id,
+          position: { ...this.position },
+          rotation: this.rotation,
+          stats: { ...this.stats }
+        });
+      }
+    }
   }
   
   /**

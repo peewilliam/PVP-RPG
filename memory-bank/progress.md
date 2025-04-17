@@ -13,6 +13,11 @@
 - ✅ Spawns de monstros distribuídos por bioma, com diferentes níveis e quantidades
 - ✅ Sistema de FPS e ping na UI do cliente
 - ✅ Sistema de logs para depuração de colisões
+- ✅ Regeneração de mana e HP baseada em percentuais configuráveis
+- ✅ Sincronização periódica de stats entre servidor e cliente (2s)
+- ✅ HUD e SkillManager refletem corretamente mana/cooldown
+- ✅ Logs detalhados para depuração de recursos
+- ✅ Correção de bugs de duplicidade em eventos MOVED
 
 ## O que está faltando construir
 - [ ] Sistema de combate (dano, morte, XP)
@@ -118,4 +123,24 @@ O sistema de colisão garante que objetos do mundo não se sobreponham, e a arqu
 ### Versão 1.0
 - Balanceamento completo
 - Múltiplas áreas/zonas
-- Sistema PvP refinado 
+- Sistema PvP refinado
+
+## Progresso Atual (jun/2024)
+
+### O que funciona
+- Regeneração de mana e HP baseada em percentuais configuráveis
+- Sincronização periódica de stats entre servidor e cliente (2s)
+- HUD e SkillManager refletem corretamente mana/cooldown
+- Logs detalhados para depuração de recursos
+- Correção de bugs de duplicidade em eventos MOVED
+
+### O que falta/conferir
+- Testar estabilidade da nova regeneração
+- Ajustar balanceamento se necessário
+- Monitorar logs para bugs residuais
+
+### Arquivos alterados
+- shared/constants/gameConstants.js
+- server/src/models/Player.js
+- server/src/index.js
+- client/src/main.js 

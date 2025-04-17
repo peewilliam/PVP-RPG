@@ -14,7 +14,7 @@ export class SkillManager {
     this.scene = scene;
     this.lastUpdate = performance.now();
     this.playerCooldowns = {};  // Controle local de cooldowns {abilityId: timestamp}
-    this.playerMana = 100;      // Mana do jogador local
+    this.playerMana = 250;      // Mana do jogador local
   }
   
   /**
@@ -44,18 +44,28 @@ export class SkillManager {
     const now = Date.now();
     const ability = this.getAbilityById(abilityId);
     
-    if (!ability) return false;
+    if (!ability) {
+      console.warn(`Habilidade com ID ${abilityId} não encontrada`);
+      return false;
+    }
     
     // Verifica cooldown local
-    if (this.playerCooldowns[abilityId] && 
-        now - this.playerCooldowns[abilityId] < ability.COOLDOWN) {
-      console.log(`Habilidade ${ability.NAME} em cooldown!`);
-      return false;
+    if (this.playerCooldowns[abilityId]) {
+      // O valor armazenado é o timestamp de quando o cooldown termina
+      const cooldownEndTime = this.playerCooldowns[abilityId];
+      const remainingTime = Math.max(0, cooldownEndTime - now);
+      
+      if (remainingTime > 0) {
+        // Formatação mais legível do tempo restante
+        const remainingSeconds = (remainingTime / 1000).toFixed(1);
+        console.log(`Habilidade ${ability.NAME} em cooldown! Tempo restante: ${remainingSeconds}s`);
+        return false;
+      }
     }
     
     // Verifica mana
     if (this.playerMana < ability.MANA_COST) {
-      console.log(`Mana insuficiente para usar ${ability.NAME}!`);
+      console.log(`Mana insuficiente para usar ${ability.NAME}! Necessário: ${ability.MANA_COST}, Atual: ${this.playerMana.toFixed(1)}`);
       return false;
     }
     
@@ -226,5 +236,37 @@ export class SkillManager {
     });
 
     // Define o cooldown visual (o servidor definirá o cooldown real)
+  }
+
+  /**
+   * Retorna o motivo pelo qual uma habilidade não pode ser usada
+   * @param {number} abilityId - ID da habilidade
+   * @returns {string} - Motivo formatado para exibição
+   */
+  getWhyCannotUse(abilityId) {
+    const now = Date.now();
+    const ability = this.getAbilityById(abilityId);
+    
+    if (!ability) {
+      return "Habilidade inválida";
+    }
+    
+    // Verifica cooldown local
+    if (this.playerCooldowns[abilityId]) {
+      const cooldownEndTime = this.playerCooldowns[abilityId];
+      const remainingTime = Math.max(0, cooldownEndTime - now);
+      
+      if (remainingTime > 0) {
+        const remainingSeconds = (remainingTime / 1000).toFixed(1);
+        return `Em cooldown: ${remainingSeconds}s`;
+      }
+    }
+    
+    // Verifica mana
+    if (this.playerMana < ability.MANA_COST) {
+      return `Mana insuficiente (${this.playerMana.toFixed(0)}/${ability.MANA_COST})`;
+    }
+    
+    return "Pronto para usar";
   }
 } 

@@ -21,12 +21,36 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - ✅ Estruturas especiais desativadas
 - ✅ Sistema de spawn de monstros revisado e distribuído
 - ✅ FPS e ping adicionados à interface do cliente
+- **Regeneração de Mana:**
+  - Agora 5% por segundo (PLAYER.REGENERATION.MANA_PERCENT = 0.05)
+  - Configurações centralizadas em PLAYER.REGENERATION
+  - Notificação ao cliente quando mana muda significativamente ou está baixa
+- **Sincronização Cliente-Servidor:**
+  - Intervalo reduzido para 2s
+  - Envio de timestamps para compensar diferenças de relógio
+  - Eventos PLAYER.MOVED enviados junto com sincronizações
+- **Cliente:**
+  - HUD e SkillManager atualizam mana/cooldown com dados do servidor
+  - Logs detalhados para depuração de mana
+  - Correção de duplicidade e bugs no processamento de MOVED
+- **Servidor:**
+  - Player.js usa as constantes de regeneração do objeto PLAYER
+  - Notificações de stats otimizadas
+  - Sincronização periódica e eventos de habilidade revisados
+- **Arquivos alterados:**
+  - shared/constants/gameConstants.js
+  - server/src/models/Player.js
+  - server/src/index.js
+  - client/src/main.js
 
 ## Próximos Passos
 - Implementar sistema de combate (dano, morte, XP)
 - Reavaliar retorno de casas/cercas e estruturas especiais
 - Adicionar novos tipos de monstros e desafios
 - Melhorar feedback visual e efeitos
+- Testar estabilidade da regeneração e sincronização
+- Ajustar balanceamento se necessário
+- Monitorar logs de mana/cooldown para identificar possíveis bugs
 
 ## Decisões e Considerações Ativas
 - Mundo grande, explorável, com biomas distintos

@@ -25,7 +25,9 @@ export const EVENTS = {
     LEVEL_UP: 'player:levelUp',
     DEATH: 'player:death',     // Quando um jogador morre
     RESPAWN: 'player:respawn', // Quando um jogador reaparece
-    TARGET: 'player:target'    // Jogador seleciona um alvo
+    TARGET: 'player:target',   // Jogador seleciona um alvo
+    SYNC_REQUEST: 'player:syncRequest', // Solicitação de sincronização de cooldowns e mana
+    SYNC_RESPONSE: 'player:syncResponse' // Resposta com dados sincronizados do servidor
   },
   MONSTER: {
     SPAWN: 'monster:spawn',
@@ -55,9 +57,15 @@ export const PLAYER = {
   SPEED: 0.3, // Velocidade por tick
   BASE_STATS: {
     HP: 100,
-    MANA: 100,
+    MANA: 250,
     ATTACK: 10,
     DEFENSE: 5
+  },
+  // Configurações de regeneração de recursos
+  REGENERATION: {
+    HP_PERCENT: 0.01, // 1% do HP máximo por segundo
+    MANA_PERCENT: 0.01, // 5% da mana máxima por segundo
+    NOTIFY_THRESHOLD: 0.25 // Notificar cliente quando recursos abaixo de 25%
   },
   XP_PER_LEVEL: [
     0, // Nível 1
@@ -77,7 +85,7 @@ export const MONSTERS = {
     ID: 1,
     NAME: 'Goblin',
     HP: 50,
-    DAMAGE: 5,
+    DAMAGE: 50,
     DEFENSE: 2,
     SPEED: 0.05,
     XP_REWARD: 20,

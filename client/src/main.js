@@ -107,22 +107,89 @@ function updateLocalHUDFromServer(data) {
 
 // Atualiza HUD ao usar habilidade (mana/cooldown)
 channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
-  if (data.id === playerId && data.mana !== undefined) {
-    if (player && player.userData) player.userData.stats.mana = data.mana;
-    hudManager.update(player.userData.stats, player.userData.level, 'Arcane');
+  try {
+    console.log("ABILITY_USED recebido:", data);
     
-    // Atualiza cooldown visual no slot correto e no skillManager
-    if (data.abilityId && data.cooldown) {
-      const slot = hudManager.abilitySlots.indexOf(data.abilityId) + 1;
-      if (slot > 0) {
-        const now = Date.now();
-        const cd = data.cooldown; // Valor absoluto do cooldown (em ms)
-        hudManager.setCooldown(slot, cd, cd);
+    // Se o evento for para o jogador local
+    if (data.id === playerId) {
+      // Atualiza a mana no jogador
+      if (player && player.userData) {
+        if (data.mana !== undefined) {
+          player.userData.stats.mana = data.mana;
+          
+          // Atualiza também a mana máxima se fornecida
+          if (data.maxMana !== undefined) {
+            player.userData.stats.maxMana = data.maxMana;
+          }
+          
+          // Atualiza o HUD com os novos valores
+          hudManager.update(player.userData.stats, player.userData.level, 'Arcane');
+          
+          // Atualiza a mana no gerenciador de habilidades para verificações locais
+          skillManager.updateMana(data.mana);
+        }
       }
-      // Atualiza o cooldown no skill manager e a mana
-      skillManager.startCooldown(data.abilityId, data.cooldown);
-      skillManager.updateMana(data.mana);
+      
+      // Atualiza cooldown visual com base no valor recebido do servidor
+      if (data.abilityId) {
+        // Encontra qual slot da UI corresponde à habilidade usada
+        const abilityIndex = hudManager.abilitySlots.indexOf(data.abilityId);
+        const slot = abilityIndex + 1;
+        
+        if (slot > 0) {
+          const now = Date.now();
+          let remainingCooldown;
+          
+          // Processamento do cooldown com múltiplas estratégias de fallback
+          if (data.cooldownEnd && data.cooldownEnd > now) {
+            // Caso 1: Usar timestamp de fim do cooldown (mais preciso)
+            remainingCooldown = data.cooldownEnd - now;
+            console.log(`Usando cooldownEnd: ${remainingCooldown}ms restantes`);
+          } 
+          else if (data.cooldownStart && data.cooldownDuration) {
+            // Caso 2: Calcular com base no início + duração
+            const elapsedTime = now - data.cooldownStart;
+            remainingCooldown = Math.max(0, data.cooldownDuration - elapsedTime);
+            console.log(`Calculando cooldown: ${remainingCooldown}ms restantes`);
+          }
+          else if (data.cooldown) {
+            // Caso 3: Compatibilidade com versão anterior
+            // Determina se cooldown é timestamp futuro ou duração
+            if (data.cooldown > now + 1000) {
+              remainingCooldown = data.cooldown - now;
+            } else {
+              remainingCooldown = data.cooldown;
+            }
+            console.log(`Usando cooldown legado: ${remainingCooldown}ms restantes`);
+          }
+          else {
+            // Caso 4: Fallback para configuração da habilidade
+            const ability = skillManager.getAbilityById(data.abilityId);
+            if (!ability) return;
+            remainingCooldown = ability.COOLDOWN;
+            console.log(`Usando cooldown padrão: ${remainingCooldown}ms restantes`);
+          }
+          
+          // Garante que o cooldown não seja negativo
+          remainingCooldown = Math.max(0, remainingCooldown);
+          
+          // Define o cooldown visual na UI
+          hudManager.setCooldown(slot, remainingCooldown, remainingCooldown);
+          
+          // Atualiza o registro de cooldown no gerenciador de habilidades
+          // Armazenamos o timestamp de quando o cooldown termina
+          if (data.cooldownEnd) {
+            skillManager.startCooldown(data.abilityId, data.cooldownEnd);
+          } else {
+            skillManager.startCooldown(data.abilityId, now + remainingCooldown);
+          }
+          
+          console.log(`Definido cooldown para habilidade ${data.abilityId} (slot ${slot}): ${remainingCooldown}ms | Termina em: ${new Date(now + remainingCooldown).toLocaleTimeString()}`);
+        }
+      }
     }
+  } catch (error) {
+    console.error("Erro ao processar evento ABILITY_USED:", error);
   }
 });
 
@@ -131,9 +198,69 @@ channel.on(EVENTS.PLAYER.INIT, data => {
   if (player && player.userData) updateLocalHUDFromServer(player.userData);
 });
 channel.on(EVENTS.PLAYER.MOVED, data => {
-  if (data.id === playerId && player && player.userData) {
-    player.userData.stats = data.stats;
-    updateLocalHUDFromServer(player.userData);
+  try {
+    // Verifica se os dados são válidos
+    if (!data || !data.id || !data.position) {
+      console.error('Dados de jogador inválidos:', data);
+      return;
+    }
+    
+    const otherPlayerId = data.id;
+    
+    // Tratamento diferente para o jogador local vs. outros jogadores
+    if (otherPlayerId === playerId) {
+      // Atualiza posição do jogador local
+      if (player) {
+        // Valida os valores antes de atualizar
+        const x = Number(data.position.x) || 0;
+        const y = Number(data.position.y) || 0;
+        const z = Number(data.position.z) || 0;
+        
+        player.position.set(x, y, z);
+        player.rotation.y = Number(data.rotation) || 0;
+        
+        // Atualiza estatísticas do jogador (HP, mana, etc)
+        if (data.stats && player.userData) {
+          // Registra mudanças significativas na mana para depuração
+          if (data.stats.mana !== undefined && player.userData.stats) {
+            const oldMana = player.userData.stats.mana || 0;
+            const newMana = data.stats.mana;
+            const manaChange = newMana - oldMana;
+            
+            if (Math.abs(manaChange) > 1) {
+              console.log(`Mana atualizada (MOVED): ${oldMana.toFixed(1)} → ${newMana.toFixed(1)} (${manaChange > 0 ? '+' : ''}${manaChange.toFixed(1)})`);
+            }
+          }
+          
+          // Atualiza todas as estatísticas
+          player.userData.stats = { ...player.userData.stats, ...data.stats };
+          
+          // Atualiza o HUD
+          hudManager.update(player.userData.stats, player.userData.level, 'Arcane');
+          
+          // Atualiza o SkillManager com a mana atual
+          if (data.stats.mana !== undefined) {
+            skillManager.updateMana(data.stats.mana);
+          }
+        }
+        
+        // A câmera segue o jogador mantendo a mesma vista isométrica
+        // Usamos a posição atual do jogador como centro da visualização
+        const offsetX = 20; // Mesmo valor usado na inicialização da câmera
+        const offsetY = 20;
+        const offsetZ = 20;
+        
+        camera.position.x = player.position.x + offsetX;
+        camera.position.y = player.position.y + offsetY;
+        camera.position.z = player.position.z + offsetZ;
+        camera.lookAt(player.position);
+      }
+    } else {
+      // Atualiza outros jogadores usando o PlayerPresenter
+      playerPresenter.updatePlayer(data);
+    }
+  } catch (error) {
+    console.error('Erro ao processar movimento de jogador:', error);
   }
 });
 
@@ -628,49 +755,6 @@ channel.on(EVENTS.WORLD.INIT, data => {
   }
 });
 
-// Recebe atualizações de movimento de jogadores (incluindo o próprio jogador)
-channel.on(EVENTS.PLAYER.MOVED, data => {
-  try {
-    // Verifica se os dados são válidos
-    if (!data || !data.id || !data.position) {
-      console.error('Dados de jogador inválidos:', data);
-      return;
-    }
-    
-    const otherPlayerId = data.id;
-    
-    // Tratamento diferente para o jogador local vs. outros jogadores
-    if (otherPlayerId === playerId) {
-      // Atualiza posição do jogador local
-      if (player) {
-        // Valida os valores antes de atualizar
-        const x = Number(data.position.x) || 0;
-        const y = Number(data.position.y) || 0;
-        const z = Number(data.position.z) || 0;
-        
-        player.position.set(x, y, z);
-        player.rotation.y = Number(data.rotation) || 0;
-        
-        // A câmera segue o jogador mantendo a mesma vista isométrica
-        // Usamos a posição atual do jogador como centro da visualização
-        const offsetX = 20; // Mesmo valor usado na inicialização da câmera
-        const offsetY = 20;
-        const offsetZ = 20;
-        
-        camera.position.x = player.position.x + offsetX;
-        camera.position.y = player.position.y + offsetY;
-        camera.position.z = player.position.z + offsetZ;
-        camera.lookAt(player.position);
-      }
-    } else {
-      // Atualiza outros jogadores usando o PlayerPresenter
-      playerPresenter.updatePlayer(data);
-    }
-  } catch (error) {
-    console.error('Erro ao processar movimento de jogador:', error);
-  }
-});
-
 // Remove jogadores desconectados
 channel.on(EVENTS.PLAYER.DISCONNECTED, data => {
   try {
@@ -928,7 +1012,7 @@ animate = function() {
   oldAnimate();
 };
 
-// Envio de habilidade ao pressionar 1-4 (agora com verificação local)
+// Envio de habilidade ao pressionar 1-4
 window.addEventListener('keydown', (e) => {
   let slot = null;
   if (e.key === '1') slot = 1;
@@ -936,22 +1020,62 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '3') slot = 3;
   if (e.key === '4') slot = 4;
   if (!slot || !player) return;
+  
   const abilityId = hudManager.abilitySlots[slot - 1];
   if (!abilityId) return;
   
+  // Obter informações da habilidade para feedback
+  const ability = skillManager.getAbilityById(abilityId);
+  if (!ability) return;
+  
   // Verificação local de cooldown e mana antes de enviar
-  if (!skillManager.canUseAbility(abilityId)) return;
+  if (!skillManager.canUseAbility(abilityId)) {
+    // Feedback visual de erro para o jogador
+    const reason = skillManager.getWhyCannotUse(abilityId);
+    
+    // Mostra mensagem de erro flutuante
+    if (floatingTextManager && player) {
+      const position = {
+        x: player.position.x,
+        y: player.position.y + 2.0,
+        z: player.position.z
+      };
+      
+      // Cores diferentes para cada tipo de erro
+      let color = '#ff0000'; // Padrão vermelho
+      if (reason.includes('cooldown')) {
+        color = '#ffaa00'; // Laranja para cooldown
+      } else if (reason.includes('mana')) {
+        color = '#00aaff'; // Azul para mana
+      }
+      
+      floatingTextManager.createFloatingText({
+        text: reason,
+        position: position,
+        color: color,
+        size: 0.8,
+        duration: 1500,
+        type: 'error'
+      });
+    }
+    
+    return; // Não continua se não puder usar
+  }
   
   const targetPosition = getMouseWorldPosition();
+  
+  // Temporariamente define um cooldown visual para feedback imediato
+  if (ability) {
+    // Isto é temporário, apenas para feedback visual, e será substituído
+    // quando o servidor confirmar o uso da habilidade
+    hudManager.setCooldown(slot, ability.COOLDOWN, ability.COOLDOWN);
+  }
   
   // Envia o comando para o servidor
   channel.emit(EVENTS.PLAYER.USE_ABILITY, {
     abilityId,
     targetPosition
   });
-  
-  // O efeito visual local agora é gerenciado pelo SkillManager
-  // (o verdadeiro efeito será controlado pelo evento ABILITY_USED do servidor)
 });
 
 // Adiciona chamada no loop de animação
@@ -1244,4 +1368,98 @@ function initServerEvents() {
       console.error('Erro ao processar evento de respawn:', error);
     }
   });
-} 
+
+  // Evento de resposta de sincronização
+  channel.on(EVENTS.PLAYER.SYNC_RESPONSE, data => {
+    try {
+      console.log("Sincronização recebida:", 
+        `Mana: ${data.mana?.toFixed(1)}/${data.maxMana?.toFixed(1)}`, 
+        `Cooldowns: ${Object.keys(data.cooldowns || {}).length}`);
+      
+      // Atualiza a mana do jogador
+      if (player && player.userData && data.mana !== undefined) {
+        // Registra se houve uma mudança significativa na mana
+        const oldMana = player.userData.stats.mana;
+        const manaChange = data.mana - oldMana;
+        if (Math.abs(manaChange) > 1) {
+          console.log(`Mana atualizada: ${oldMana.toFixed(1)} → ${data.mana.toFixed(1)} (${manaChange > 0 ? '+' : ''}${manaChange.toFixed(1)})`);
+        }
+        
+        player.userData.stats.mana = data.mana;
+        
+        if (data.maxMana !== undefined) {
+          player.userData.stats.maxMana = data.maxMana;
+        }
+        
+        // Atualiza HP se fornecido
+        if (data.hp !== undefined) {
+          player.userData.stats.hp = data.hp;
+        }
+        
+        if (data.maxHp !== undefined) {
+          player.userData.stats.maxHp = data.maxHp;
+        }
+        
+        // Atualiza o HUD
+        hudManager.update(player.userData.stats, player.userData.level, 'Arcane');
+        
+        // Atualiza o SkillManager com a mana atual
+        skillManager.updateMana(data.mana);
+      }
+      
+      // Atualiza cooldowns no SkillManager
+      if (data.cooldowns) {
+        const now = Date.now();
+        // Ajuste de tempo com base no timestamp do servidor, se disponível
+        const timeOffset = data.timestamp ? (now - data.timestamp) : 0;
+        
+        for (const abilityId in data.cooldowns) {
+          const cooldownEndTime = data.cooldowns[abilityId];
+          // Ajusta o tempo de fim do cooldown com base na diferença de relógios
+          const adjustedEndTime = cooldownEndTime + timeOffset;
+          
+          // Atualiza o cooldown no SkillManager
+          skillManager.startCooldown(parseInt(abilityId), adjustedEndTime);
+          
+          // Também atualiza na UI
+          const slot = hudManager.abilitySlots.indexOf(parseInt(abilityId)) + 1;
+          if (slot > 0) {
+            const remainingTime = Math.max(0, adjustedEndTime - now);
+            hudManager.setCooldown(slot, remainingTime, remainingTime);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao processar sincronização:", error);
+    }
+  });
+}
+
+// Configurar sincronização periódica
+let lastSyncRequest = 0;
+const SYNC_INTERVAL = 2000; // Reduzido de 5000 para 2000 (a cada 2 segundos)
+
+function requestServerSync() {
+  const now = Date.now();
+  // Limita a frequência de sincronização
+  if (now - lastSyncRequest < SYNC_INTERVAL) return;
+  
+  // Envia requisição de sincronização
+  if (channel && channel.readyState === 1) { // Só envia se estiver conectado
+    console.log("Solicitando sincronização com servidor...");
+    channel.emit(EVENTS.PLAYER.SYNC_REQUEST);
+    lastSyncRequest = now;
+  }
+}
+
+// Adiciona a chamada de sincronização ao loop de animação
+const originalAnimate = animate;
+animate = function() {
+  // Solicita sincronização periodicamente
+  if (player && playerId) {
+    requestServerSync();
+  }
+  
+  // Chama a função de animação original
+  originalAnimate();
+}; 

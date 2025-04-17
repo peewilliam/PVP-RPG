@@ -144,12 +144,18 @@ io.onConnection(channel => {
         
         // Notifica o cliente que a habilidade foi usada
         channel.emit(EVENTS.PLAYER.ABILITY_USED, {
+          id: player.id,
           abilityId: data.abilityId,
           position: player.position,
           targetPosition: data.targetPosition,
           teleport: result.teleportPosition ? true : false,
           teleportPosition: result.teleportPosition,
-          areaEffect: result.areaEffect
+          areaEffect: result.areaEffect,
+          cooldownStart: player.abilityCooldowns[data.abilityId],
+          cooldownDuration: ability.COOLDOWN,
+          cooldownEnd: player.abilityCooldowns[data.abilityId] + ability.COOLDOWN,
+          mana: player.stats.mana,
+          maxMana: player.stats.maxMana
         });
         
         // Notifica outros jogadores sobre a habilidade usada
@@ -201,6 +207,54 @@ io.onConnection(channel => {
         }
       } catch (error) {
         console.error('Erro ao processar uso de habilidade:', error);
+      }
+    });
+
+    // Processa requisições de sincronização
+    channel.on(EVENTS.PLAYER.SYNC_REQUEST, () => {
+      try {
+        const player = gameWorld.entityManager.getPlayer(channel.id);
+        if (!player) return;
+        
+        // Envia mana e cooldowns atualizados para o cliente
+        const cooldowns = {};
+        const now = Date.now();
+        
+        // Para cada habilidade, envia o timestamp de fim do cooldown
+        for (const abilityId in player.abilityCooldowns) {
+          const abilityStartTime = player.abilityCooldowns[abilityId];
+          if (abilityStartTime === 0) continue; // Ignora se não estiver em cooldown
+          
+          const ability = player.getAbilityById(parseInt(abilityId));
+          if (!ability) continue;
+          
+          // Calcula quando o cooldown termina
+          const cooldownEndTime = abilityStartTime + ability.COOLDOWN;
+          
+          // Só envia se ainda estiver em cooldown
+          if (cooldownEndTime > now) {
+            cooldowns[abilityId] = cooldownEndTime;
+          }
+        }
+        
+        channel.emit(EVENTS.PLAYER.SYNC_RESPONSE, {
+          mana: player.stats.mana,
+          maxMana: player.stats.maxMana,
+          hp: player.stats.hp,
+          maxHp: player.stats.maxHp,
+          cooldowns: cooldowns,
+          timestamp: now // Enviando timestamp do servidor para ajustar diferenças de relógio
+        });
+        
+        // Adicionalmente, enviamos um evento MOVED para garantir que os stats estejam sincronizados
+        channel.emit(EVENTS.PLAYER.MOVED, {
+          id: player.id,
+          position: { ...player.position },
+          rotation: player.rotation,
+          stats: { ...player.stats }
+        });
+      } catch (error) {
+        console.error('Erro ao processar sincronização:', error);
       }
     });
   } catch (error) {
