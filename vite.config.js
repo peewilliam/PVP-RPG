@@ -9,7 +9,7 @@ export default defineConfig({
     emptyOutDir: true
   },
   server: {
-    port: 8080,
+    port: 5173,
     open: true,
     cors: true,
     hmr: true,
