@@ -210,3 +210,24 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 ## Sistema de Renderização
 
 [...resto do conteúdo existente...]
+
+## Habilidades de Área e DamageZone
+- Todas as habilidades de área (ex: Meteor Storm, Estacas de Gelo) usam a classe DamageZone para centralizar lógica de dano, ticks e efeitos.
+- DamageZone aceita flags customizadas (ex: frostSpikes) para efeitos especiais.
+- O CombatSystem é responsável por criar e atualizar zonas de dano, além de aplicar efeitos de status.
+
+## Aplicação de Status (Slow)
+- O status de lentidão (slow) é aplicado via DamageZone, usando os parâmetros da habilidade (SLOW, SLOW_DURATION).
+- Player e Monster consultam status.slowedUntil e lastSlowValue para modificar a velocidade de movimento enquanto o efeito estiver ativo.
+
+## Integração Visual Cliente-Servidor
+- O servidor emite o evento `combat:slow` para todos os clientes próximos sempre que um alvo recebe slow.
+- O cliente exibe o efeito visual de congelado/lentidão (ex: cor azul) durante a duração do efeito.
+
+## Robustez e Logs
+- O sistema de combate possui logs detalhados para depuração de zonas, ticks, aplicação de dano e status.
+- Parâmetros de habilidades são validados e edge cases tratados (ex: duração, tickInterval, múltiplos alvos).
+
+## Manutenção e Escalabilidade
+- O padrão DamageZone + eventos permite fácil adição de novas habilidades de área e efeitos de status.
+- Toda a lógica de efeitos é centralizada e desacoplada da renderização visual.

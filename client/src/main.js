@@ -108,7 +108,7 @@ function updateLocalHUDFromServer(data) {
 // Atualiza HUD ao usar habilidade (mana/cooldown)
 channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
   try {
-    console.log("ABILITY_USED recebido:", data);
+    // console.log("ABILITY_USED recebido:", data);
     
     // Se o evento for para o jogador local
     if (data.id === playerId) {
@@ -144,13 +144,13 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
           if (data.cooldownEnd && data.cooldownEnd > now) {
             // Caso 1: Usar timestamp de fim do cooldown (mais preciso)
             remainingCooldown = data.cooldownEnd - now;
-            console.log(`Usando cooldownEnd: ${remainingCooldown}ms restantes`);
+            // console.log(`Usando cooldownEnd: ${remainingCooldown}ms restantes`);
           } 
           else if (data.cooldownStart && data.cooldownDuration) {
             // Caso 2: Calcular com base no início + duração
             const elapsedTime = now - data.cooldownStart;
             remainingCooldown = Math.max(0, data.cooldownDuration - elapsedTime);
-            console.log(`Calculando cooldown: ${remainingCooldown}ms restantes`);
+            // console.log(`Calculando cooldown: ${remainingCooldown}ms restantes`);
           }
           else if (data.cooldown) {
             // Caso 3: Compatibilidade com versão anterior
@@ -160,14 +160,14 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
             } else {
               remainingCooldown = data.cooldown;
             }
-            console.log(`Usando cooldown legado: ${remainingCooldown}ms restantes`);
+            // console.log(`Usando cooldown legado: ${remainingCooldown}ms restantes`);
           }
           else {
             // Caso 4: Fallback para configuração da habilidade
             const ability = skillManager.getAbilityById(data.abilityId);
             if (!ability) return;
             remainingCooldown = ability.COOLDOWN;
-            console.log(`Usando cooldown padrão: ${remainingCooldown}ms restantes`);
+            // console.log(`Usando cooldown padrão: ${remainingCooldown}ms restantes`);
           }
           
           // Garante que o cooldown não seja negativo
@@ -184,7 +184,7 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
             skillManager.startCooldown(data.abilityId, now + remainingCooldown);
           }
           
-          console.log(`Definido cooldown para habilidade ${data.abilityId} (slot ${slot}): ${remainingCooldown}ms | Termina em: ${new Date(now + remainingCooldown).toLocaleTimeString()}`);
+          // console.log(`Definido cooldown para habilidade ${data.abilityId} (slot ${slot}): ${remainingCooldown}ms | Termina em: ${new Date(now + remainingCooldown).toLocaleTimeString()}`);
         }
       }
     }
@@ -228,7 +228,7 @@ channel.on(EVENTS.PLAYER.MOVED, data => {
             const manaChange = newMana - oldMana;
             
             if (Math.abs(manaChange) > 1) {
-              console.log(`Mana atualizada (MOVED): ${oldMana.toFixed(1)} → ${newMana.toFixed(1)} (${manaChange > 0 ? '+' : ''}${manaChange.toFixed(1)})`);
+              // console.log(`Mana atualizada (MOVED): ${oldMana.toFixed(1)} → ${newMana.toFixed(1)} (${manaChange > 0 ? '+' : ''}${manaChange.toFixed(1)})`);
             }
           }
           
@@ -678,6 +678,21 @@ function animate() {
   if (floatingTextManager) {
     floatingTextManager.update();
   }
+
+  if (selectedTargetId && selectedTargetType) {
+    let targetData = null;
+    if (selectedTargetType === 'monster') {
+      targetData = monsterPresenter.getMonsterData(selectedTargetId);
+      if (targetData) {
+        updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
+      }
+    } else if (selectedTargetType === 'player') {
+      targetData = playerPresenter.getPlayerData(selectedTargetId);
+      if (targetData) {
+        updateTargetHUD(formatTargetForHUD(targetData, 'player'));
+      }
+    }
+  }
 }
 
 // Conexão ao servidor
@@ -965,11 +980,26 @@ window.addEventListener('mousedown', (event) => {
       selectedTargetType = 'monster';
       highlightTarget(mesh);
       found = true;
+      // INTEGRAÇÃO HUD
+      const monster = monsterPresenter.getMonsterData(id);
+      const target = {
+        id,
+        type: 'monster',
+        name: monster?.monsterType || '???',
+        hp: monster?.stats?.hp,
+        maxHp: monster?.stats?.maxHp,
+        energy: 0,
+        maxEnergy: 0,
+        status: []
+      };
+      if (monster?.status?.slowedUntil && monster.status.slowedUntil > Date.now()) {
+        target.status.push({ type: 'slow', icon: '❄️', tooltip: 'Lento' });
+      }
+      updateTargetHUD(target);
       break;
     }
   }
   if (!found) {
-    // Checa jogadores (exceto o local)
     for (const [id, mesh] of playerPresenter.players.entries()) {
       if (id === playerId) continue;
       const intersects = raycaster.intersectObject(mesh, true);
@@ -978,6 +1008,22 @@ window.addEventListener('mousedown', (event) => {
         selectedTargetType = 'player';
         highlightTarget(mesh);
         found = true;
+        // INTEGRAÇÃO HUD
+        const playerData = playerPresenter.getPlayerData(id);
+        const target = {
+          id,
+          type: 'player',
+          name: playerData?.name || '???',
+          hp: playerData?.stats?.hp,
+          maxHp: playerData?.stats?.maxHp,
+          energy: playerData?.stats?.mana || 0,
+          maxEnergy: playerData?.stats?.maxMana || 0,
+          status: []
+        };
+        if (playerData?.status?.slowedUntil && playerData.status.slowedUntil > Date.now()) {
+          target.status.push({ type: 'slow', icon: '❄️', tooltip: 'Lento' });
+        }
+        updateTargetHUD(target);
         break;
       }
     }
@@ -986,21 +1032,28 @@ window.addEventListener('mousedown', (event) => {
     selectedTargetId = null;
     selectedTargetType = null;
     highlightTarget(null);
+    updateTargetHUD(null);
   }
 });
 
 // Remove outline se o alvo morrer/desaparecer
 function clearTargetIfInvalid() {
   if (!selectedTargetId) return;
-  if (selectedTargetType === 'monster' && !monsterPresenter.monsters.has(selectedTargetId)) {
-    selectedTargetId = null;
-    selectedTargetType = null;
-    highlightTarget(null);
-  }
-  if (selectedTargetType === 'player' && !playerPresenter.players.has(selectedTargetId)) {
-    selectedTargetId = null;
-    selectedTargetType = null;
-    highlightTarget(null);
+  
+  if (selectedTargetType === 'monster') {
+    const monsterExists = monsterPresenter.monsters.has(selectedTargetId);
+    if (!monsterExists) {
+      selectedTargetId = null;
+      selectedTargetType = null;
+      updateTargetHUD(null); // Esconde HUD
+    }
+  } else if (selectedTargetType === 'player') {
+    const playerExists = playerPresenter.players.has(selectedTargetId);
+    if (!playerExists) {
+      selectedTargetId = null;
+      selectedTargetType = null;
+      updateTargetHUD(null); // Esconde HUD
+    }
   }
 }
 
@@ -1240,6 +1293,38 @@ function initServerEvents() {
     try {
       if (!data || !data.targetId || !data.damage) return;
       
+      // ADICIONADO: Verificação de morte com base no campo died
+      if (data.died === true) {
+        // Se o alvo morreu, defina HP como 0 imediatamente
+        if (data.targetType === 'monster') {
+          const monsterMesh = monsterPresenter.getMonster(data.targetId);
+          if (monsterMesh && monsterMesh.userData && monsterMesh.userData.stats) {
+            monsterMesh.userData.stats.hp = 0;
+            
+            // Se o monstro morto era o alvo selecionado, atualize imediatamente o HUD
+            if (selectedTargetId === data.targetId && selectedTargetType === 'monster') {
+              const targetData = monsterPresenter.getMonsterData(data.targetId);
+              if (targetData) {
+                updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
+              }
+            }
+          }
+        } else if (data.targetType === 'player') {
+          const playerMesh = playerPresenter.getPlayer(data.targetId);
+          if (playerMesh && playerMesh.userData && playerMesh.userData.stats) {
+            playerMesh.userData.stats.hp = 0;
+            
+            // Se o jogador morto era o alvo selecionado, atualize imediatamente o HUD
+            if (selectedTargetId === data.targetId && selectedTargetType === 'player') {
+              const targetData = playerPresenter.getPlayerData(data.targetId);
+              if (targetData) {
+                updateTargetHUD(formatTargetForHUD(targetData, 'player'));
+              }
+            }
+          }
+        }
+      }
+      
       // Encontra o alvo (baseado no tipo)
       let targetEntity = null;
       if (data.targetType === 'monster') {
@@ -1327,6 +1412,37 @@ function initServerEvents() {
         
         // Desativa controles temporariamente
         playerControlsEnabled = false;
+        
+        // Zera a vida do jogador local
+        if (player && player.userData && player.userData.stats) {
+          player.userData.stats.hp = 0;
+        }
+      }
+      
+      // Efeito visual de morte do jogador
+      const playerMesh = playerPresenter.getPlayer(data.id);
+      if (playerMesh) {
+        // Zera a vida do jogador no userData
+        if (playerMesh.userData && playerMesh.userData.stats) {
+          playerMesh.userData.stats.hp = 0;
+        }
+        
+        // Adicionar efeito visual de jogador morto (deitado)
+        playerMesh.rotation.x = Math.PI / 2; // Deitar o jogador
+        playerMesh.position.y = 0.1; // Abaixar para o chão
+        if (playerMesh.material) {
+          playerMesh.material.opacity = 0.7;
+          playerMesh.material.transparent = true;
+        }
+      }
+      
+      // Se o jogador morto era o alvo selecionado e não é o jogador local,
+      // limpa a HUD do alvo (para jogador local, manteremos a seleção)
+      if (selectedTargetId === data.id && selectedTargetType === 'player' && data.id !== playerId) {
+        selectedTargetId = null;
+        selectedTargetType = null;
+        updateTargetHUD(null); // Esconde HUD
+        highlightTarget(null); // Remove destaque visual
       }
     } catch (error) {
       console.error('Erro ao processar evento de morte:', error);
@@ -1339,9 +1455,15 @@ function initServerEvents() {
       if (!data) return;
       
       // Se for o jogador local
-      if (data.position) {
+      if (data.id === playerId) {
         // Atualiza posição
         player.position.set(data.position.x, data.position.y, data.position.z);
+        
+        // Reseta rotação (jogador em pé novamente)
+        player.rotation.x = 0;
+        if (player.material) {
+          player.material.opacity = 1.0;
+        }
         
         // Atualiza a HUD com os novos valores
         if (data.stats) {
@@ -1353,8 +1475,21 @@ function initServerEvents() {
         
         // Reativa controles
         playerControlsEnabled = true;
-        
-        // Efeito visual de respawn
+      } else {
+        // Outro jogador respawnou
+        const otherPlayerMesh = playerPresenter.getPlayer(data.id);
+        if (otherPlayerMesh) {
+          // Reseta efeitos visuais de morte
+          otherPlayerMesh.rotation.x = 0;
+          otherPlayerMesh.position.y = 0;
+          if (otherPlayerMesh.material) {
+            otherPlayerMesh.material.opacity = 1.0;
+          }
+        }
+      }
+      
+      // Efeito visual de respawn
+      if (data.position) {
         floatingTextManager.createFloatingText({
           text: 'Respawn!',
           position: data.position,
@@ -1433,6 +1568,51 @@ function initServerEvents() {
       console.error("Erro ao processar sincronização:", error);
     }
   });
+
+  // Evento de morte de monstro
+  channel.on(EVENTS.MONSTER.DEATH, data => {
+    try {
+      if (!data || !data.id) {
+        console.warn('Dados de morte de monstro inválidos:', data);
+        return;
+      }
+      
+      console.log(`Monstro morreu: ${data.id}`);
+      
+      // Monstro agora está morto - atualiza seus dados para mostrar HP 0
+      const monsterMesh = monsterPresenter.getMonster(data.id);
+      if (monsterMesh && monsterMesh.userData && monsterMesh.userData.stats) {
+        monsterMesh.userData.stats.hp = 0; // Garante que HP é zero quando morto
+      }
+      
+      // Se o monstro era o alvo selecionado, limpa a HUD do alvo IMEDIATAMENTE
+      if (selectedTargetId === data.id && selectedTargetType === 'monster') {
+        selectedTargetId = null;
+        selectedTargetType = null;
+        updateTargetHUD(null); // Esconde HUD
+        highlightTarget(null); // Remove destaque visual
+      }
+      
+      // Adiciona efeito visual de morte (opcional)
+      if (monsterMesh) {
+        // Efeito visual de morte - pode ser uma animação, textura ou partícula
+        monsterMesh.rotation.x = Math.PI / 2; // Deita o monstro
+        monsterMesh.position.y = 0.1; // Coloca próximo ao chão
+        if (monsterMesh.material) {
+          monsterMesh.material.opacity = 0.7; // Deixa translúcido
+          monsterMesh.material.transparent = true;
+        }
+      }
+      
+      // Remove o corpo do monstro após um curto delay (para animações)
+      setTimeout(() => {
+        monsterPresenter.removeMonster(data.id);
+      }, 2000); // 2 segundos de delay para mostrar animação de morte
+      
+    } catch (error) {
+      console.error('Erro ao processar morte de monstro:', error);
+    }
+  });
 }
 
 // Configurar sincronização periódica
@@ -1462,4 +1642,115 @@ animate = function() {
   
   // Chama a função de animação original
   originalAnimate();
-}; 
+};
+
+function formatTargetForHUD(data, type) {
+  // Verificações de alvo morto
+  let hp = data.stats?.hp;
+  const maxHp = data.stats?.maxHp || 1;
+  
+  // Verificação se o HP é menor ou igual a zero
+  if (hp <= 0) {
+    hp = 0;
+  }
+  
+  // Verificação adicional para monstros: se está deitado (rotação aproximada a Math.PI/2), está morto
+  if (type === 'monster' && data.id) {
+    const mesh = monsterPresenter.getMonster(data.id);
+    if (mesh && mesh.rotation && Math.abs(mesh.rotation.x - Math.PI/2) < 0.1) {
+      hp = 0; // Monstro está deitado (morto), então HP é zero
+    }
+  }
+  
+  // Verificação para jogadores: se está deitado, está morto
+  if (type === 'player' && data.id) {
+    const mesh = playerPresenter.getPlayer(data.id);
+    if (mesh && mesh.rotation && Math.abs(mesh.rotation.x - Math.PI/2) < 0.1) {
+      hp = 0; // Jogador está deitado (morto), então HP é zero
+    }
+  }
+  
+  return {
+    id: data.id,
+    type,
+    name: data.name || data.monsterType || '???',
+    hp: hp,
+    maxHp: maxHp,
+    energy: data.stats?.mana || 0,
+    maxEnergy: data.stats?.maxMana || 0,
+    status: [
+      ...(data.status?.slowedUntil && data.status.slowedUntil > Date.now()
+        ? [{ icon: '❄️', alt: 'Slow', tooltip: 'Lento (movimento reduzido)' }]
+        : [])
+      // Adicione outros status aqui
+    ]
+  };
+}
+
+function updateTargetHUD(target) {
+  const hud = document.querySelector('.target-ui');
+  
+  // Se não tiver alvo, esconde o HUD
+  if (!hud || !target) {
+    if (hud) hud.style.display = 'none';
+    return;
+  }
+  
+  // NOVA VERIFICAÇÃO: Se HP = 0, limpa o alvo e esconde o HUD imediatamente
+  // (exceto se for o jogador local)
+  if (target.hp <= 0 && !(target.type === 'player' && target.id === playerId)) {
+    // Limpa a seleção do alvo
+    selectedTargetId = null;
+    selectedTargetType = null;
+    highlightTarget(null);
+    
+    // Esconde o HUD
+    hud.style.display = 'none';
+    return;
+  }
+  
+  // Se chegou aqui, exibe e atualiza o HUD normalmente
+  hud.style.display = 'block';
+  hud.querySelector('.target-icon').textContent = target.type === 'player' ? '👤' : '👹';
+  hud.querySelector('.target-name').textContent = target.name;
+  
+  // Vida
+  const hpPercent = (target.hp / target.maxHp) * 100;
+  hud.querySelector('.hp-fill').style.width = hpPercent + '%';
+  hud.querySelector('.hp-text').textContent = `${target.hp} / ${target.maxHp}`;
+  
+  // Mana/energia
+  const manaBar = hud.querySelector('.mana-bar');
+  if (target.maxEnergy) {
+    manaBar.style.display = 'block';
+    const manaPercent = (target.energy / target.maxEnergy) * 100;
+    hud.querySelector('.mana-fill').style.width = manaPercent + '%';
+    hud.querySelector('.mana-text').textContent = `${target.energy} / ${target.maxEnergy}`;
+  } else {
+    manaBar.style.display = 'none';
+  }
+  
+  // Status
+  const statusDiv = hud.querySelector('.target-status');
+  statusDiv.innerHTML = '';
+  (target.status || []).forEach(st => {
+    if (st.icon.startsWith('http') || st.icon.includes('.')) {
+      // Se for URL ou caminho de arquivo, usa <img>
+      const img = document.createElement('img');
+      img.src = st.icon;
+      img.alt = st.alt || '';
+      img.title = st.tooltip || '';
+      statusDiv.appendChild(img);
+    } else {
+      // Se for emoji ou texto, usa <span>
+      const span = document.createElement('span');
+      span.textContent = st.icon;
+      span.alt = st.alt || '';
+      span.title = st.tooltip || '';
+      span.style.fontSize = '20px';
+      span.style.lineHeight = '20px';
+      span.style.cursor = 'help';
+      statusDiv.appendChild(span);
+    }
+  });
+} 

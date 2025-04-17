@@ -84,6 +84,113 @@ export class HUDManager {
     `;
     document.body.appendChild(this.hud);
     this.renderAbilitySlots();
+
+    // --- HUD de Alvo (Target) ---
+    if (!document.querySelector('.target-ui')) {
+      const targetHud = document.createElement('div');
+      targetHud.className = 'target-ui';
+      targetHud.style.display = 'none';
+      targetHud.innerHTML = `
+        <div class="target-header">
+          <span class="target-icon">👤</span>
+          <span class="target-name">Nome</span>
+        </div>
+        <div class="target-bars">
+          <div class="hp-bar">
+            <div class="hp-fill" style="width: 100%"></div>
+            <span class="hp-text">0 / 0</span>
+          </div>
+          <div class="mana-bar">
+            <div class="mana-fill" style="width: 100%"></div>
+            <span class="mana-text">0 / 0</span>
+          </div>
+        </div>
+        <div class="target-status"></div>
+      `;
+      
+      // Estilização completa conforme especificado
+      targetHud.style.position = 'absolute';
+      targetHud.style.top = '50px';
+      targetHud.style.left = '50%';
+      targetHud.style.transform = 'translateX(-50%)';
+      targetHud.style.width = '400px';
+      targetHud.style.backgroundColor = 'rgba(20, 20, 20, 0.7)';
+      targetHud.style.borderRadius = '10px';
+      targetHud.style.padding = '10px';
+      targetHud.style.fontFamily = 'Segoe UI, sans-serif';
+      targetHud.style.color = 'white';
+      targetHud.style.boxShadow = '0 0 10px #000';
+      targetHud.style.zIndex = '3000';
+      
+      // Estilização do cabeçalho
+      const header = targetHud.querySelector('.target-header');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.fontWeight = 'bold';
+      header.style.marginBottom = '5px';
+      header.style.fontSize = '14px';
+      
+      // Estilização das barras
+      const bars = targetHud.querySelector('.target-bars');
+      bars.style.marginBottom = '5px';
+      
+      // Estilização das barras de HP e mana
+      const hpBar = targetHud.querySelector('.hp-bar');
+      const manaBar = targetHud.querySelector('.mana-bar');
+      [hpBar, manaBar].forEach(bar => {
+        bar.style.position = 'relative';
+        bar.style.height = '20px';
+        bar.style.borderRadius = '4px';
+        bar.style.overflow = 'hidden';
+        bar.style.marginBottom = '3px';
+      });
+      
+      // Estilização específica da barra de HP
+      hpBar.style.backgroundColor = '#440000';
+      const hpFill = targetHud.querySelector('.hp-fill');
+      hpFill.style.background = 'linear-gradient(to right, #ff3333, #cc0000)';
+      hpFill.style.height = '100%';
+      const hpText = targetHud.querySelector('.hp-text');
+      hpText.style.position = 'absolute';
+      hpText.style.width = '100%';
+      hpText.style.textAlign = 'center';
+      hpText.style.top = '0';
+      hpText.style.lineHeight = '20px';
+      hpText.style.fontSize = '13px';
+      
+      // Estilização específica da barra de mana
+      manaBar.style.backgroundColor = '#003366';
+      const manaFill = targetHud.querySelector('.mana-fill');
+      manaFill.style.background = 'linear-gradient(to right, #3399ff, #0066cc)';
+      manaFill.style.height = '100%';
+      const manaText = targetHud.querySelector('.mana-text');
+      manaText.style.position = 'absolute';
+      manaText.style.width = '100%';
+      manaText.style.textAlign = 'center';
+      manaText.style.top = '0';
+      manaText.style.lineHeight = '20px';
+      manaText.style.fontSize = '13px';
+      
+      // Estilização dos ícones de status
+      const statusDiv = targetHud.querySelector('.target-status');
+      statusDiv.style.display = 'flex';
+      statusDiv.style.gap = '5px';
+      statusDiv.style.justifyContent = 'flex-end';
+      
+      // Estilo para as imagens de status (aplicado via JS ao criar dinamicamente)
+      const styleSheet = document.createElement('style');
+      styleSheet.type = 'text/css';
+      styleSheet.textContent = `
+        .target-status img {
+          width: 20px;
+          height: 20px;
+        }
+      `;
+      document.head.appendChild(styleSheet);
+      
+      document.body.appendChild(targetHud);
+    }
+
     // Cria o elemento de tooltip customizado
     this.tooltip = document.createElement('div');
     this.tooltip.id = 'hud-tooltip';
@@ -407,5 +514,72 @@ export class HUDManager {
         slotDiv.style.background = '#1a1a1a80'; // Fundo mais escuro
       }
     }
+  }
+
+  // --- HUD de Alvo (Target) ---
+  updateMonsterHUD(target) {
+    const hud = document.querySelector('.target-ui');
+    if (!hud) return;
+    hud.style.display = 'block';
+    hud.querySelector('.target-icon').textContent = '👹';
+    hud.querySelector('.target-name').textContent = target.name;
+    // Vida
+    const hpPercent = (target.hp / target.maxHp) * 100;
+    hud.querySelector('.hp-fill').style.width = hpPercent + '%';
+    hud.querySelector('.hp-text').textContent = `${target.hp} / ${target.maxHp}`;
+    // Esconde barra de mana/energia
+    hud.querySelector('.mana-bar').style.display = 'none';
+    // Status
+    const statusDiv = hud.querySelector('.target-status');
+    statusDiv.innerHTML = '';
+    (target.status || []).forEach(st => {
+      const span = document.createElement('span');
+      span.textContent = st.icon;
+      span.title = st.tooltip;
+      span.className = 'status-icon';
+      statusDiv.appendChild(span);
+    });
+  }
+
+  updatePlayerHUD(target) {
+    const hud = document.querySelector('.target-ui');
+    if (!hud) return;
+    hud.style.display = 'block';
+    hud.querySelector('.target-icon').textContent = '👤';
+    hud.querySelector('.target-name').textContent = target.name;
+    // Vida
+    const hpPercent = (target.hp / target.maxHp) * 100;
+    hud.querySelector('.hp-fill').style.width = hpPercent + '%';
+    hud.querySelector('.hp-text').textContent = `${target.hp} / ${target.maxHp}`;
+    // Mana/energia
+    const manaBar = hud.querySelector('.mana-bar');
+    if (target.maxEnergy) {
+      manaBar.style.display = 'block';
+      const manaPercent = (target.energy / target.maxEnergy) * 100;
+      hud.querySelector('.mana-fill').style.width = manaPercent + '%';
+      hud.querySelector('.mana-text').textContent = `${target.energy} / ${target.maxEnergy}`;
+    } else {
+      manaBar.style.display = 'none';
+    }
+    // Status
+    const statusDiv = hud.querySelector('.target-status');
+    statusDiv.innerHTML = '';
+    (target.status || []).forEach(st => {
+      const span = document.createElement('span');
+      span.textContent = st.icon;
+      span.title = st.tooltip;
+      span.className = 'status-icon';
+      statusDiv.appendChild(span);
+    });
+  }
+
+  clearMonsterHUD() {
+    const hud = document.querySelector('.target-ui');
+    if (hud) hud.style.display = 'none';
+  }
+
+  clearPlayerHUD() {
+    const hud = document.querySelector('.target-ui');
+    if (hud) hud.style.display = 'none';
   }
 } 

@@ -58,6 +58,12 @@ export class GameWorld {
     // Atualiza todas as entidades
     this.entityManager.update(safeDeltaTime);
     
+    // Atualiza projéteis (colisão e dano)
+    this.combatSystem.updateProjectiles(safeDeltaTime);
+    
+    // Atualiza zonas de dano (Meteor Storm, etc)
+    this.combatSystem.updateDamageZones(safeDeltaTime);
+    
     // Verifica e resolve colisões
     this.collisionSystem.update();
     

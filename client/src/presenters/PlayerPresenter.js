@@ -188,4 +188,19 @@ export class PlayerPresenter {
       this.removePlayer(id);
     }
   }
+
+  /**
+   * Retorna os dados completos do player selecionado
+   * @param {string} id - ID do player
+   * @returns {Object|null} - Dados do player (userData + status) ou null
+   */
+  getPlayerData(id) {
+    const mesh = this.getPlayer(id);
+    if (!mesh) return null;
+    // Retorna userData + status (se existir)
+    return {
+      ...mesh.userData,
+      status: mesh.userData.status || {},
+    };
+  }
 } 

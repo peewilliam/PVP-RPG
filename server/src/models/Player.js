@@ -80,7 +80,10 @@ export class Player extends Entity {
     
     // Usamos a velocidade base definida nas constantes
     // Essa velocidade é calibrada para o tick rate do servidor
-    const moveSpeed = PLAYER.SPEED * this.speedModifier;
+    let moveSpeed = PLAYER.SPEED * this.speedModifier;
+    if (this.status && this.status.slowedUntil && this.status.slowedUntil > Date.now()) {
+      moveSpeed *= (this.lastSlowValue || 0.4);
+    }
     let dirX = 0;
     let dirZ = 0;
     

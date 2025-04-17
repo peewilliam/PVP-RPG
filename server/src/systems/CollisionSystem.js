@@ -134,7 +134,7 @@ export class CollisionSystem {
       if (entity.distanceTo(worldObject) < totalRadius) {
         // Log de colisão para depuração
         if (process.env.DEBUG_COLLISIONS === 'true') {
-          console.log(`Colisão detectada: ${entity.type} (${entity.id}) com ${worldObject.objectType} (${worldObject.id})`);
+          // console.log(`Colisão detectada: ${entity.type} (${entity.id}) com ${worldObject.objectType} (${worldObject.id})`);
         }
         
         // Resolver a colisão (empurrar a entidade para fora do objeto)
@@ -160,7 +160,7 @@ export class CollisionSystem {
       if (entity.distanceTo(other) < totalRadius) {
         // Log de colisão para depuração
         if (process.env.DEBUG_COLLISIONS === 'true') {
-          console.log(`Colisão detectada: ${entity.type} (${entity.id}) com ${other.type} (${other.id})`);
+          // console.log(`Colisão detectada: ${entity.type} (${entity.id}) com ${other.type} (${other.id})`);
         }
         
         // Resolver a colisão (empurrar as entidades para fora uma da outra)
@@ -199,7 +199,7 @@ export class CollisionSystem {
     
     // Log detalhado da resolução de colisão
     if (process.env.DEBUG_COLLISIONS === 'true') {
-      console.log(`Resolvendo colisão: penetração de ${penetration.toFixed(2)} unidades`);
+      // console.log(`Resolvendo colisão: penetração de ${penetration.toFixed(2)} unidades`);
     }
     
     // Normaliza o vetor de direção
@@ -213,7 +213,7 @@ export class CollisionSystem {
       entity1.position.z -= dirZ * penetration;
       
       if (process.env.DEBUG_COLLISIONS === 'true') {
-        console.log(`Entidade ${entity1.id} empurrada para fora do objeto ${entity2.id}`);
+        // console.log(`Entidade ${entity1.id} empurrada para fora do objeto ${entity2.id}`);
       }
     }
     // Se ambas forem dinâmicas (jogador ou monstro), ambas se movem
@@ -227,7 +227,7 @@ export class CollisionSystem {
       entity2.position.z += dirZ * (penetration * 0.5);
       
       if (process.env.DEBUG_COLLISIONS === 'true') {
-        console.log(`Ambas entidades ${entity1.id} e ${entity2.id} empurradas em direções opostas`);
+        // console.log(`Ambas entidades ${entity1.id} e ${entity2.id} empurradas em direções opostas`);
       }
     }
   }
@@ -281,6 +281,6 @@ export class CollisionSystem {
   cleanup() {
     // Atualmente não há recursos para limpar, mas mantemos o método
     // para consistência com outros sistemas e para facilitar extensões futuras
-    console.log('CollisionSystem: Recursos liberados');
+    // console.log('CollisionSystem: Recursos liberados');
   }
 } 

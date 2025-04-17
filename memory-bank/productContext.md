@@ -40,4 +40,9 @@ Este MMORPG topdown isométrico foi concebido para oferecer uma experiência de 
 - Jogadores de MMORPGs que procuram uma experiência mais direta e focada em ação
 - Fãs de jogos topdown isométricos
 - Jogadores que gostam de classes mágicas e sistemas de habilidades
-- Entusiastas de jogos multiplayer cooperativos 
+- Entusiastas de jogos multiplayer cooperativos
+
+O sistema agora oferece feedback visual e mecânico consistente para habilidades de área e efeitos de status:
+- Jogadores e monstros recebem dano e efeitos (ex: slow) de forma clara e previsível.
+- O efeito de slow é visível no cliente, reforçando o impacto das habilidades e melhorando a clareza do combate.
+- A arquitetura permite fácil expansão para novos efeitos e habilidades, mantendo a experiência do usuário fluida e responsiva. 

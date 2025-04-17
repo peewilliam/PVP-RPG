@@ -2,7 +2,7 @@
  * Sistema de combate que gerencia interações de combate entre jogadores e monstros
  * Suporta tanto combate PvE (Player vs Environment) quanto PvP (Player vs Player)
  */
-import { WORLD, EVENTS } from '../../../shared/constants/gameConstants.js';
+import { WORLD, EVENTS, ABILITY_IDS } from '../../../shared/constants/gameConstants.js';
 
 export class CombatSystem {
   /**
@@ -55,7 +55,7 @@ export class CombatSystem {
     console.log(`Parâmetros da habilidade:`, effect);
     
     // Trata cada tipo de habilidade de forma diferente
-    if (ability.TYPE === 'mobility' && ability.ID === 2) { // Teleporte
+    if (ability.TYPE === 'mobility' && ability.ID === ABILITY_IDS.TELEPORT) { // Teleporte
       // Calcula distância do teleporte
       const dx = targetPosition.x - origin.x;
       const dz = targetPosition.z - origin.z;
@@ -84,28 +84,106 @@ export class CombatSystem {
         y: 0,
         z: targetPosition.z - origin.z
       };
-      
-      // Normaliza o vetor
       const projLen = Math.sqrt(projVec.x * projVec.x + projVec.z * projVec.z);
       const normVec = {
         x: projVec.x / projLen,
         y: 0,
         z: projVec.z / projLen
       };
-      
-      // Verifica colisão com monstros
-      this._checkProjectileCollisionWithEntities(
-        origin, normVec, effect, player, result, this.entityManager.monsters.values(), 'monster'
-      );
-      
-      // Verifica colisão com outros jogadores (PvP)
-      this._checkProjectileCollisionWithEntities(
-        origin, normVec, effect, player, result, this.entityManager.players.values(), 'player'
-      );
+      // Cria o projétil persistente
+      this.entityManager.createProjectile({
+        position: { ...origin },
+        direction: normVec,
+        speed: effect.speed,
+        radius: 0.4, // Raio da fireball
+        maxLifetime: effect.duration * 1000, // ms
+        owner: player,
+        ability: ability
+      });
+      // O resultado não terá hits imediatos, pois o dano será processado no impacto
+      return result;
     } 
     else if (ability.TYPE === 'aoe' || ability.TYPE === 'zone') {
-      // Dano em área no ponto alvo
-      this._applyAreaEffect(targetPosition, effect.areaRadius, effect.damage, player, result);
+      // Verifica se é Meteor Storm (Chuva de Meteoros)
+      if (ability.TYPE === 'zone' && ability.ID === ABILITY_IDS.METEOR_STORM) {
+        // console.log(`[DEBUG] Criando zona de dano para Meteor Storm (ID=${ability.ID}) no local (${targetPosition.x.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+        // console.log(`[DEBUG] Tipo da habilidade: ${ability.TYPE}, ID esperado (ABILITY_IDS.METEOR_STORM): ${ABILITY_IDS.METEOR_STORM}`);
+        // console.log(`[DEBUG] Valores originais: DURATION=${ability.DURATION}, TICK_INTERVAL=${ability.TICK_INTERVAL}`);
+        
+        // Verifica se DURATION já está em ms (valor > 100) ou em segundos (valor < 100)
+        let durationMs;
+        if (ability.DURATION > 100) {
+          // Já está em ms, usa direto
+          durationMs = ability.DURATION;
+        } else {
+          // Está em segundos, converte para ms
+          durationMs = ability.DURATION * 1000;
+        }
+        
+        // Verifica se TICK_INTERVAL já está em ms (valor > 100) ou em segundos (valor < 100)
+        let tickIntervalMs;
+        if (ability.TICK_INTERVAL > 100) {
+          // Já está em ms, usa direto
+          tickIntervalMs = ability.TICK_INTERVAL;
+        } else {
+          // Está em segundos, converte para ms
+          tickIntervalMs = (ability.TICK_INTERVAL || 0.5) * 1000;
+        }
+        
+        // Validação para garantir que a duração e o tick interval estejam dentro de limites razoáveis
+        if (durationMs > 60000) { // Não permitir durações maiores que 1 minuto
+          console.warn(`[AVISO] Duração ${durationMs}ms muito longa, limitando a 60000ms`);
+          durationMs = 60000;
+        }
+        
+        if (tickIntervalMs > 10000) { // Não permitir intervalos maiores que 10 segundos
+          console.warn(`[AVISO] Intervalo de tick ${tickIntervalMs}ms muito longo, limitando a 10000ms`);
+          tickIntervalMs = 10000;
+        }
+        
+        // Cria zona de dano contínua
+        const zoneParams = {
+          position: { ...targetPosition },
+          radius: ability.AREA_RADIUS || 3,
+          duration: durationMs,
+          tickInterval: tickIntervalMs,
+          damage: ability.DAMAGE || 10,
+          owner: player,
+          ability: ability
+        };
+        
+        // console.log(`[DEBUG] Parâmetros da zona:`, zoneParams);
+        const zone = this.entityManager.createDamageZone(zoneParams);
+        // console.log(`[DEBUG] Zona de dano criada com ID: ${zone.id}, duração: ${zoneParams.duration}ms, tickInterval: ${zoneParams.tickInterval}ms`);
+        
+        // O resultado não terá hits imediatos
+        return result;
+      }
+      // Frost Spikes (Estacas de Gelo)
+      else if (ability.TYPE === 'aoe' && ability.ID === ABILITY_IDS.FROST_SPIKES) {
+        console.log(`[DEBUG] Criando zona instantânea para Estacas de Gelo (ID=${ability.ID}) no local (${targetPosition.x.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);
+        // Zona instantânea: duração e tickInterval muito curtos (100ms)
+        const durationMs = 100;
+        const tickIntervalMs = 100;
+        const zoneParams = {
+          position: { ...targetPosition },
+          radius: ability.AREA_RADIUS || 3,
+          duration: durationMs,
+          tickInterval: tickIntervalMs,
+          damage: ability.DAMAGE || 10,
+          owner: player,
+          ability: ability,
+          frostSpikes: true // flag para identificar zona especial
+        };
+        console.log(`[DEBUG] Parâmetros da zona Frost Spikes:`, zoneParams);
+        const zone = this.entityManager.createDamageZone(zoneParams);
+        console.log(`[DEBUG] Zona instantânea criada com ID: ${zone.id}`);
+        return result;
+      } else {
+        // Dano em área instantâneo (ex: Estacas de Gelo)
+        // console.log(`[DEBUG] Aplicando efeito de área instantâneo (tipo: ${ability.TYPE}, ID: ${ability.ID})`);
+        this._applyAreaEffect(targetPosition, effect.areaRadius, effect.damage, player, result);
+      }
     }
     
     // Log do resultado
@@ -274,6 +352,206 @@ export class CombatSystem {
           level: player.level
         });
       }, 2000); // 2 segundos de "tela de morte"
+    }
+  }
+
+  /**
+   * Atualiza todos os projéteis ativos, verifica colisão e aplica dano
+   * Deve ser chamado a cada tick do mundo
+   * @param {number} deltaTime - Tempo desde a última atualização (ms)
+   */
+  updateProjectiles(deltaTime) {
+    for (const [id, projectile] of this.entityManager.projectiles) {
+      if (!projectile.active || projectile.markedForRemoval) continue;
+      // Log posição do projétil
+      console.log(`[PROJETIL] ${id} pos=(${projectile.position.x.toFixed(2)},${projectile.position.z.toFixed(2)}) owner=${projectile.owner?.id}`);
+      // Checa colisão com monstros
+      for (const monster of this.entityManager.monsters.values()) {
+        if (!monster.active || monster.stats.hp <= 0) continue;
+        const dist = Math.sqrt(
+          Math.pow(monster.position.x - projectile.position.x, 2) +
+          Math.pow(monster.position.z - projectile.position.z, 2)
+        );
+        // Log posição do monstro
+        console.log(`[MONSTRO] ${monster.id} pos=(${monster.position.x.toFixed(2)},${monster.position.z.toFixed(2)}) dist=${dist.toFixed(2)}`);
+        if (dist < (monster.collisionRadius + projectile.collisionRadius)) {
+          console.log(`[COLISAO] Projétil ${id} colidiu com monstro ${monster.id}`);
+          // Aplica dano
+          const damage = projectile.ability.DAMAGE;
+          const died = monster.takeDamage(damage, projectile.owner);
+          console.log(`[DANO] Aplicado ${damage} ao monstro ${monster.id} (morreu=${died})`);
+          // Feedback visual: emitir evento de dano para TODOS os jogadores conectados
+          for (const player of this.entityManager.players.values()) {
+            if (player.channel) {
+              player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+                targetId: monster.id,
+                targetType: 'monster',
+                damage,
+                died,
+                position: { ...monster.position }
+              });
+            }
+          }
+          console.log(`[EVENTO] DAMAGE_DEALT emitido para todos os jogadores (monstro atingido)`);
+          projectile.markedForRemoval = true;
+          break;
+        }
+      }
+      // Checa colisão com jogadores (PvP)
+      for (const player of this.entityManager.players.values()) {
+        if (!player.active || player.stats.hp <= 0 || player.id === projectile.owner.id) continue;
+        const dist = Math.sqrt(
+          Math.pow(player.position.x - projectile.position.x, 2) +
+          Math.pow(player.position.z - projectile.position.z, 2)
+        );
+        // Log posição do jogador
+        console.log(`[JOGADOR] ${player.id} pos=(${player.position.x.toFixed(2)},${player.position.z.toFixed(2)}) dist=${dist.toFixed(2)}`);
+        if (dist < (player.collisionRadius + projectile.collisionRadius)) {
+          console.log(`[COLISAO] Projétil ${id} colidiu com jogador ${player.id}`);
+          // Aplica dano PvP
+          const damage = Math.round(projectile.ability.DAMAGE * (this.damageMultipliers.player.player || 1.0));
+          const died = player.takeDamage(damage, projectile.owner);
+          console.log(`[DANO] Aplicado ${damage} ao jogador ${player.id} (morreu=${died})`);
+          // Feedback visual: emitir evento de dano para o lançador
+          if (projectile.owner && projectile.owner.channel) {
+            projectile.owner.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+              targetId: player.id,
+              targetType: 'player',
+              damage,
+              died,
+              position: { ...player.position }
+            });
+            console.log(`[EVENTO] DAMAGE_DEALT emitido para lançador ${projectile.owner.id}`);
+          }
+          // Emitir também para o alvo atingido (caso seja jogador)
+          if (player.channel) {
+            player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+              targetId: player.id,
+              targetType: 'player',
+              damage,
+              died,
+              position: { ...player.position }
+            });
+            console.log(`[EVENTO] DAMAGE_DEALT emitido para alvo ${player.id}`);
+          }
+          projectile.markedForRemoval = true;
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Atualiza todas as zonas de dano, aplicando dano periódico
+   * @param {number} deltaTime - Tempo desde a última atualização (ms)
+   */
+  updateDamageZones(deltaTime) {
+    for (const [id, zone] of this.entityManager.damageZones) {
+      if (zone.markedForRemoval) {
+        // console.log(`[DAMAGEZONE] Zona ${id} REMOVIDA (duração atingida)`);
+        continue;
+      }
+      // Só aplica dano se chegou o intervalo
+      if (zone.justTicked) {
+        let hits = 0;
+        // Dano em monstros
+        for (const monster of this.entityManager.monsters.values()) {
+          if (!monster.active || monster.stats.hp <= 0) continue;
+          const dist = Math.sqrt(
+            Math.pow(monster.position.x - zone.position.x, 2) +
+            Math.pow(monster.position.z - zone.position.z, 2)
+          );
+          if (dist <= zone.radius && !zone.alreadyHit.has(monster.id)) {
+            const damage = zone.damage;
+            const died = monster.takeDamage(damage, zone.owner);
+            zone.alreadyHit.add(monster.id);
+            hits++;
+            // Aplica lentidão se for Frost Spikes
+            if (zone.frostSpikes && zone.ability && zone.ability.SLOW_DURATION) {
+              const slowDuration = zone.ability.SLOW_DURATION;
+              const slowValue = zone.ability.SLOW || 0.4;
+              if (!monster.status) monster.status = {};
+              monster.status.slowedUntil = Date.now() + slowDuration;
+              monster.lastSlowValue = slowValue;
+              console.log(`[FROST_SPIKES][SLOW] Monstro ${monster.id} recebeu lentidão por ${slowDuration}ms (até ${monster.status.slowedUntil})`);
+              // Emitir evento para efeito visual de congelado
+              for (const player of this.entityManager.players.values()) {
+                if (player.channel) {
+                  player.channel.emit('combat:slow', {
+                    targetId: monster.id,
+                    targetType: 'monster',
+                    slowDuration,
+                    slowUntil: monster.status.slowedUntil
+                  });
+                }
+              }
+            }
+            // Emitir evento para todos os jogadores
+            for (const player of this.entityManager.players.values()) {
+              if (player.channel) {
+                player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+                  targetId: monster.id,
+                  targetType: 'monster',
+                  damage,
+                  died,
+                  position: { ...monster.position }
+                });
+              }
+            }
+          }
+        }
+        // Dano em jogadores (PvP)
+        for (const player of this.entityManager.players.values()) {
+          if (!player.active || player.stats.hp <= 0 || (zone.owner && player.id === zone.owner.id)) continue;
+          const dist = Math.sqrt(
+            Math.pow(player.position.x - zone.position.x, 2) +
+            Math.pow(player.position.z - zone.position.z, 2)
+          );
+          if (dist <= zone.radius && !zone.alreadyHit.has(player.id)) {
+            const damage = Math.round(zone.damage * (this.damageMultipliers.player.player || 1.0));
+            const died = player.takeDamage(damage, zone.owner);
+            zone.alreadyHit.add(player.id);
+            hits++;
+            // Depuração: logar valores antes de aplicar slow
+            console.log(`[FROST_SPIKES][DEBUG] zone.frostSpikes=${zone.frostSpikes}, zone.ability.SLOW_DURATION=${zone.ability && zone.ability.SLOW_DURATION}`);
+            // Aplica lentidão se for Frost Spikes
+            if (zone.frostSpikes && zone.ability && zone.ability.SLOW_DURATION) {
+              const slowDuration = zone.ability.SLOW_DURATION;
+              const slowValue = zone.ability.SLOW || 0.4;
+              if (!player.status) player.status = {};
+              player.status.slowedUntil = Date.now() + slowDuration;
+              player.lastSlowValue = slowValue;
+              console.log(`[FROST_SPIKES][SLOW] Player ${player.id} recebeu lentidão por ${slowDuration}ms (até ${player.status.slowedUntil})`);
+              // Emitir evento para efeito visual de congelado
+              for (const p of this.entityManager.players.values()) {
+                if (p.channel) {
+                  p.channel.emit('combat:slow', {
+                    targetId: player.id,
+                    targetType: 'player',
+                    slowDuration,
+                    slowUntil: player.status.slowedUntil
+                  });
+                }
+              }
+            }
+            // Emitir evento para todos os jogadores
+            for (const p of this.entityManager.players.values()) {
+              if (p.channel) {
+                p.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+                  targetId: player.id,
+                  targetType: 'player',
+                  damage,
+                  died,
+                  position: { ...player.position }
+                });
+              }
+            }
+          }
+        }
+        if (hits === 0) {
+          // console.log(`[DAMAGEZONE] Nenhum alvo atingido neste tick.`);
+        }
+      }
     }
   }
 } 

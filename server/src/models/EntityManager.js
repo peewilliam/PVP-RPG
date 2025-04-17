@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Player } from './Player.js';
 import { Monster } from './Monster.js';
+import { Projectile } from './Projectile.js';
+import { DamageZone } from './DamageZone.js';
 
 /**
  * Gerenciador de entidades que controla todas as entidades do jogo
@@ -11,6 +13,8 @@ export class EntityManager {
     this.players = new Map();  // Map de ID -> Player (para acesso rápido)
     this.monsters = new Map(); // Map de ID -> Monster (para acesso rápido)
     this.worldObjects = new Map(); // Map de ID -> WorldObject (futuro)
+    this.projectiles = new Map(); // Map de ID -> Projectile
+    this.damageZones = new Map(); // Map de ID -> DamageZone
   }
   
   /**
@@ -58,6 +62,50 @@ export class EntityManager {
   }
   
   /**
+   * Cria e adiciona um novo projétil ao gerenciador
+   * @param {Object} params - Parâmetros do projétil
+   * @returns {Projectile} - Instância do projétil criado
+   */
+  createProjectile(params) {
+    const id = `projectile-${uuidv4()}`;
+    const projectile = new Projectile(
+      id,
+      params.position,
+      params.direction,
+      params.speed,
+      params.radius,
+      params.maxLifetime,
+      params.owner,
+      params.ability
+    );
+    this.entities.set(id, projectile);
+    this.projectiles.set(id, projectile);
+    return projectile;
+  }
+  
+  /**
+   * Cria e adiciona uma nova zona de dano ao gerenciador
+   * @param {Object} params - Parâmetros da zona
+   * @returns {DamageZone} - Instância da zona criada
+   */
+  createDamageZone(params) {
+    const id = `damagezone-${Date.now()}-${Math.floor(Math.random()*10000)}`;
+    const zone = new DamageZone(
+      id,
+      params.position,
+      params.radius,
+      params.duration,
+      params.tickInterval,
+      params.damage,
+      params.owner,
+      params.ability,
+      params.frostSpikes
+    );
+    this.damageZones.set(id, zone);
+    return zone;
+  }
+  
+  /**
    * Remove uma entidade do gerenciador
    * @param {string} id - ID da entidade a remover
    * @returns {boolean} - true se a entidade foi removida, false caso contrário
@@ -92,6 +140,33 @@ export class EntityManager {
   }
   
   /**
+   * Remove um projétil do gerenciador
+   * @param {string} id - ID do projétil
+   * @returns {boolean} - true se removido
+   */
+  removeProjectile(id) {
+    this.projectiles.delete(id);
+    return this.entities.delete(id);
+  }
+  
+  /**
+   * Remove uma zona de dano do gerenciador
+   * @param {string} id - ID da zona
+   * @returns {boolean} - true se removida
+   */
+  removeDamageZone(id) {
+    // console.log(`[EntityManager] Removendo zona de dano ${id}`);
+    if (this.damageZones.has(id)) {
+      const resultado = this.damageZones.delete(id);
+      // console.log(`[EntityManager] Zona de dano ${id} removida com sucesso: ${resultado}`);
+      return resultado;
+    } else {
+      // console.log(`[EntityManager] Zona de dano ${id} não encontrada para remoção`);
+      return false;
+    }
+  }
+  
+  /**
    * Obtém uma entidade pelo ID
    * @param {string} id - ID da entidade
    * @returns {Entity|null} - Entidade encontrada ou null
@@ -119,6 +194,24 @@ export class EntityManager {
   }
   
   /**
+   * Obtém um projétil pelo ID
+   * @param {string} id - ID do projétil
+   * @returns {Projectile|null}
+   */
+  getProjectile(id) {
+    return this.projectiles.get(id) || null;
+  }
+  
+  /**
+   * Obtém uma zona de dano pelo ID
+   * @param {string} id - ID da zona
+   * @returns {DamageZone|null}
+   */
+  getDamageZone(id) {
+    return this.damageZones.get(id) || null;
+  }
+  
+  /**
    * Atualiza todas as entidades
    * @param {number} deltaTime - Tempo desde a última atualização
    */
@@ -137,6 +230,42 @@ export class EntityManager {
     for (const player of this.players.values()) {
       if (player.active) {
         player.update(deltaTime);
+      }
+    }
+    
+    // Atualiza projéteis
+    for (const [id, projectile] of this.projectiles) {
+      if (projectile.active && !projectile.markedForRemoval) {
+        projectile.update(deltaTime);
+      }
+    }
+    
+    // Remove projéteis marcados para remoção
+    for (const [id, projectile] of this.projectiles) {
+      if (projectile.markedForRemoval) {
+        this.removeProjectile(id);
+      }
+    }
+    
+    // Atualiza zonas de dano
+    // console.log(`[EntityManager] Atualizando ${this.damageZones.size} zonas de dano`);
+    let zonasExpiradas = 0;
+    for (const [id, zone] of this.damageZones) {
+      if (!zone.markedForRemoval) {
+        zone.update(deltaTime);
+        if (zone.markedForRemoval) {
+          zonasExpiradas++;
+        }
+      }
+    }
+    
+    // Remove zonas de dano expiradas
+    if (zonasExpiradas > 0) {
+      // console.log(`[EntityManager] Encontradas ${zonasExpiradas} zonas expiradas para remover`);
+    }
+    for (const [id, zone] of this.damageZones) {
+      if (zone.markedForRemoval) {
+        this.removeDamageZone(id);
       }
     }
     

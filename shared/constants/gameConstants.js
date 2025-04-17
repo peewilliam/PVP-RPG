@@ -47,6 +47,14 @@ export const EVENTS = {
   }
 };
 
+// IDs de habilidades para facilitar comparações
+export const ABILITY_IDS = {
+  FIREBALL: 1,
+  TELEPORT: 2,
+  FROST_SPIKES: 3,
+  METEOR_STORM: 4
+};
+
 // Configurações de habilidades (agora centralizadas)
 export const ABILITIES = SKILLS;
 

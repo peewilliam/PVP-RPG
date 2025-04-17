@@ -54,6 +54,7 @@ export const SKILLS = {
     DURATION: 5000, // ms
     METEORS: 10,
     METEOR_INTERVAL: 500, // ms
+    TICK_INTERVAL:500,
     ICON: '☄️',
     EFFECTS: ['meteor', 'fire', 'smoke'],
   }

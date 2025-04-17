@@ -148,4 +148,97 @@
 ### Sincronização de Estado
 - O loop do servidor roda a 20 ticks por segundo (50ms)
 - Atualizações de estado são enviadas apenas quando houver mudanças
-- Estado do mundo é enviado apenas para entidades próximas ao jogador (otimização) 
+- Estado do mundo é enviado apenas para entidades próximas ao jogador (otimização)
+
+### Sistema de Combate
+- CombatSystem gerencia todas as interações de dano
+- Diferentes tipos de habilidades (projétil, área, zona, mobilidade)
+- Quatro habilidades implementadas:
+  1. Bola de Fogo (projétil): ID 1
+  2. Teleporte (mobilidade): ID 2  
+  3. Estacas de Gelo (área + slow): ID 3
+  4. Chuva de Meteoros (zona de dano contínuo): ID 4
+- Dano tem multiplicadores baseados no tipo de entidade
+- Zonas de dano processam ticks em intervalos regulares
+
+### DamageZone
+- Criada por habilidades como Chuva de Meteoros
+- Aplica dano em ticks regulares (tickInterval)
+- Usa um loop `while` para processar múltiplos ticks se deltaTime for grande
+- Mantém controle de entidades já atingidas no tick atual (alreadyHit)
+- É removida automaticamente após a duração
+
+## Arquivos Importantes
+
+### Servidor
+- **server/src/index.js**: Inicialização do servidor e handlers de eventos
+- **server/src/models/GameWorld.js**: Coordenação de todos os sistemas
+- **server/src/models/Player.js**: Estado e comportamento do jogador
+- **server/src/models/Monster.js**: IA e comportamento dos monstros
+- **server/src/models/DamageZone.js**: Zonas de dano contínuo
+- **server/src/models/Projectile.js**: Projéteis e colisão
+- **server/src/systems/CombatSystem.js**: Processamento de dano e habilidades
+- **server/src/systems/CollisionSystem.js**: Detecção e resolução de colisões
+- **server/src/systems/SpawnSystem.js**: Spawns e respawns de monstros
+
+### Cliente
+- **client/src/main.js**: Inicialização do cliente
+- **client/src/GameClient.js**: Lógica principal do cliente
+- **client/src/presenters/PlayerPresenter.js**: Renderização de jogadores
+- **client/src/presenters/MonsterPresenter.js**: Renderização de monstros
+- **client/src/presenters/WorldObjectPresenter.js**: Renderização de objetos do mundo
+- **client/src/UI/HUD.js**: Interface do usuário
+- **client/src/skills/SkillManager.js**: Gerenciamento de habilidades no cliente
+
+### Compartilhado
+- **shared/constants/gameConstants.js**: Constantes compartilhadas
+- **shared/skills/skillsConfig.js**: Configuração de habilidades
+
+## Convenções Importantes
+
+### Ciclo de Vida
+- Loop do jogo roda a 20 ticks por segundo (50ms)
+- GameWorld.update() chama todos os sistemas
+- Projeteis e zonas de dano são atualizadas pelo CombatSystem
+- Colisões são resolvidas após movimento e antes da sincronização
+
+### Depuração
+- Logs categorizados por sistema em formato `[SISTEMA] Mensagem`
+- DEBUG_COLLISIONS = true para visualizar colisões
+- Logs extensivos para rastreamento de habilidades e zonas de dano
+
+### IDs e Referências
+- Usar ABILITY_IDS do gameConstants.js para referência de habilidades
+- Verificar tipos de monstros via constantes MONSTERS
+- Validar todos os IDs antes de processar
+
+### Otimizações
+- Enviar apenas entidades próximas aos jogadores
+- Limitar atualizações desnecessárias
+- Usar deltaTime para cálculos independentes de FPS
+
+## Dicas para Modificações
+
+### Adicionar Nova Habilidade
+1. Adicionar configuração em skillsConfig.js
+2. Adicionar ID em ABILITY_IDS no gameConstants.js
+3. Implementar lógica no CombatSystem.processAbilityUse
+4. Adicionar visual no cliente
+
+### Modificar DamageZone
+- Garantir que o loop `while` seja usado para processamento de ticks
+- Certificar-se de limpar o set alreadyHit após cada tick
+- Usar logs detalhados para depuração
+
+### Implementar Novos Efeitos de Status
+1. Adicionar definição no gameConstants.js
+2. Implementar aplicação no CombatSystem
+3. Adicionar métodos em Monster e Player para processar o efeito
+4. Implementar feedback visual no cliente
+
+## Lembretes de Cuidados
+- Testar habilidades em diferentes situações (solo, múltiplos alvos)
+- Verificar consistência de dano com multiplicadores
+- Garantir que eventos de rede sejam enviados corretamente
+- Verificar sincronização de cooldowns e custos de mana
+- Validar todos os inputs antes do processamento 

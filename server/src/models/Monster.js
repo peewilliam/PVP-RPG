@@ -99,6 +99,7 @@ export class Monster extends Entity {
     if (this.stats.hp <= 0) return;
     
     const now = Date.now();
+    let moveSpeed; // Corrigido: declarar apenas uma vez
     
     // Verifica o estado atual e realiza ações apropriadas
     switch (this.aiState) {
@@ -129,8 +130,12 @@ export class Monster extends Entity {
         this.patrolTimer -= deltaTime;
         
         // Move na direção da patrulha
-        this.velocity.x = this.patrolDirection.x * this.moveSpeed;
-        this.velocity.z = this.patrolDirection.z * this.moveSpeed;
+        moveSpeed = this.moveSpeed;
+        if (this.status && this.status.slowedUntil && this.status.slowedUntil > Date.now()) {
+          moveSpeed *= (this.lastSlowValue || 0.4);
+        }
+        this.velocity.x = this.patrolDirection.x * moveSpeed;
+        this.velocity.z = this.patrolDirection.z * moveSpeed;
         
         // Verifica se há jogadores próximos para começar a perseguir
         this.findTarget(players);
@@ -203,8 +208,12 @@ export class Monster extends Entity {
         
         // Move em direção ao ponto de spawn
         const length = Math.sqrt(dx * dx + dz * dz);
-        this.velocity.x = (dx / length) * this.moveSpeed;
-        this.velocity.z = (dz / length) * this.moveSpeed;
+        moveSpeed = this.moveSpeed;
+        if (this.status && this.status.slowedUntil && this.status.slowedUntil > Date.now()) {
+          moveSpeed *= (this.lastSlowValue || 0.4);
+        }
+        this.velocity.x = (dx / length) * moveSpeed;
+        this.velocity.z = (dz / length) * moveSpeed;
         
         // Atualiza a rotação para a direção do movimento
         this.rotation = Math.atan2(dz, dx);
@@ -282,9 +291,15 @@ export class Monster extends Entity {
     // Calcula a direção normalizada
     const length = Math.sqrt(dx * dx + dz * dz);
     
+    // Declara e inicializa moveSpeed antes de usar
+    let moveSpeed = this.moveSpeed;
+    if (this.status && this.status.slowedUntil && this.status.slowedUntil > Date.now()) {
+      moveSpeed *= (this.lastSlowValue || 0.4);
+    }
+    
     // Atualiza a velocidade
-    this.velocity.x = (dx / length) * this.moveSpeed;
-    this.velocity.z = (dz / length) * this.moveSpeed;
+    this.velocity.x = (dx / length) * moveSpeed;
+    this.velocity.z = (dz / length) * moveSpeed;
     
     // Atualiza a rotação para olhar para o alvo
     this.lookAt(target.position);

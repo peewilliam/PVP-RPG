@@ -38,3 +38,15 @@ Desenvolver um MMORPG topdown isométrico (estilo AlbionOnline e MuOnline) com m
 - Um tipo de monstro
 - Mundo de tamanho pequeno mas funcional
 - Mecânicas básicas de MMORPG implementadas de forma completa 
+
+# Resumo do Projeto
+
+O projeto implementa um MMORPG topdown isométrico com combate em tempo real, habilidades de área, sistema de status (ex: slow), arquitetura MCP e servidor autoritativo. Recentemente, foram padronizadas as seguintes práticas:
+
+- Habilidades de área (como Meteor Storm e Estacas de Gelo) usam DamageZone para centralizar lógica de dano e efeitos.
+- Efeitos de status (ex: slow) são aplicados via DamageZone e consultados por Player e Monster para modificar comportamento (ex: velocidade).
+- Eventos de rede específicos (ex: `combat:slow`) são usados para sincronizar efeitos visuais entre servidor e cliente.
+- O sistema de combate foi robustecido com logs detalhados, validação de parâmetros e tratamento de edge cases.
+- O cliente exibe efeitos visuais de status (ex: congelado) de forma sincronizada com o servidor.
+
+Esses padrões garantem escalabilidade, fácil manutenção e experiência consistente para o jogador. 

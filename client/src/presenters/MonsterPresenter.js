@@ -182,4 +182,19 @@ export class MonsterPresenter {
       staleIds.forEach(id => this.removeMonster(id));
     }
   }
+
+  /**
+   * Retorna os dados completos do monstro selecionado
+   * @param {string} id - ID do monstro
+   * @returns {Object|null} - Dados do monstro (userData + status) ou null
+   */
+  getMonsterData(id) {
+    const mesh = this.getMonster(id);
+    if (!mesh) return null;
+    // Retorna userData + status (se existir)
+    return {
+      ...mesh.userData,
+      status: mesh.userData.status || {},
+    };
+  }
 } 
