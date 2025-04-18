@@ -110,7 +110,7 @@ export class HUDManager {
       
       // Estilização completa conforme especificado
       targetHud.style.position = 'absolute';
-      targetHud.style.top = '50px';
+      targetHud.style.top = '0px';
       targetHud.style.left = '50%';
       targetHud.style.transform = 'translateX(-50%)';
       targetHud.style.width = '400px';

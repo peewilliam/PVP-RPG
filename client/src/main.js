@@ -17,6 +17,9 @@ console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
 // Força a conexão explicitamente usando a porta das constantes
 const channel = geckos({ port: SERVER.PORT });
 
+// Defina cameraSize como variável global
+const cameraSize = 15;
+
 // Configurações do renderizador
 const container = document.getElementById('game-container');
 const width = window.innerWidth;
@@ -213,10 +216,8 @@ channel.on(EVENTS.PLAYER.MOVED, data => {
       if (player) {
         // Valida os valores antes de atualizar
         const x = Number(data.position.x) || 0;
-        const y = Number(data.position.y) || 0;
         const z = Number(data.position.z) || 0;
-        
-        player.position.set(x, y, z);
+        player.position.set(x, 0.5, z); // y fixo em 0.5
         player.rotation.y = Number(data.rotation) || 0;
         
         // Atualiza estatísticas do jogador (HP, mana, etc)
@@ -368,7 +369,6 @@ function initThree() {
   
   // Cria câmera isométrica
   const aspectRatio = width / height;
-  const cameraSize = 15; // Define o zoom da câmera (maior valor = visão mais ampla)
   camera = new THREE.OrthographicCamera(
     -cameraSize * aspectRatio, cameraSize * aspectRatio,
     cameraSize, -cameraSize,
@@ -532,11 +532,12 @@ function onWindowResize() {
   const newWidth = window.innerWidth;
   const newHeight = window.innerHeight;
   const newAspectRatio = newWidth / newHeight;
-  
-  camera.left = -10 * newAspectRatio;
-  camera.right = 10 * newAspectRatio;
+  // Use cameraSize global
+  camera.left = -cameraSize * newAspectRatio;
+  camera.right = cameraSize * newAspectRatio;
+  camera.top = cameraSize;
+  camera.bottom = -cameraSize;
   camera.updateProjectionMatrix();
-  
   renderer.setSize(newWidth, newHeight);
 }
 
@@ -691,6 +692,20 @@ function animate() {
       if (targetData) {
         updateTargetHUD(formatTargetForHUD(targetData, 'player'));
       }
+    }
+  }
+
+  // Atualiza o outline do alvo selecionado para acompanhar o mesh
+  if (selectedOutline && selectedTargetId && selectedTargetType) {
+    let mesh = null;
+    if (selectedTargetType === 'monster') {
+      mesh = monsterPresenter.getMonster(selectedTargetId);
+    } else if (selectedTargetType === 'player') {
+      mesh = playerPresenter.getPlayer(selectedTargetId);
+    }
+    if (mesh) {
+      selectedOutline.position.copy(mesh.position);
+      selectedOutline.rotation.copy(mesh.rotation);
     }
   }
 }

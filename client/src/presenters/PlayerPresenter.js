@@ -87,7 +87,7 @@ export class PlayerPresenter {
     const position = data.position || { x: 0, y: 0, z: 0 };
     player.position.set(
       Number(position.x) || 0,
-      Number(position.y) || 0.5, // Um pouco acima do chão
+      0.5, // y fixo em 0.5 para alinhar a base do cubo ao chão
       Number(position.z) || 0
     );
     
@@ -127,7 +127,7 @@ export class PlayerPresenter {
     if (data.position) {
       player.position.set(
         Number(data.position.x) || player.position.x,
-        Number(data.position.y) || player.position.y,
+        0.5, // y fixo em 0.5 para alinhar a base do cubo ao chão
         Number(data.position.z) || player.position.z
       );
     }
