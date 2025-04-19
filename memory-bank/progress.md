@@ -174,18 +174,21 @@ O sistema de colisão garante que objetos do mundo não se sobreponham, e a arqu
 # Progress
 
 ## O que já funciona
-- Barra de skills visualmente profissional, drag-and-drop, cooldown correto e responsivo.
-- HUD centralizado, barras animadas, XP, nível, vida e mana.
-- Chat lateral moderno, abas, sem borda inferior.
+- Renderização de modelos 3D otimizados, com materiais vibrantes e naturais.
+- Iluminação avançada: ambiente, sol, hemisférica, névoa e fundo de céu.
+- Sistema de LOD e culling inteligente para performance.
+- Sincronização de entidades e jogadores via eventos de rede.
+- Estrutura pronta para instanciamento de objetos repetidos.
+- **Chat em tempo real** implementado, integrado ao HUD, com atalhos de teclado, foco automático e comunicação entre jogadores estável.
 
 ## O que falta
-- Refino mobile, tooltips avançados, integração de novas skills.
-- Testes de usabilidade e feedback de jogadores.
+- Instanciamento real para objetos repetidos.
+- Normal maps/texturas para vegetação e pedras.
+- Mais variação visual em flores e pedras.
+- Testes de performance em dispositivos variados.
 
 ## Status atual
-- Interface principal pronta e funcional.
-- Experiência visual e de uso muito próxima de MMOs modernos.
-
-## Issues conhecidas
-- Ajustes finos de responsividade em telas muito pequenas.
-- Possível refino em tooltips e feedback de erro. 
+- Mundo visualmente bonito, leve e responsivo.
+- Problema de árvores escuras resolvido.
+- Performance otimizada mesmo com muitos objetos.
+- **Chat funcional e estável, melhorando a experiência social do MMORPG.** 

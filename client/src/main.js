@@ -52,7 +52,7 @@ const keys = {
 };
 
 // Distância da câmera do jogador (visão isométrica)
-const cameraDistance = 20;
+const cameraDistance = 10;
 
 // Estado anterior das teclas para detectar mudanças
 let prevKeys = {
@@ -61,6 +61,12 @@ let prevKeys = {
   s: false,
   d: false
 };
+
+// Variáveis para medição de FPS e ping
+let frames = 0;
+let lastFpsUpdate = performance.now();
+let lastFrameTime = performance.now();
+let ping = 0;
 
 // Elemento de UI para FPS e Ping
 let statsDiv = document.createElement('div');
@@ -76,17 +82,6 @@ statsDiv.style.borderRadius = '8px';
 statsDiv.style.zIndex = '1000';
 statsDiv.innerHTML = 'FPS: --<br>Ping: -- ms';
 document.body.appendChild(statsDiv);
-
-// Variáveis para FPS
-let lastFrameTime = performance.now();
-let frames = 0;
-let fps = 0;
-let lastFpsUpdate = performance.now();
-
-// Variáveis para Ping
-let ping = 0;
-let lastPingSent = 0;
-let pingStartTime = 0;
 
 // Sistema de dano flutuante
 const floatingDamages = [];
@@ -365,7 +360,7 @@ function updateFloatingDamages() {
 function initThree() {
   // Cria cena
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB); // Cor de céu azul claro
+  // Não definimos cor de fundo aqui, será definido pelo sistema de iluminação
   
   // Cria câmera isométrica
   const aspectRatio = width / height;
@@ -380,32 +375,34 @@ function initThree() {
   camera.position.set(20, 20, 20);
   camera.lookAt(0, 0, 0);
   
-  // Cria renderizador
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  // Cria renderizador com configurações melhoradas
+  renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    precision: 'highp',
+    powerPreference: 'high-performance'
+  });
   renderer.setSize(width, height);
+  renderer.setPixelRatio(window.devicePixelRatio); // Melhora a nitidez em dispositivos HiDPI
   container.appendChild(renderer.domElement);
   
-  // Adiciona luz ambiente
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
-  
-  // Adiciona luz direcional (como sol)
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(5, 10, 7.5);
-  scene.add(directionalLight);
+  // Não adicionamos luzes básicas aqui, usando o sistema avançado de iluminação
   
   // Adiciona grid para referência (temporário)
   const gridHelper = new THREE.GridHelper(WORLD.SIZE.WIDTH, 20);
   scene.add(gridHelper);
   
-  // Cria um plano para o "chão"
+  // Cria um plano para o "chão" com material melhorado
   const planeGeometry = new THREE.PlaneGeometry(WORLD.SIZE.WIDTH, WORLD.SIZE.HEIGHT);
   const planeMaterial = new THREE.MeshStandardMaterial({ 
     color: 0x90EE90,  // Verde claro
-    side: THREE.DoubleSide
+    side: THREE.DoubleSide,
+    roughness: 0.8,
+    metalness: 0.1,
+    flatShading: false
   });
   plane = new THREE.Mesh(planeGeometry, planeMaterial);
   plane.rotation.x = Math.PI / 2;
+  plane.receiveShadow = true; // O chão recebe sombras
   scene.add(plane);
   
   // Adiciona marcadores nos limites do mundo
@@ -416,6 +413,9 @@ function initThree() {
   worldObjectPresenter = new WorldObjectPresenter(scene);
   playerPresenter = new PlayerPresenter(scene);
   skillManager = new SkillManager(scene);
+  
+  // Configura o sistema de iluminação avançado
+  worldObjectPresenter.setupLighting(renderer);
   
   // Responsividade
   window.addEventListener('resize', onWindowResize);
@@ -653,62 +653,62 @@ channel.on('pong', () => {
 // Envia ping periodicamente
 setInterval(sendPing, 2000);
 
-// Loop de animação principal
+// Loop principal de renderização
 function animate() {
-  updateFloatingDamages();
   requestAnimationFrame(animate);
   
-  // Captura e processa inputs
-  handleMovementInput();
-  // Não usamos mais handleRotation() pois a rotação agora é baseada no movimento
-  
-  renderer.render(scene, camera);
-
-  // FPS
-  frames++;
   const now = performance.now();
+  
+  // Calcula o delta time desde o último frame para animações suaves
+  const deltaTime = (now - lastFrameTime) / 1000; // Converte para segundos
+  lastFrameTime = now;
+  
+  // Atualiza FPS
+  frames++;
   if (now - lastFpsUpdate > 1000) {
-    fps = Math.round((frames * 1000) / (now - lastFpsUpdate));
-    lastFpsUpdate = now;
+    // Atualiza a UI com FPS e ping
+    statsDiv.innerHTML = `FPS: ${frames}<br>Ping: ${ping} ms`;
     frames = 0;
+    lastFpsUpdate = now;
   }
-
-  // Atualiza UI
-  statsDiv.innerHTML = `FPS: ${fps}<br>Ping: ${ping} ms`;
-
+  
+  // Processa movimentos
+  handleMovementInput();
+  
+  // Atualiza a posição da câmera para seguir o jogador
+  updateCameraPosition();
+  
+  // Atualiza posições interpoladas dos outros jogadores
+  if (playerPresenter.updatePositions) {
+    playerPresenter.updatePositions(deltaTime);
+  }
+  
+  // Atualiza posições interpoladas dos monstros
+  if (monsterPresenter.updatePositions) {
+    monsterPresenter.updatePositions(deltaTime);
+  }
+  
+  // Atualiza as partículas e efeitos visuais
+  if (skillManager.update) {
+    skillManager.update(deltaTime);
+  }
+  
   // Atualiza os textos flutuantes
   if (floatingTextManager) {
-    floatingTextManager.update();
+    floatingTextManager.update(deltaTime);
   }
-
-  if (selectedTargetId && selectedTargetType) {
-    let targetData = null;
-    if (selectedTargetType === 'monster') {
-      targetData = monsterPresenter.getMonsterData(selectedTargetId);
-      if (targetData) {
-        updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
-      }
-    } else if (selectedTargetType === 'player') {
-      targetData = playerPresenter.getPlayerData(selectedTargetId);
-      if (targetData) {
-        updateTargetHUD(formatTargetForHUD(targetData, 'player'));
-      }
-    }
+  
+  // Atualiza o sistema de otimização do renderizador
+  if (worldObjectPresenter && worldObjectPresenter.updateRenderer) {
+    worldObjectPresenter.updateRenderer(deltaTime, camera.position);
   }
-
-  // Atualiza o outline do alvo selecionado para acompanhar o mesh
-  if (selectedOutline && selectedTargetId && selectedTargetType) {
-    let mesh = null;
-    if (selectedTargetType === 'monster') {
-      mesh = monsterPresenter.getMonster(selectedTargetId);
-    } else if (selectedTargetType === 'player') {
-      mesh = playerPresenter.getPlayer(selectedTargetId);
-    }
-    if (mesh) {
-      selectedOutline.position.copy(mesh.position);
-      selectedOutline.rotation.copy(mesh.rotation);
-    }
+  
+  // Se temos um jogador local, atualiza a luz para seguir o jogador
+  if (player) {
+    worldObjectPresenter.updateLightPosition(player.position);
   }
+  
+  renderer.render(scene, camera);
 }
 
 // Conexão ao servidor
@@ -744,43 +744,50 @@ channel.on(EVENTS.PLAYER.INIT, data => {
 // Recebe a inicialização do mundo do servidor
 channel.on(EVENTS.WORLD.INIT, data => {
   try {
-    // Verifica se os dados são válidos
-    if (!data) {
-      console.error('Dados de inicialização do mundo inválidos');
-      return;
+    console.log('[WORLD] Recebendo dados iniciais do mundo:', data);
+    
+    worldObjects = data.worldObjects || [];
+    monsters = data.monsters || [];
+    
+    // Processa objetos do mundo
+    if (worldObjects && worldObjects.length > 0) {
+      console.log(`[WORLD] Processando ${worldObjects.length} objetos do mundo`);
+      
+      // Inicializa contadores por bioma para análise
+      const objectsByBiome = {};
+      
+      // Para cada objeto do mundo, cria uma representação visual
+      worldObjects.forEach(object => {
+        // Contagem de objetos por bioma para logs de diagnóstico
+        const biome = object.biome || 'UNKNOWN';
+        objectsByBiome[biome] = (objectsByBiome[biome] || 0) + 1;
+        
+        // Cria o objeto visual
+        worldObjectPresenter.updateWorldObject(object);
+      });
+      
+      // Log de contagem por bioma
+      console.log('[WORLD] Contagem de objetos por bioma:', objectsByBiome);
+      
+      // Agora que temos muitos objetos carregados, otimizamos a cena
+      // Isso tentará usar instanciamento para tipos comuns de objetos
+      if (worldObjectPresenter.optimizeSceneWithInstancing) {
+        console.log('[WORLD] Aplicando otimizações de renderização...');
+        worldObjectPresenter.optimizeSceneWithInstancing();
+      }
     }
     
-    console.log('Recebendo inicialização do mundo');
-    
-    // Limpa estado existente (se houver)
-    if (monsterPresenter) {
-      console.log('Limpando todos os monstros existentes');
-      monsterPresenter.clearAllMonsters();
-    }
-    if (worldObjectPresenter) worldObjectPresenter.clearAllWorldObjects();
-    if (playerPresenter) playerPresenter.clearAllPlayers();
-    
-    // Processa monstros iniciais
-    if (data.monsters && Array.isArray(data.monsters)) {
-      console.log(`Inicializando ${data.monsters.length} monstros`);
-      for (const monsterData of data.monsters) {
+    // Processa monstros
+    if (monsters && monsters.length > 0) {
+      console.log(`Inicializando ${monsters.length} monstros`);
+      for (const monsterData of monsters) {
         if (monsterData && monsterData.id) {
           monsterPresenter.updateMonster(monsterData);
         }
       }
     }
-    
-    // Processa objetos do mundo iniciais
-    if (data.worldObjects && Array.isArray(data.worldObjects)) {
-      console.log(`Inicializando ${data.worldObjects.length} objetos do mundo`);
-      for (const objectData of data.worldObjects) {
-        if (objectData && objectData.id) {
-          worldObjectPresenter.updateWorldObject(objectData);
-        }
-      }
-    }
   } catch (error) {
-    console.error('Erro ao processar inicialização do mundo:', error);
+    console.error('[ERRO] Falha ao processar dados iniciais do mundo:', error);
   }
 });
 
@@ -1826,4 +1833,22 @@ function updateTargetHUD(target) {
 
 let chatFocused = false;
 window.addEventListener('chat:focus', () => { chatFocused = true; });
-window.addEventListener('chat:blur', () => { chatFocused = false; }); 
+window.addEventListener('chat:blur', () => { chatFocused = false; });
+
+// Função para atualizar a posição da câmera para seguir o jogador
+function updateCameraPosition() {
+  if (!player) return;
+  
+  // Calcula offset baseado na visão isométrica
+  const offsetX = 20;
+  const offsetY = 20;
+  const offsetZ = 20;
+  
+  // Mantém a câmera na posição isométrica relativa ao jogador
+  camera.position.set(
+    player.position.x + offsetX,
+    player.position.y + offsetY,
+    player.position.z + offsetZ
+  );
+  camera.lookAt(player.position);
+} 

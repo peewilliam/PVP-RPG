@@ -1,14 +1,15 @@
 # Project Brief
 
-Este projeto é um MMORPG Topdown Isométrico com foco em PVP e RPG, inspirado em grandes MMOs modernos. O objetivo é criar uma experiência visual e de jogabilidade profissional, com interface responsiva, barra de skills customizável, HUD moderno e chat lateral eficiente.
+Desenvolver um MMORPG topdown isométrico com renderização 3D, foco em performance, visual vibrante e arquitetura robusta (MCP). O objetivo é criar um mundo imersivo, com biomas distintos, objetos 3D otimizados, sistema de combate, movimentação fluida, sincronização eficiente entre cliente e servidor e chat em tempo real integrado.
 
 ## Requisitos principais
-- Barra de skills com drag-and-drop, cooldown visual, ícones em PNG.
-- Chat lateral moderno, com abas, atalhos de teclado e sem borda inferior.
-- HUD com barras de vida/mana estilizadas, animações e responsividade.
-- Sincronização de cooldown ao mover habilidades de slot.
-- Sistema de combate, XP, eventos de rede padronizados.
-- Arquitetura MCP (Model-Controller-Presenter) e servidor autoritativo.
+- Mundo 3D com biomas, vegetação, rochas, estruturas e ambientação variada.
+- Sincronização de jogadores e entidades via eventos de rede.
+- Sistema de combate, habilidades e morte/respawn.
+- Renderização isométrica com Three.js, materiais realistas e iluminação dinâmica.
+- Otimização para alta performance mesmo com muitos objetos.
+- Estrutura de código clara, separando cliente, servidor e código compartilhado.
+- **Chat em tempo real** integrado à interface do jogo, permitindo comunicação entre jogadores de forma fluida e intuitiva.
 
 ## Objetivo do Projeto
 Desenvolver um MMORPG topdown isométrico (estilo AlbionOnline e MuOnline) com movimentação WSAD e rotação do personagem. O projeto foca em criar um mundo persistente gerenciado pelo servidor, com combate em tempo real, habilidades mágicas e progressão de personagem.

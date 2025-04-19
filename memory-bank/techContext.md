@@ -127,4 +127,23 @@
 
 - **Three.js vs Engine de Jogos**: Three.js foi escolhido por ser leve e focado na renderização 3D, sem as complexidades de uma engine completa que não seria totalmente aproveitada em um jogo isométrico.
 
-- **Servidor Node.js**: Permite compartilhar código entre cliente e servidor (ambos em JavaScript) e oferece boa performance para um servidor de jogos do porte planejado. 
+- **Servidor Node.js**: Permite compartilhar código entre cliente e servidor (ambos em JavaScript) e oferece boa performance para um servidor de jogos do porte planejado.
+
+## Tecnologias
+- **Three.js** para renderização 3D.
+- **Node.js** e **geckos.io** para servidor e rede.
+- **GLTFLoader** para modelos 3D.
+- Estrutura modular: `/client`, `/server`, `/shared`.
+- **Sistema de chat em tempo real** implementado via eventos de rede, integrado ao frontend Three.js.
+
+## Setup
+- Renderizador configurado para alta qualidade (antialias, sRGB, ACESFilmicToneMapping).
+- Pixel ratio limitado para performance.
+- Materiais otimizados para balancear visual e desempenho.
+- Sistema de iluminação customizado via código.
+- **Input de chat customizado**: atalhos de teclado, foco automático, integração com HUD.
+
+## Restrições
+- Modelos devem ser otimizados (baixo polycount, sem texturas pesadas).
+- Performance priorizada em dispositivos médios.
+- Atualizações de sombra e culling não são por frame, mas em intervalos. 

@@ -11,14 +11,16 @@ export class WorldObject extends Entity {
    * @param {Object} scale - Escala {x, y, z}
    * @param {number} rotation - Rotação em radianos
    * @param {boolean} isCollidable - Se o objeto permite colisão
+   * @param {string} biome - Nome do bioma ao qual o objeto pertence
    */
-  constructor(id, objectType, position = { x: 0, y: 0, z: 0 }, scale = { x: 1, y: 1, z: 1 }, rotation = 0, isCollidable = true) {
+  constructor(id, objectType, position = { x: 0, y: 0, z: 0 }, scale = { x: 1, y: 1, z: 1 }, rotation = 0, isCollidable = true, biome = null) {
     super(id, position, rotation);
     
     this.objectType = objectType;
     this.type = 'worldObject';
     this.scale = { ...scale };
     this.isCollidable = isCollidable;
+    this.biome = biome;
     
     // Objetos do mundo são estáticos, não têm velocidade
     this.velocity = { x: 0, y: 0, z: 0 };
@@ -146,6 +148,7 @@ export class WorldObject extends Entity {
       objectType: this.objectType,
       scale: { ...this.scale },
       isCollidable: this.isCollidable,
+      biome: this.biome,
       // Enviamos apenas propriedades relevantes ao cliente
       properties: {
         isAnimated: this.properties.isAnimated || false,

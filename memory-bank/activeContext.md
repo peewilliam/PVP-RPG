@@ -3,6 +3,12 @@
 ## Foco atual
 - Refino visual e usabilidade da barra de skills, HUD e chat.
 - Correção de bugs de cooldown e nomes de habilidades/jogadores.
+- Aprimoramento visual dos modelos 3D (árvores, vegetação, rochas, etc).
+- Correção de cores escuras nas árvores (folhas e tronco).
+- Implementação de sistema de iluminação avançado (ambiente, sol, hemisférica, névoa).
+- Otimização de performance: LOD, culling, materiais simplificados para objetos distantes.
+- Estrutura para instanciamento futuro de objetos repetidos.
+- **Chat em tempo real** implementado e integrado ao HUD, com atalhos de teclado, foco automático e sem bloquear inputs de gameplay.
 
 ## Mudanças recentes
 - Troca de emojis por imagens reais nas skills.
@@ -123,4 +129,12 @@ Estamos refinando o sistema de combate completo do jogo, que permite aos jogador
 - Refinar efeitos visuais (partículas, shader, etc)
 - Implementar/testar novas habilidades seguindo o mesmo padrão
 - Aprimorar feedback visual de cooldown e disponibilidade de habilidades
-- Balancear valores de dano, custos de mana e cooldowns 
+- Balancear valores de dano, custos de mana e cooldowns
+
+## Decisões Recentes
+- Troca de materiais físicos por standard para vegetação.
+- Aumento da exposição global e intensidade das luzes.
+- Remoção de escalas e offsets dos modelos (tamanho nativo).
+- Ajuste de emissive e variação de cor para naturalidade.
+- Atualização do plano do chão para receber sombras.
+- **Chat estável e funcional, integrado à experiência do usuário.** 

@@ -56,4 +56,11 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 - Usuário pode arrastar habilidades entre slots e o cooldown acompanha a habilidade.
 - Chat sempre visível, sem borda inferior, com abas e atalhos de teclado.
 - HUD centralizado, com barras animadas e informações de XP, vida, mana e nível.
-- Skills exibem imagens reais, não emojis, e o número do slot é sempre visível. 
+- Skills exibem imagens reais, não emojis, e o número do slot é sempre visível.
+
+## Experiência do Usuário
+- Visual limpo, colorido e agradável.
+- Mundo com sensação de profundidade e vida.
+- Jogabilidade fluida, sem travamentos mesmo com muitos jogadores/objetos.
+- Feedback visual claro para ações, habilidades e interações.
+- **Chat em tempo real** integrado ao HUD, permitindo comunicação entre jogadores sem atrapalhar a experiência de jogo. O chat é essencial para a interação social e colaboração dentro do MMORPG. 

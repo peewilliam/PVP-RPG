@@ -254,3 +254,27 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 ### Chat
 - Estrutura flexível, abas, atalhos, sem borda inferior, responsivo.
 - Input com atalhos de teclado (Enter/Esc), abas para Main, Sistema(Dano/Cura), Global e Privado.
+
+## Eventos de Rede
+- Formato `categoria:ação` (ex: `player:move`, `world:init`).
+- Sincronização baseada em comandos, não posições absolutas.
+- **Chat**: eventos dedicados para mensagens de chat, broadcast para todos os clientes conectados.
+
+## Renderização e Otimização
+- Uso de Three.js com OrthographicCamera para visão isométrica.
+- Materiais `MeshStandardMaterial` para vegetação e objetos, com emissive e variação de cor.
+- Iluminação composta: ambiente, direcional (sol), hemisférica e névoa.
+- Sistema de LOD: objetos próximos com alta qualidade, distantes simplificados ou ocultos.
+- Frustum e distance culling para ocultar objetos fora do campo de visão ou muito distantes.
+- Estrutura para instanciamento de objetos repetidos.
+- Atualização de sombras e culling em intervalos otimizados.
+
+## Chat
+- Sistema de chat integrado ao HUD, não bloqueia inputs de gameplay.
+- Eventos de rede específicos para envio e recebimento de mensagens.
+- Foco em usabilidade: atalhos de teclado, foco automático, não atrapalha a experiência de jogo.
+
+## Robustez
+- Validação de dados recebidos.
+- Try/catch em handlers críticos.
+- Logs descritivos para depuração.

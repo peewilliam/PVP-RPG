@@ -198,7 +198,7 @@ export class WorldManager {
         scale.z *= scaleFactor;
         
         // Cria o objeto
-        this.createWorldObject(objectType, position, scale, rotation);
+        this.createWorldObject(objectType, position, scale, rotation, true, biomeName);
       }
     }
   }
@@ -230,9 +230,11 @@ export class WorldManager {
    * @param {Object} position - Posição
    * @param {Object} scale - Escala
    * @param {number} rotation - Rotação
+   * @param {boolean} isCollidable - Se o objeto é colidível
+   * @param {string} biome - Nome do bioma
    * @returns {WorldObject} - Objeto criado
    */
-  createWorldObject(objectType, position, scale = { x: 1, y: 1, z: 1 }, rotation = 0, isCollidable = true) {
+  createWorldObject(objectType, position, scale = { x: 1, y: 1, z: 1 }, rotation = 0, isCollidable = true, biome = null) {
     const id = `world-object-${uuidv4()}`;
     
     // Cria o objeto
@@ -242,7 +244,8 @@ export class WorldManager {
       position,
       scale,
       rotation,
-      isCollidable
+      isCollidable,
+      biome
     );
     
     // Adiciona ao gerenciador de entidades
