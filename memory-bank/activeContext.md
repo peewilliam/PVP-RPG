@@ -1,3 +1,20 @@
+# Active Context
+
+## Foco atual
+- Refino visual e usabilidade da barra de skills, HUD e chat.
+- Correção de bugs de cooldown e nomes de habilidades/jogadores.
+
+## Mudanças recentes
+- Troca de emojis por imagens reais nas skills.
+- Cooldown agora acompanha a habilidade ao trocar de slot.
+- Barra de skills com hover, glow, transições e número do slot sempre visível.
+- Chat sem borda inferior.
+- HUD com barras de vida/mana animadas e feedback visual para vida/mana baixa.
+
+## Próximos passos
+- Refino de tooltips, responsividade mobile, e integração de novas habilidades.
+- Testes de usabilidade e coleta de feedback dos jogadores.
+
 # Contexto Ativo
 
 ## Foco de Trabalho Atual

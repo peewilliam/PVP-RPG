@@ -1,4 +1,14 @@
-# Project Brief: MMORPG Topdown Isométrico
+# Project Brief
+
+Este projeto é um MMORPG Topdown Isométrico com foco em PVP e RPG, inspirado em grandes MMOs modernos. O objetivo é criar uma experiência visual e de jogabilidade profissional, com interface responsiva, barra de skills customizável, HUD moderno e chat lateral eficiente.
+
+## Requisitos principais
+- Barra de skills com drag-and-drop, cooldown visual, ícones em PNG.
+- Chat lateral moderno, com abas, atalhos de teclado e sem borda inferior.
+- HUD com barras de vida/mana estilizadas, animações e responsividade.
+- Sincronização de cooldown ao mover habilidades de slot.
+- Sistema de combate, XP, eventos de rede padronizados.
+- Arquitetura MCP (Model-Controller-Presenter) e servidor autoritativo.
 
 ## Objetivo do Projeto
 Desenvolver um MMORPG topdown isométrico (estilo AlbionOnline e MuOnline) com movimentação WSAD e rotação do personagem. O projeto foca em criar um mundo persistente gerenciado pelo servidor, com combate em tempo real, habilidades mágicas e progressão de personagem.

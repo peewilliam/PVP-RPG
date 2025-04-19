@@ -1,4 +1,17 @@
-# Contexto Técnico
+# Tech Context
+
+## Stack
+- Frontend: JavaScript puro, manipulação direta do DOM, CSS customizado.
+- Imagens de skills em PNG, pasta `/client/src/imagens/skills`.
+- Estrutura modular: `/client`, `/server`, `/shared`.
+
+## Dependências
+- Nenhuma dependência externa obrigatória para HUD/skills/chat.
+
+## Restrições
+- Foco em performance e responsividade.
+- Sem frameworks pesados no frontend.
+- CSS customizado para todos os componentes visuais.
 
 ## Tecnologias Utilizadas
 

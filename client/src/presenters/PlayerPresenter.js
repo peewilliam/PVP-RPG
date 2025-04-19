@@ -103,6 +103,7 @@ export class PlayerPresenter {
     player.userData = {
       id: id,
       type: 'player',
+      name: data.name || `Player${id.slice(-4)}`,
       stats: data.stats || {},
       level: data.level || 1,
       created: Date.now()

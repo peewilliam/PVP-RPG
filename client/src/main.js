@@ -616,6 +616,7 @@ function sendMovementInput() {
 
 // Função para verificar periodicamente mudanças e corrigir possíveis dessincronizações
 function handleMovementInput() {
+  if (chatFocused) return; // Bloqueia movimentação se o chat estiver focado
   if (!player || !playerId) return;
   
   // Limita a taxa de envio para 5 vezes por segundo (a cada 200ms) para sincronização
@@ -718,13 +719,11 @@ channel.onConnect(error => {
   }
   
   console.log('Conectado ao servidor!');
-  
+  hudManager.setChannel(channel); // Integração correta via HUDManager
   // Inicializa o Three.js após conectar ao servidor
   initThree();
-  
   // Inicializa os eventos do servidor
   initServerEvents();
-  
   // Inicia o loop de renderização
   animate();
 });
@@ -1296,6 +1295,20 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
       // Nota: Removemos o código específico para METEOR_STORM (ID 4) 
       // pois agora usamos o MeteorStormSkill.js
     }
+    
+    // Efeito visual de hit no alvo (tremor ou flash)
+    if (mesh) {
+      // Aplica um efeito visual temporário - reduz o multiplicador
+      const originalScale = mesh.scale.clone();
+      mesh.scale.multiplyScalar(1.1); // Reduzido de 1.2 para 1.1
+      
+      // Volta ao tamanho normal
+      setTimeout(() => {
+        if (mesh) {
+          mesh.scale.copy(originalScale);
+        }
+      }, 150);
+    }
   } catch (error) {
     console.error('Erro ao processar habilidade:', error);
   }
@@ -1390,6 +1403,47 @@ function initServerEvents() {
             targetEntity.scale.copy(originalScale);
           }
         }, 150);
+      }
+      
+      // NOVO CÓDIGO: Envia mensagem de dano para o chat
+      if (hudManager && hudManager.chatManager) {
+        // Quando você recebe dano (seu ID é o alvo)
+        if (data.targetId === playerId) {
+          console.log(`[DEBUG] Você recebeu ${data.damage} de dano!`);
+          hudManager.chatManager.addDamageMessage(`Você recebeu ${data.damage} de dano!`);
+        } 
+        // Quando você causa dano (seu ID é a fonte)
+        // O servidor não está enviando sourceId corretamente,
+        // então assumimos que todo dano a monstros foi causado pelo jogador local
+        // e danos a outros jogadores também são causados pelo jogador local
+        if (data.sourceId === playerId || 
+            data.targetType === 'monster' || 
+            (data.targetType === 'player' && data.targetId !== playerId)) {
+          console.log(`[DEBUG] Você causou ${data.damage} de dano em ${data.targetType} ${data.targetId}!`);
+          if (data.targetType === 'monster') {
+            // Obter o nome do monstro, se disponível
+            let monsterName = "monstro";
+            const monsterData = monsterPresenter.getMonsterData(data.targetId);
+            if (monsterData && monsterData.monsterType) {
+              monsterName = monsterData.monsterType;
+            } else {
+              // Nome genérico com ID curto para identificação
+              monsterName = `Monstro ${data.targetId.substring(0, 6)}`;
+            }
+            hudManager.chatManager.addDamageMessage(`Você causou ${data.damage} de dano no ${monsterName}!`);
+          } else if (data.targetType === 'player' && data.targetId !== playerId) {
+            // Obter o nome do jogador, se disponível
+            let playerName = "jogador";
+            const playerData = playerPresenter.getPlayerData(data.targetId);
+            if (playerData && playerData.name) {
+              playerName = playerData.name;
+            } else {
+              // Nome genérico com ID curto para identificação
+              playerName = `Jogador ${data.targetId.substring(0, 6)}`;
+            }
+            hudManager.chatManager.addDamageMessage(`Você causou ${data.damage} de dano em ${playerName}!`);
+          }
+        }
       }
     } catch (error) {
       console.error('Erro ao processar evento de dano:', error);
@@ -1768,4 +1822,8 @@ function updateTargetHUD(target) {
       statusDiv.appendChild(span);
     }
   });
-} 
+}
+
+let chatFocused = false;
+window.addEventListener('chat:focus', () => { chatFocused = true; });
+window.addEventListener('chat:blur', () => { chatFocused = false; }); 

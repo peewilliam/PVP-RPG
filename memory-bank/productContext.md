@@ -45,4 +45,15 @@ Este MMORPG topdown isométrico foi concebido para oferecer uma experiência de 
 O sistema agora oferece feedback visual e mecânico consistente para habilidades de área e efeitos de status:
 - Jogadores e monstros recebem dano e efeitos (ex: slow) de forma clara e previsível.
 - O efeito de slow é visível no cliente, reforçando o impacto das habilidades e melhorando a clareza do combate.
-- A arquitetura permite fácil expansão para novos efeitos e habilidades, mantendo a experiência do usuário fluida e responsiva. 
+- A arquitetura permite fácil expansão para novos efeitos e habilidades, mantendo a experiência do usuário fluida e responsiva.
+
+## Problemas resolvidos
+- Interface de skills e HUD mais profissional e clara.
+- Feedback visual aprimorado para cooldown, mana, vida e ações do jogador.
+- Experiência de usuário moderna, inspirada em MMOs atuais.
+
+## Como deve funcionar
+- Usuário pode arrastar habilidades entre slots e o cooldown acompanha a habilidade.
+- Chat sempre visível, sem borda inferior, com abas e atalhos de teclado.
+- HUD centralizado, com barras animadas e informações de XP, vida, mana e nível.
+- Skills exibem imagens reais, não emojis, e o número do slot é sempre visível. 

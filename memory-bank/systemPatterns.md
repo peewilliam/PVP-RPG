@@ -231,3 +231,26 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 ## Manutenção e Escalabilidade
 - O padrão DamageZone + eventos permite fácil adição de novas habilidades de área e efeitos de status.
 - Toda a lógica de efeitos é centralizada e desacoplada da renderização visual.
+
+## System Patterns
+
+### Arquitetura
+- MCP (Model-Controller-Presenter) para separação de lógica, apresentação e controle.
+- Servidor autoritativo para validação de ações e sincronização de estado.
+
+### Eventos de rede
+- Padrão `categoria:ação` (ex: `player:move`, `combat:damageDealt`).
+- Cliente envia comandos, servidor processa e retorna estado.
+
+### Barra de skills
+- Slots renderizados dinamicamente, drag-and-drop, cooldown visual com gradiente radial.
+- Ícones de habilidades via `<img>`, responsivos, com fallback para emoji/texto.
+- Número do slot sempre visível, com fundo escuro translúcido.
+
+### HUD
+- Barras de vida/mana com gradiente, animação de pulsação para vida baixa.
+- XP em losango central, nível destacado.
+
+### Chat
+- Estrutura flexível, abas, atalhos, sem borda inferior, responsivo.
+- Input com atalhos de teclado (Enter/Esc), abas para Main, Sistema(Dano/Cura), Global e Privado.

@@ -257,6 +257,112 @@ io.onConnection(channel => {
         console.error('Erro ao processar sincronização:', error);
       }
     });
+
+    // --- CHAT SYSTEM ---
+    // Controle de anti-spam por jogador
+    player._lastChat = 0;
+    channel.on('chat:main', data => {
+      try {
+        console.log(`[CHAT:MAIN] Recebido de ${player.id} (${player.name}):`, data);
+        if (!data || typeof data.text !== 'string') return;
+        const now = Date.now();
+        if (now - player._lastChat < 700) {
+          console.log(`[CHAT:MAIN] Bloqueado por anti-spam: ${player.name}`);
+          return;
+        }
+        player._lastChat = now;
+        const text = sanitizeText(data.text, 200);
+        if (!text) {
+          console.log(`[CHAT:MAIN] Mensagem vazia após sanitização de ${player.name}`);
+          return;
+        }
+        // Envia só para jogadores próximos
+        for (const other of gameWorld.entityManager.players.values()) {
+          if (!other.channel) continue;
+          if (other.id === player.id || player.distanceTo(other) < 25) {
+            console.log(`[CHAT:MAIN] Enviando para ${other.id} (${other.name}):`, text);
+            other.channel.emit('chat:main', {
+              from: player.name || 'Player',
+              text
+            });
+          }
+        }
+      } catch (e) { console.error('Erro chat:main', e); }
+    });
+    channel.on('chat:global', data => {
+      try {
+        console.log(`[CHAT:GLOBAL] Recebido de ${player.id} (${player.name}):`, data);
+        if (!data || typeof data.text !== 'string') return;
+        const now = Date.now();
+        if (now - player._lastChat < 1200) {
+          console.log(`[CHAT:GLOBAL] Bloqueado por anti-spam: ${player.name}`);
+          return;
+        }
+        player._lastChat = now;
+        const text = sanitizeText(data.text, 200);
+        if (!text) {
+          console.log(`[CHAT:GLOBAL] Mensagem vazia após sanitização de ${player.name}`);
+          return;
+        }
+        for (const other of gameWorld.entityManager.players.values()) {
+          if (other.channel) {
+            console.log(`[CHAT:GLOBAL] Enviando para ${other.id} (${other.name}):`, text);
+            other.channel.emit('chat:global', {
+              from: player.name || 'Player',
+              text
+            });
+          }
+        }
+      } catch (e) { console.error('Erro chat:global', e); }
+    });
+    channel.on('chat:private', data => {
+      try {
+        console.log(`[CHAT:PRIVATE] Recebido de ${player.id} (${player.name}):`, data);
+        if (!data || typeof data.text !== 'string' || typeof data.to !== 'string') return;
+        const now = Date.now();
+        if (now - player._lastChat < 1000) {
+          console.log(`[CHAT:PRIVATE] Bloqueado por anti-spam: ${player.name}`);
+          return;
+        }
+        player._lastChat = now;
+        const text = sanitizeText(data.text, 200);
+        if (!text) {
+          console.log(`[CHAT:PRIVATE] Mensagem vazia após sanitização de ${player.name}`);
+          return;
+        }
+        // Procura destinatário
+        const toPlayer = Array.from(gameWorld.entityManager.players.values()).find(p => p.name === data.to);
+        if (toPlayer && toPlayer.channel) {
+          console.log(`[CHAT:PRIVATE] Enviando para ${toPlayer.id} (${toPlayer.name}):`, text);
+          toPlayer.channel.emit('chat:private', {
+            from: player.name || 'Player',
+            text
+          });
+          // Feedback para quem enviou
+          channel.emit('chat:private', {
+            from: player.name || 'Player',
+            text,
+            to: data.to
+          });
+        } else {
+          console.log(`[CHAT:PRIVATE] Destinatário não encontrado: ${data.to}`);
+          channel.emit('chat:private', {
+            from: 'Sistema',
+            text: `Jogador '${data.to}' não encontrado.`
+          });
+        }
+      } catch (e) { console.error('Erro chat:private', e); }
+    });
+    // --- FIM CHAT SYSTEM ---
+
+    // Garante nome único para o jogador
+    if (!player.name) {
+      const idStr = String(channel.id);
+      player.name = 'Player' + idStr.slice(-4);
+      console.log(`[CHAT:NOME] Definido nome padrão para ${player.id}: ${player.name}`);
+    } else {
+      console.log(`[CHAT:NOME] Nome já definido para ${player.id}: ${player.name}`);
+    }
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
   }
@@ -360,4 +466,13 @@ process.on('SIGTERM', () => {
   console.log('Encerrando servidor...');
   gameWorld.cleanup();
   process.exit(0);
-}); 
+});
+
+// Função utilitária para sanitizar texto
+function sanitizeText(text, maxLen = 200) {
+  if (typeof text !== 'string') return '';
+  let t = text.trim().slice(0, maxLen);
+  t = t.replace(/[<>]/g, ''); // Remove < >
+  t = t.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove chars de controle
+  return t;
+} 

@@ -169,4 +169,23 @@ O sistema de colisão garante que objetos do mundo não se sobreponham, e a arqu
 - Refinar efeitos visuais (partículas, shader, etc)
 - Implementar sistema de inventário e drops
 - Expandir para novos tipos de monstros
-- Adicionar novas habilidades seguindo o mesmo padrão 
+- Adicionar novas habilidades seguindo o mesmo padrão
+
+# Progress
+
+## O que já funciona
+- Barra de skills visualmente profissional, drag-and-drop, cooldown correto e responsivo.
+- HUD centralizado, barras animadas, XP, nível, vida e mana.
+- Chat lateral moderno, abas, sem borda inferior.
+
+## O que falta
+- Refino mobile, tooltips avançados, integração de novas skills.
+- Testes de usabilidade e feedback de jogadores.
+
+## Status atual
+- Interface principal pronta e funcional.
+- Experiência visual e de uso muito próxima de MMOs modernos.
+
+## Issues conhecidas
+- Ajustes finos de responsividade em telas muito pequenas.
+- Possível refino em tooltips e feedback de erro. 

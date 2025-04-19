@@ -44,7 +44,13 @@ export class FloatingTextManager {
       type = 'default',
       index = 0
     } = options;
-    
+
+    // Exibir apenas dano e cura como texto flutuante
+    if (type !== 'damage' && type !== 'heal') {
+      // Futuramente: enviar para o chat lateral
+      return null;
+    }
+
     // --- Agrupamento e cooldown de mensagens iguais ---
     const key = `${type}:${text}`;
     const now = performance.now();

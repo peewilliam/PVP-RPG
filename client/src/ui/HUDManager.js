@@ -1,5 +1,6 @@
 // HUDManager.js
 import { SKILLS } from '../../../shared/skills/skillsConfig.js';
+import { ChatManager } from './ChatManager.js';
 
 export class HUDManager {
   constructor() {
@@ -45,6 +46,8 @@ export class HUDManager {
     this.abilityMaxCooldowns = [0, 0, 0, 0];
     this.lastUpdate = Date.now();
     this.animateCooldowns();
+    // Inicializa o chat lateral
+    this.chatManager = new ChatManager(document.body);
   }
 
   createHUD() {
@@ -52,35 +55,39 @@ export class HUDManager {
     this.hud.id = 'hud';
     this.hud.style.position = 'fixed';
     this.hud.style.left = '50%';
-    this.hud.style.bottom = '38px';
+    this.hud.style.bottom = '3vw';
     this.hud.style.transform = 'translateX(-50%)';
     this.hud.style.zIndex = '2000';
     this.hud.style.display = 'flex';
     this.hud.style.flexDirection = 'column';
     this.hud.style.alignItems = 'center';
+    this.hud.style.width = '32vw';
+    this.hud.style.minWidth = '240px';
+    this.hud.style.maxWidth = '520px';
+    this.hud.style.fontSize = 'min(1.2vw, 16px)';
     this.hud.innerHTML = `
-      <div id="hud-barrow" style="display: flex; align-items: center; gap: 0;">
-        <div id="hud-hp-wrap" style="position: relative; width: 220px; height: 26px; display: flex; align-items: center;">
-          <div id="hud-hp-bg" style="position: absolute; left: 0; top: 6px; width: 100%; height: 14px; background: #3a1818; border-radius: 8px 0 0 8px;"></div>
-          <div id="hud-hp" style="position: absolute; left: 0; top: 6px; height: 14px; background: linear-gradient(90deg, #ff4444, #b80000); border-radius: 8px 0 0 0; transition: width 0.2s;"></div>
-          <div id="hud-hp-text" style="position: absolute; left: 18px; top: 6px; color: #fff; font-size: 13px; font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;"></div>
+      <div id="hud-barrow" style="display: flex; align-items: center; gap: 0; width: 100%;">
+        <div id="hud-hp-wrap" style="position: relative; width: 40%; height: 2.2vw; min-width: 90px; max-width: 220px; display: flex; align-items: center;">
+          <div id="hud-hp-bg" style="position: absolute; left: 0; top: 0.5vw; width: 100%; height: 1vw; background: #3a1818; border-radius: 0.6vw 0 0 0.6vw;"></div>
+          <div id="hud-hp" style="position: absolute; left: 0; top: 0.5vw; height: 1vw; background: linear-gradient(90deg, #ff4444, #b80000); border-radius: 0.6vw 0 0 0; transition: width 0.2s;"></div>
+          <div id="hud-hp-text" style="position: absolute; left: 1vw; top: 0.5vw; color: #fff; font-size: min(1vw, 13px); font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;"></div>
         </div>
-        <div id="hud-center-diamond" style="width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; position: relative; z-index:3; margin: 0 -8px;">
-          <svg width="64" height="64" viewBox="0 0 64 64" style="position:absolute;left:0;top:0;z-index:1;">
+        <div id="hud-center-diamond" style="width: 4vw; height: 4vw; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; position: relative; z-index:3; margin: 0 -0.5vw;">
+          <svg width="100%" height="100%" viewBox="0 0 64 64" style="position:absolute;left:0;top:0;z-index:1;">
             <!-- Borda de XP -->
             <polygon id="hud-xp-border" points="32,4 60,32 32,60 4,32" fill="none" stroke="#ffe066" stroke-width="9" stroke-linejoin="round" style="filter: drop-shadow(0 0 4px #ffb700cc);" />
             <!-- Losango de fundo -->
             <polygon points="32,4 60,32 32,60 4,32" fill="#000" stroke="#fff" stroke-width="3"/>
           </svg>
-          <span id="hud-level" style="position: absolute; left: 0; top: 0; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;">1</span>
+          <span id="hud-level" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: min(2vw, 22px); font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;">1</span>
         </div>
-        <div id="hud-mp-wrap" style="position: relative; width: 220px; height: 26px; display: flex; align-items: center;">
-          <div id="hud-mp-bg" style="position: absolute; right: 0; top: 6px; width: 100%; height: 14px; background: #1a2a3a; border-radius: 0 8px 8px 8px;"></div>
-          <div id="hud-mp" style="position: absolute; right: 0; top: 6px; height: 14px; background: linear-gradient(90deg, #3399ff, #003366); border-radius: 0 8px 8px 0; transition: width 0.2s;"></div>
-          <div id="hud-mp-text" style="position: absolute; right: 18px; top: 6px; color: #fff; font-size: 13px; font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;"></div>
+        <div id="hud-mp-wrap" style="position: relative; width: 40%; height: 2.2vw; min-width: 90px; max-width: 220px; display: flex; align-items: center;">
+          <div id="hud-mp-bg" style="position: absolute; right: 0; top: 0.5vw; width: 100%; height: 1vw; background: #1a2a3a; border-radius: 0 0.6vw 0.6vw 0;"></div>
+          <div id="hud-mp" style="position: absolute; right: 0; top: 0.5vw; height: 1vw; background: linear-gradient(90deg, #3399ff, #003366); border-radius: 0 0.6vw 0.6vw 0; transition: width 0.2s;"></div>
+          <div id="hud-mp-text" style="position: absolute; right: 1vw; top: 0.5vw; color: #fff; font-size: min(1vw, 13px); font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;"></div>
         </div>
       </div>
-      <div id="hud-slots" style="margin-top: 12px; display: flex; gap: 8px;"></div>
+      <div id="hud-slots" style="margin-top: 1vw; display: flex; gap: 0.6vw; width: 100%; justify-content: center;"></div>
     `;
     document.body.appendChild(this.hud);
     this.renderAbilitySlots();
@@ -219,23 +226,42 @@ export class HUDManager {
       slotDiv.id = `slot-${i + 1}`;
       slotDiv.style.width = '44px';
       slotDiv.style.height = '44px';
-      slotDiv.style.background = '#2226';
+      slotDiv.style.background = 'linear-gradient(145deg, #1a2334, #2a3349)';
       slotDiv.style.borderRadius = '8px';
-      slotDiv.style.border = '2px solid #444';
-      slotDiv.style.boxShadow = '0 1px 4px #0008';
+      slotDiv.style.border = '2px solid #334466';
+      slotDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.7), inset 0 1px 1px rgba(255,255,255,0.1)';
       slotDiv.style.position = 'relative';
       slotDiv.style.display = 'flex';
       slotDiv.style.alignItems = 'center';
       slotDiv.style.justifyContent = 'center';
       slotDiv.style.cursor = 'pointer';
+      slotDiv.style.transition = 'all 0.2s ease';
+      slotDiv.style.overflow = 'hidden';
+      
+      // Efeito hover
+      slotDiv.addEventListener('mouseenter', () => {
+        if (this.cooldowns[i] <= 0) {
+          slotDiv.style.boxShadow = '0 2px 8px rgba(120,180,255,0.4), inset 0 1px 1px rgba(255,255,255,0.2)';
+          slotDiv.style.border = '2px solid #5599ff';
+        }
+      });
+      
+      slotDiv.addEventListener('mouseleave', () => {
+        slotDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.7), inset 0 1px 1px rgba(255,255,255,0.1)';
+        slotDiv.style.border = '2px solid #334466';
+      });
       
       // Ícone da habilidade
       const abilityId = this.abilitySlots[i];
       const ability = this.abilities.find(a => a.id === abilityId);
       const iconSpan = document.createElement('span');
-      iconSpan.textContent = ability ? ability.icon : '?';
-      iconSpan.style.fontSize = '28px';
-      iconSpan.style.userSelect = 'none';
+      if (ability && ability.icon && ability.icon.endsWith('.png')) {
+        iconSpan.innerHTML = `<img src='${ability.icon}' alt='${ability.name}' class='skill-icon-img' style='width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:6px;transition:all 0.2s ease;'>`;
+      } else {
+        iconSpan.textContent = ability ? ability.icon : '?';
+        iconSpan.style.fontSize = '28px';
+        iconSpan.style.userSelect = 'none';
+      }
       slotDiv.appendChild(iconSpan);
       
       // Tooltip customizado em vez de title
@@ -293,11 +319,16 @@ export class HUDManager {
       const numSpan = document.createElement('span');
       numSpan.textContent = i + 1;
       numSpan.style.position = 'absolute';
-      numSpan.style.left = '6px';
-      numSpan.style.top = '4px';
-      numSpan.style.fontSize = '12px';
-      numSpan.style.color = '#fff8';
+      numSpan.style.left = '4px';
+      numSpan.style.top = '2px';
+      numSpan.style.fontSize = '13px';
+      numSpan.style.color = '#fff';
+      numSpan.style.background = 'rgba(0,0,0,0.55)';
+      numSpan.style.padding = '1px 5px 1px 3px';
+      numSpan.style.borderRadius = '6px';
+      numSpan.style.zIndex = '2';
       numSpan.style.pointerEvents = 'none';
+      numSpan.style.fontWeight = 'bold';
       slotDiv.appendChild(numSpan);
       
       slotsDiv.appendChild(slotDiv);
@@ -306,10 +337,27 @@ export class HUDManager {
 
   // Troca habilidades entre slots
   swapAbilities(from, to) {
+    // Troca as habilidades
     const temp = this.abilitySlots[from];
     this.abilitySlots[from] = this.abilitySlots[to];
     this.abilitySlots[to] = temp;
+    
+    // Troca os cooldowns também
+    const tempCooldown = this.cooldowns[from];
+    this.cooldowns[from] = this.cooldowns[to];
+    this.cooldowns[to] = tempCooldown;
+    
+    // Troca os cooldowns máximos também
+    const tempMaxCooldown = this.abilityMaxCooldowns[from];
+    this.abilityMaxCooldowns[from] = this.abilityMaxCooldowns[to];
+    this.abilityMaxCooldowns[to] = tempMaxCooldown;
+    
+    // Renderiza os slots com as novas posições
     this.renderAbilitySlots();
+    
+    // Atualiza o visual de cooldown para ambos os slots
+    this.updateCooldownVisual(from + 1);
+    this.updateCooldownVisual(to + 1);
   }
 
   update(stats, level, name, xp, nextLevelXp) {
@@ -364,19 +412,33 @@ export class HUDManager {
       overlay.style.top = '0';
       overlay.style.width = '100%';
       overlay.style.height = '100%';
-      overlay.style.background = 'rgba(0,0,0,0.55)';
+      overlay.style.background = 'rgba(0,10,30,0.75)';
       overlay.style.color = '#fff';
       overlay.style.fontWeight = 'bold';
-      overlay.style.fontSize = '18px';
+      overlay.style.fontSize = '19px';
       overlay.style.display = 'flex';
       overlay.style.alignItems = 'center';
       overlay.style.justifyContent = 'center';
       overlay.style.borderRadius = '6px';
+      overlay.style.backdropFilter = 'blur(1px)';
+      overlay.style.textShadow = '0 0 4px #000';
+      overlay.style.transition = 'all 0.15s ease-out';
+      overlay.style.boxShadow = 'inset 0 0 10px rgba(0,0,0,0.5)';
       slotDiv.appendChild(overlay);
     }
     if (this.cooldowns[slot - 1] > 0) {
       overlay.style.display = 'flex';
       overlay.textContent = Math.ceil(this.cooldowns[slot - 1] / 1000);
+      
+      // Cálculo da porcentagem de cooldown para efeito radial
+      const percentRemaining = this.cooldowns[slot - 1] / this.abilityMaxCooldowns[slot - 1];
+      const angle = percentRemaining * 360;
+      
+      // Gradiente radial para efeito de preenchimento circular
+      overlay.style.background = `conic-gradient(
+        transparent ${angle}deg, 
+        rgba(0,10,30,0.75) ${angle}deg
+      )`;
     } else {
       overlay.style.display = 'none';
     }
@@ -457,27 +519,44 @@ export class HUDManager {
    * @param {number} maxHealth - Saúde máxima
    */
   updateHealth(currentHealth, maxHealth) {
-    const healthBar = document.getElementById('health-bar');
-    const healthText = document.getElementById('health-text');
+    if (!this.healthBar || !this.healthText) return;
+
+    const healthPercent = Math.max(0, currentHealth / maxHealth);
+    this.healthBar.style.width = `${healthPercent * 100}%`;
+    this.healthText.textContent = `${Math.floor(currentHealth)} / ${Math.floor(maxHealth)}`;
     
-    if (healthBar && maxHealth !== undefined) {
-      const healthPercent = (currentHealth / maxHealth) * 100;
-      healthBar.style.width = `${healthPercent}%`;
+    // Adicionar efeito visual quando a vida está baixa
+    if (healthPercent < 0.3) {
+      this.healthBar.style.background = 'linear-gradient(to right, #7f0000, #c0392b)';
       
-      // Muda a cor baseado na porcentagem de vida
-      if (healthPercent < 20) {
-        healthBar.style.backgroundColor = '#ff0000'; // Vermelho para vida baixa
-      } else if (healthPercent < 50) {
-        healthBar.style.backgroundColor = '#ffaa00'; // Laranja para vida média
-      } else {
-        healthBar.style.backgroundColor = '#00ff00'; // Verde para vida alta
+      // Adicionar animação de pulsação quando vida está muito baixa
+      if (healthPercent < 0.15) {
+        if (!this.lowHealthAnimation) {
+          this.lowHealthAnimation = this.healthBar.animate(
+            [
+              { opacity: 0.7 },
+              { opacity: 1 }
+            ],
+            {
+              duration: 800,
+              iterations: Infinity,
+              direction: 'alternate',
+              easing: 'ease-in-out'
+            }
+          );
+        }
+      } else if (this.lowHealthAnimation) {
+        this.lowHealthAnimation.cancel();
+        this.lowHealthAnimation = null;
+        this.healthBar.style.opacity = 1;
       }
-    }
-    
-    if (healthText) {
-      healthText.textContent = maxHealth !== undefined 
-        ? `${Math.floor(currentHealth)}/${Math.floor(maxHealth)}`
-        : `${Math.floor(currentHealth)}`;
+    } else {
+      this.healthBar.style.background = 'linear-gradient(to right, #c0392b, #e74c3c)';
+      if (this.lowHealthAnimation) {
+        this.lowHealthAnimation.cancel();
+        this.lowHealthAnimation = null;
+        this.healthBar.style.opacity = 1;
+      }
     }
   }
 
@@ -581,5 +660,128 @@ export class HUDManager {
   clearPlayerHUD() {
     const hud = document.querySelector('.target-ui');
     if (hud) hud.style.display = 'none';
+  }
+
+  // Métodos para adicionar mensagens ao chat lateral
+  addSystemMessage(text) { this.chatManager.addSystemMessage(text); }
+  addXPMessage(text) { this.chatManager.addXPMessage(text); }
+  addCooldownMessage(text) { this.chatManager.addCooldownMessage(text); }
+  addManaMessage(text) { this.chatManager.addManaMessage(text); }
+  addErrorMessage(text) { this.chatManager.addErrorMessage(text); }
+  addDamageMessage(text) { this.chatManager.addDamageMessage(text); }
+  addHealMessage(text) { this.chatManager.addHealMessage(text); }
+  addPlayerMessage(name, text, tab) { this.chatManager.addPlayerMessage(name, text, tab); }
+
+  setChannel(channel) {
+    if (this.chatManager) {
+      this.chatManager.setChannel(channel);
+    }
+  }
+
+  createHealthBar() {
+    const healthBarOuter = document.createElement('div');
+    healthBarOuter.classList.add('health-bar-outer');
+    healthBarOuter.style.position = 'absolute';
+    healthBarOuter.style.left = '20px';
+    healthBarOuter.style.bottom = '80px';
+    healthBarOuter.style.width = '230px';
+    healthBarOuter.style.height = '22px';
+    healthBarOuter.style.backgroundColor = 'rgba(0,0,0,0.6)';
+    healthBarOuter.style.padding = '3px';
+    healthBarOuter.style.borderRadius = '6px';
+    healthBarOuter.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5), inset 0 1px 3px rgba(0,0,0,0.5)';
+    healthBarOuter.style.border = '1px solid #444';
+    document.body.appendChild(healthBarOuter);
+
+    const healthBar = document.createElement('div');
+    healthBar.classList.add('health-bar');
+    healthBar.style.width = '100%';
+    healthBar.style.height = '100%';
+    healthBar.style.backgroundColor = '#e74c3c';
+    healthBar.style.background = 'linear-gradient(to right, #c0392b, #e74c3c)';
+    healthBar.style.borderRadius = '4px';
+    healthBar.style.boxShadow = 'inset 0 0 5px rgba(0,0,0,0.3)';
+    healthBar.style.transition = 'width 0.3s ease-out';
+    healthBarOuter.appendChild(healthBar);
+
+    const healthText = document.createElement('div');
+    healthText.classList.add('health-text');
+    healthText.style.position = 'absolute';
+    healthText.style.left = '0';
+    healthText.style.top = '0';
+    healthText.style.width = '100%';
+    healthText.style.height = '100%';
+    healthText.style.display = 'flex';
+    healthText.style.alignItems = 'center';
+    healthText.style.justifyContent = 'center';
+    healthText.style.color = 'white';
+    healthText.style.fontSize = '12px';
+    healthText.style.fontWeight = 'bold';
+    healthText.style.textShadow = '0 0 3px #000';
+    healthBarOuter.appendChild(healthText);
+
+    this.healthBar = healthBar;
+    this.healthText = healthText;
+  }
+
+  createManaBar() {
+    const manaBarOuter = document.createElement('div');
+    manaBarOuter.classList.add('mana-bar-outer');
+    manaBarOuter.style.position = 'absolute';
+    manaBarOuter.style.left = '20px';
+    manaBarOuter.style.bottom = '50px';
+    manaBarOuter.style.width = '230px';
+    manaBarOuter.style.height = '22px';
+    manaBarOuter.style.backgroundColor = 'rgba(0,0,0,0.6)';
+    manaBarOuter.style.padding = '3px';
+    manaBarOuter.style.borderRadius = '6px';
+    manaBarOuter.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5), inset 0 1px 3px rgba(0,0,0,0.5)';
+    manaBarOuter.style.border = '1px solid #444';
+    document.body.appendChild(manaBarOuter);
+
+    const manaBar = document.createElement('div');
+    manaBar.classList.add('mana-bar');
+    manaBar.style.width = '100%';
+    manaBar.style.height = '100%';
+    manaBar.style.backgroundColor = '#3498db';
+    manaBar.style.background = 'linear-gradient(to right, #2980b9, #3498db)';
+    manaBar.style.borderRadius = '4px';
+    manaBar.style.boxShadow = 'inset 0 0 5px rgba(0,0,0,0.3)';
+    manaBar.style.transition = 'width 0.3s ease-out';
+    manaBarOuter.appendChild(manaBar);
+
+    const manaText = document.createElement('div');
+    manaText.classList.add('mana-text');
+    manaText.style.position = 'absolute';
+    manaText.style.left = '0';
+    manaText.style.top = '0';
+    manaText.style.width = '100%';
+    manaText.style.height = '100%';
+    manaText.style.display = 'flex';
+    manaText.style.alignItems = 'center';
+    manaText.style.justifyContent = 'center';
+    manaText.style.color = 'white';
+    manaText.style.fontSize = '12px';
+    manaText.style.fontWeight = 'bold';
+    manaText.style.textShadow = '0 0 3px #000';
+    manaBarOuter.appendChild(manaText);
+
+    this.manaBar = manaBar;
+    this.manaText = manaText;
+  }
+
+  updateMana(currentMana, maxMana) {
+    if (!this.manaBar || !this.manaText) return;
+
+    const manaPercent = Math.max(0, currentMana / maxMana);
+    this.manaBar.style.width = `${manaPercent * 100}%`;
+    this.manaText.textContent = `${Math.floor(currentMana)} / ${Math.floor(maxMana)}`;
+    
+    // Adicionar efeito visual quando a mana está baixa
+    if (manaPercent < 0.3) {
+      this.manaBar.style.background = 'linear-gradient(to right, #1a5276, #2980b9)';
+    } else {
+      this.manaBar.style.background = 'linear-gradient(to right, #2980b9, #3498db)';
+    }
   }
 } 
