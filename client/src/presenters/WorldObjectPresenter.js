@@ -348,65 +348,60 @@ export class WorldObjectPresenter {
 
     // Configurando o renderer para sombras com otimizações
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras mais suaves
-    renderer.outputEncoding = THREE.sRGBEncoding; // Correção de cor para materiais
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Mapeamento de tom cinematográfico
-    renderer.toneMappingExposure = 1.5; // Aumentado para maior brilho geral
-    
-    // Otimizações avançadas para performance
-    renderer.physicallyCorrectLights = true; // Cálculos de luz mais precisos
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita para evitar overdraw em dispositivos de alta densidade
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves e realistas
+    renderer.outputColorSpace = THREE.SRGBColorSpace; // Correção de cor
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Mapeamento de tom realista
+    renderer.toneMappingExposure = 1.22; // Exposição mais alta para dia claro
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // Cor ambiente global
-    const ambientColor = 0xAEB9D3; // Azul claro mais brilhante
-    const ambientIntensity = 0.65; // Aumentado para dar mais luz ambiente
+    // --- LUZ AMBIENTE (preenche sombras, mas não domina a cena) ---
+    const ambientColor = 0xfaf3e3; // Amarelo bem claro
+    const ambientIntensity = 0.35; // Sutil, só para preencher
     const ambientLight = new THREE.AmbientLight(ambientColor, ambientIntensity);
     this.scene.add(ambientLight);
-    
-    // Luz direcional principal (sol)
-    const sunColor = 0xFFFFCC; // Amarelo mais claro
-    const sunIntensity = 1.0; // Aumentado para dar mais luz direcional
+
+    // --- LUZ DIRECIONAL (Sol, sombras suaves e claras) ---
+    const sunColor = 0xFFF6D6; // Amarelo quente, quase branco
+    const sunIntensity = 1.0; // Forte, mas não estoura
     const dirLight = new THREE.DirectionalLight(sunColor, sunIntensity);
-    dirLight.position.set(50, 120, -30); // Mais alta para menos sombras escuras
+    dirLight.position.set(60, 200, 0); // Sol alto
     dirLight.castShadow = true;
-    
-    // Configurações da área de sombra
-    dirLight.shadow.camera.near = 10; // Distância mínima para sombras (otimização)
-    dirLight.shadow.camera.far = 200; // Distância máxima para sombras (otimização)
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 10;
+    dirLight.shadow.camera.far = 200;
     dirLight.shadow.camera.left = -100;
     dirLight.shadow.camera.right = 100;
     dirLight.shadow.camera.top = 100;
     dirLight.shadow.camera.bottom = -100;
-    dirLight.shadow.mapSize.width = 2048; // Resolução de sombra
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.bias = -0.0003; // Reduzir artefatos de sombra
-    dirLight.shadow.normalBias = 0.02; // Reduzir acne de sombra
-    dirLight.shadow.radius = 2; // Sombras mais suaves (melhor qualidade)
-    dirLight.shadow.autoUpdate = false; // Atualizar manualmente para otimização
+    dirLight.shadow.bias = -0.0002;
+    dirLight.shadow.normalBias = 0.01;
+    dirLight.shadow.radius = 12; // Sombras bem suaves
+    dirLight.shadow.autoUpdate = false;
     this.lastShadowUpdateTime = 0;
-    
     this.scene.add(dirLight);
-    
-    // Luz hemisférica para simular luz do céu e reflexão do solo
-    const skyColor = 0x88BBFF; // Azul céu mais brilhante
-    const groundColor = 0x665544; // Marrom do solo
-    const hemiLight = new THREE.HemisphereLight(skyColor, groundColor, 0.7); // Aumentado
+
+    // --- LUZ HEMISFÉRICA (céu azul claro, solo quase branco) ---
+    const skyColor = 0xB3D8FF; // Azul claro do céu
+    const groundColor = 0xFFFDF6; // Solo quase branco
+    const hemiIntensity = 1.25; // Bem forte, estilo Albion
+    const hemiLight = new THREE.HemisphereLight(skyColor, groundColor, hemiIntensity);
     this.scene.add(hemiLight);
-    
-    // Adicionamos uma névoa otimizada para dar sensação de profundidade
-    const fogColor = new THREE.Color(0xCCDDFF); // Azul mais claro para névoa
-    const fogDensity = 0.002; // Menos denso para melhor visibilidade
+
+    // --- NÉVOA MÁGICA (profundidade, não escurece) ---
+    const fogColor = new THREE.Color(0xDDE6FF); // Azul claro, mágico
+    const fogDensity = 0.0010; // Suave, só para profundidade
     this.scene.fog = new THREE.FogExp2(fogColor, fogDensity);
-    
-    // Background suave de céu para melhorar a atmosfera
-    this.scene.background = new THREE.Color(0x88BBFF); // Azul céu
-    
-    console.log("[LIGHT] Iluminação configurada com sucesso");
-    
-    // Salvar referências
+
+    // --- FUNDO DO CÉU ---
+    this.scene.background = new THREE.Color(0xB3D8FF); // Azul claro do céu
+
+    // --- Salvar referências ---
     this.sunLight = dirLight;
     this.ambientLight = ambientLight;
     this.hemisphereLight = hemiLight;
+    
+    console.log("[LIGHT] Iluminação configurada com sucesso");
   }
 
   /**
@@ -424,17 +419,31 @@ export class WorldObjectPresenter {
     if (now - this.lastShadowUpdateTime > 500) { // Atualiza a cada 0.5 segundos
       this.lastShadowUpdateTime = now;
       
-      // Mantém a luz alta, mas seguindo o jogador para que as sombras se movam corretamente
+      // Mantém a luz do sol e a shadow camera sempre centralizadas no player (Albion style)
       this.sunLight.position.set(
-        playerPosition.x + 50, 
-        100, 
-        playerPosition.z - 30
+        playerPosition.x + 60, // deslocamento para simular sol vindo de um lado
+        200,
+        playerPosition.z
       );
-      
-      // Atualiza as câmeras de sombra
+      this.sunLight.target.position.set(
+        playerPosition.x,
+        0,
+        playerPosition.z
+      );
+      this.scene.add(this.sunLight.target);
+      // Ampliar o volume da shadow camera para cobrir áreas maiores do mapa
+      this.sunLight.shadow.camera.left = -150;
+      this.sunLight.shadow.camera.right = 150;
+      this.sunLight.shadow.camera.top = 150;
+      this.sunLight.shadow.camera.bottom = -150;
+      this.sunLight.shadow.camera.near = 10;
+      this.sunLight.shadow.camera.far = 300;
+      // Shadow map de alta resolução para máxima definição
+      this.sunLight.shadow.mapSize.width = 4096;
+      this.sunLight.shadow.mapSize.height = 4096;
+      // Atualiza a shadow camera e marca para atualização
       this.sunLight.shadow.camera.updateProjectionMatrix();
-      this.sunLight.shadow.needsUpdate = true; // Marca para atualização na próxima renderização
-      
+      this.sunLight.shadow.needsUpdate = true;
       // Atualiza o culling de objetos
       this.updateObjectCulling();
     }
@@ -487,21 +496,17 @@ export class WorldObjectPresenter {
           
           // Determina qualidade de sombra baseada na distância
           if (distance < this.detailLevels.HIGH) {
-            // Alta qualidade para objetos próximos
-            if (['TREE', 'MOUNTAIN', 'BRIDGE'].includes(object.userData.objectType)) {
-              child.castShadow = true;
-            }
+            // Alta qualidade para objetos próximos: todos projetam e recebem sombra
+            child.castShadow = true;
             child.receiveShadow = true;
           } else if (distance < this.detailLevels.MEDIUM) {
-            // Qualidade média para objetos a média distância
-            if (['TREE', 'MOUNTAIN'].includes(object.userData.objectType)) {
-              child.castShadow = true;
-            }
+            // Qualidade média: todos recebem sombra, mas não projetam
+            child.castShadow = false;
             child.receiveShadow = true;
           } else {
-            // Baixa qualidade para objetos distantes
+            // Baixa qualidade: só recebem sombra se ainda estiverem visíveis
             child.castShadow = false;
-            child.receiveShadow = distance < this.detailLevels.LOW; // Sombras simples em dist. média
+            child.receiveShadow = distance < this.detailLevels.LOW;
           }
           
           // Ajusta qualidade do material baseado na distância
@@ -607,27 +612,21 @@ export class WorldObjectPresenter {
         // Aplicar melhorias visuais sem alterar a escala
         const modelInfo = adjustModel(worldObject, modelType, modelPath);
         
-        // Ativar sombras para objetos grandes
+        // Ativar sombras para todos os objetos relevantes (Albion style)
         worldObject.traverse(child => {
           if (child.isMesh) {
-            // Configura qualidade inicial baseada em tipo e importância
-            // A qualidade final será ajustada pelo sistema de culling
-            if (['TREE', 'MOUNTAIN', 'BRIDGE'].includes(modelType)) {
+            // Ativa sombra para todos os objetos do mundo (exceto flores pequenas, se quiser performance)
+            if (modelType !== 'FLOWER') {
               child.castShadow = true;
             }
             child.receiveShadow = true;
-            
             // Melhorar configuração de material para responder melhor à iluminação
             if (child.material) {
-              // Aumentar envMapIntensity para melhor resposta à iluminação ambiente
               child.material.envMapIntensity = 0.8;
-              
-              // Otimização: Desativa propriedades de material caras quando não são necessárias
               if (child.material.type === 'MeshPhysicalMaterial') {
                 child.material.clearcoat = Math.min(child.material.clearcoat || 0, 0.3);
                 child.material.clearcoatRoughness = Math.max(child.material.clearcoatRoughness || 0, 0.8);
-                child.material.ior = 1.2; // Índice de refração padrão
-                // Desativa propriedades avançadas em materiais de objetos pequenos para economizar GPU
+                child.material.ior = 1.2;
                 if (!['TREE', 'MOUNTAIN', 'BRIDGE'].includes(modelType)) {
                   child.material.thickness = 0;
                   child.material.transmission = 0;
@@ -830,77 +829,75 @@ function createPrimitiveObject(objectType) {
   
   switch (objectType) {
     case 'TREE':
-      // Árvore: cilindro marrom (tronco) com cone verde (copa)
       const treeGroup = new THREE.Group();
-      
-      // Tronco
       const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
-      const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Marrom
+      const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
       const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-      trunk.position.y = 0.75; // Metade da altura
+      trunk.position.y = 0.75;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
       treeGroup.add(trunk);
-      
-      // Copa
       const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
-      const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 }); // Verde escuro
+      const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
       const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-      leaves.position.y = 2.5; // Acima do tronco
+      leaves.position.y = 2.5;
+      leaves.castShadow = true;
+      leaves.receiveShadow = true;
       treeGroup.add(leaves);
-      
-      // Referência ao objeto principal
       worldObject = treeGroup;
       break;
       
     case 'ROCK':
-      // Rocha: esfera irregular cinza
       geometry = new THREE.DodecahedronGeometry(0.8, 0);
-      material = new THREE.MeshStandardMaterial({ color: 0x808080 }); // Cinza
+      material = new THREE.MeshStandardMaterial({ color: 0x808080 });
       worldObject = new THREE.Mesh(geometry, material);
-      worldObject.scale.y = 0.7; // Achatada verticalmente
+      worldObject.scale.y = 0.7;
+      worldObject.castShadow = true;
+      worldObject.receiveShadow = true;
       break;
       
     case 'BUSH':
-      // Arbusto: esfera verde
       geometry = new THREE.SphereGeometry(0.5, 8, 6);
-      material = new THREE.MeshStandardMaterial({ color: 0x32CD32 }); // Verde limão
+      material = new THREE.MeshStandardMaterial({ color: 0x32CD32 });
       worldObject = new THREE.Mesh(geometry, material);
+      worldObject.castShadow = true;
+      worldObject.receiveShadow = true;
       break;
       
     case 'HOUSE':
-      // Casa: cubo com telhado triangular
       const houseGroup = new THREE.Group();
-      
-      // Base da casa
       const baseGeometry = new THREE.BoxGeometry(3, 2, 3);
-      const baseMaterial = new THREE.MeshStandardMaterial({ color: 0xD2B48C }); // Bege
+      const baseMaterial = new THREE.MeshStandardMaterial({ color: 0xD2B48C });
       const base = new THREE.Mesh(baseGeometry, baseMaterial);
-      base.position.y = 1; // Metade da altura
+      base.position.y = 1;
+      base.castShadow = true;
+      base.receiveShadow = true;
       houseGroup.add(base);
-      
-      // Telhado
       const roofGeometry = new THREE.ConeGeometry(3, 1.5, 4);
-      const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8B0000 }); // Vermelho escuro
+      const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8B0000 });
       const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-      roof.position.y = 2.75; // Acima da base
-      roof.rotation.y = Math.PI / 4; // Rotaciona para alinhar com a base
+      roof.position.y = 2.75;
+      roof.rotation.y = Math.PI / 4;
+      roof.castShadow = true;
+      roof.receiveShadow = true;
       houseGroup.add(roof);
-      
-      // Referência ao objeto principal
       worldObject = houseGroup;
       break;
       
     case 'FENCE':
-      // Cerca: caixa fina e comprida
       geometry = new THREE.BoxGeometry(1.5, 0.8, 0.1);
-      material = new THREE.MeshStandardMaterial({ color: 0xA0522D }); // Marrom médio
+      material = new THREE.MeshStandardMaterial({ color: 0xA0522D });
       worldObject = new THREE.Mesh(geometry, material);
+      worldObject.castShadow = true;
+      worldObject.receiveShadow = true;
       break;
       
     default:
-      // Objeto genérico: cubo cinza
       geometry = new THREE.BoxGeometry(1, 1, 1);
-      material = new THREE.MeshStandardMaterial({ color: 0xAAAAAA }); // Cinza claro
+      material = new THREE.MeshStandardMaterial({ color: 0xAAAAAA });
       worldObject = new THREE.Mesh(geometry, material);
+      worldObject.castShadow = true;
+      worldObject.receiveShadow = true;
       break;
   }
   

@@ -9,6 +9,13 @@ import { PlayerPresenter } from './presenters/PlayerPresenter.js';
 import { HUDManager } from './ui/HUDManager.js';
 import { SkillManager } from './skills/SkillManager.js';
 import { FloatingTextManager } from './effects/FloatingTextManager.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
+import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
+import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -29,6 +36,7 @@ const height = window.innerHeight;
 let scene, camera, renderer;
 let player; // Objeto do jogador local
 let playerId; // ID do jogador recebido do servidor
+let composer; // Pós-processamento global
 
 // Presenters para os diferentes tipos de entidades
 let monsterPresenter;
@@ -51,9 +59,6 @@ const keys = {
   d: false
 };
 
-// Distância da câmera do jogador (visão isométrica)
-const cameraDistance = 10;
-
 // Estado anterior das teclas para detectar mudanças
 let prevKeys = {
   w: false,
@@ -67,6 +72,8 @@ let frames = 0;
 let lastFpsUpdate = performance.now();
 let lastFrameTime = performance.now();
 let ping = 0;
+let pingStartTime = 0;
+let lastPingSent = 0;
 
 // Elemento de UI para FPS e Ping
 let statsDiv = document.createElement('div');
@@ -212,7 +219,7 @@ channel.on(EVENTS.PLAYER.MOVED, data => {
         // Valida os valores antes de atualizar
         const x = Number(data.position.x) || 0;
         const z = Number(data.position.z) || 0;
-        player.position.set(x, 0.5, z); // y fixo em 0.5
+        player.targetPosition = new THREE.Vector3(x, 0.5, z);
         player.rotation.y = Number(data.rotation) || 0;
         
         // Atualiza estatísticas do jogador (HP, mana, etc)
@@ -242,14 +249,13 @@ channel.on(EVENTS.PLAYER.MOVED, data => {
         
         // A câmera segue o jogador mantendo a mesma vista isométrica
         // Usamos a posição atual do jogador como centro da visualização
-        const offsetX = 20; // Mesmo valor usado na inicialização da câmera
-        const offsetY = 20;
-        const offsetZ = 20;
-        
-        camera.position.x = player.position.x + offsetX;
-        camera.position.y = player.position.y + offsetY;
-        camera.position.z = player.position.z + offsetZ;
-        camera.lookAt(player.position);
+        // const offsetX = 20; // Mesmo valor usado na inicialização da câmera
+        // const offsetY = 20;
+        // const offsetZ = 20;
+        // camera.position.x = player.position.x + offsetX;
+        // camera.position.y = player.position.y + offsetY;
+        // camera.position.z = player.position.z + offsetZ;
+        // camera.lookAt(player.position);
       }
     } else {
       // Atualiza outros jogadores usando o PlayerPresenter
@@ -360,7 +366,41 @@ function updateFloatingDamages() {
 function initThree() {
   // Cria cena
   scene = new THREE.Scene();
-  // Não definimos cor de fundo aqui, será definido pelo sistema de iluminação
+  // --- SKYBOX GRADIENTE ---
+  // Cria uma esfera gigante invertida para simular o céu
+  const skyGeo = new THREE.SphereGeometry(500, 32, 32);
+  // Shader de gradiente vertical azul escuro para azul médio
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: {
+      topColor: { value: new THREE.Color(0x223355) }, // Azul escuro
+      bottomColor: { value: new THREE.Color(0x3a6ea8) }, // Azul médio
+      offset: { value: 400 },
+      exponent: { value: 0.8 }
+    },
+    vertexShader: `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor;
+      uniform vec3 bottomColor;
+      uniform float offset;
+      uniform float exponent;
+      varying vec3 vWorldPosition;
+      void main() {
+        float h = normalize(vWorldPosition + offset).y;
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+      }
+    `
+  });
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(sky);
+  // Não defina scene.background para não conflitar com o skybox
   
   // Cria câmera isométrica
   const aspectRatio = width / height;
@@ -387,17 +427,24 @@ function initThree() {
   
   // Não adicionamos luzes básicas aqui, usando o sistema avançado de iluminação
   
-  // Adiciona grid para referência (temporário)
-  const gridHelper = new THREE.GridHelper(WORLD.SIZE.WIDTH, 20);
-  scene.add(gridHelper);
-  
-  // Cria um plano para o "chão" com material melhorado
+  // --- TEXTURA TILEADA PARA O CHÃO ---
+  const textureLoader = new THREE.TextureLoader();
+  const groundTexture = textureLoader.load('public/textures/environment/tiled_stone_texture.png', (tex) => {
+    console.log('Textura do chão carregada:', tex);
+  });
+  groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+  groundTexture.repeat.set(32, 32); // Ajuste o número de tiles conforme o tamanho do mapa
+  groundTexture.anisotropy = 8;
+  groundTexture.colorSpace = THREE.SRGBColorSpace;
+
+  // Cria um plano para o "chão" com material tileado
   const planeGeometry = new THREE.PlaneGeometry(WORLD.SIZE.WIDTH, WORLD.SIZE.HEIGHT);
   const planeMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x90EE90,  // Verde claro
+    map: groundTexture,
+    color: 0xffffff, // Mantém a cor original da textura
     side: THREE.DoubleSide,
-    roughness: 0.8,
-    metalness: 0.1,
+    roughness: 0.5, // Mais reflexivo
+    metalness: 0.0, // Não metálico
     flatShading: false
   });
   plane = new THREE.Mesh(planeGeometry, planeMaterial);
@@ -416,6 +463,40 @@ function initThree() {
   
   // Configura o sistema de iluminação avançado
   worldObjectPresenter.setupLighting(renderer);
+  
+  // --- CONFIGURAÇÃO PROFISSIONAL ALBION ONLINE ---
+  // Tonemapping e exposição para cores naturais e vibrantes
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.12; // Deixe a cena clara, mas sem estourar
+  
+  // --- PÓS-PROCESSAMENTO LEVE E PROFISSIONAL ---
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  // Bloom sutil, só realça magias/luzes intensas
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.6, // intensidade
+    0.4, // raio
+    0.85 // threshold
+  );
+  composer.addPass(bloomPass);
+  // FXAA para suavizar serrilhados
+  const fxaaPass = new ShaderPass(FXAAShader);
+  fxaaPass.material.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+  composer.addPass(fxaaPass);
+  // Vinheta REMOVIDA para visual Albion
+  // const vignettePass = new ShaderPass(VignetteShader);
+  // vignettePass.uniforms['offset'].value = 1.05;
+  // vignettePass.uniforms['darkness'].value = 1.1;
+  // composer.addPass(vignettePass);
+  // --- COLOR CORRECTION PASS (Albion: sutil, só realça um pouco) ---
+  const colorCorrectionPass = new ShaderPass(ColorCorrectionShader);
+  colorCorrectionPass.uniforms['powRGB'].value.set(1.05, 1.05, 1.05); // leve aumento de saturação
+  colorCorrectionPass.uniforms['mulRGB'].value.set(1.05, 1.05, 1.05); // leve aumento de brilho/contraste
+  composer.addPass(colorCorrectionPass);
+  // Color space correto para fidelidade de cor
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   
   // Responsividade
   window.addEventListener('resize', onWindowResize);
@@ -525,6 +606,7 @@ function createPlayer() {
   
   // Informa o ID do jogador local ao playerPresenter
   playerPresenter.setLocalPlayerId(playerId);
+  player.targetPosition = player.position.clone();
 }
 
 // Trata redimensionamento da janela
@@ -539,6 +621,12 @@ function onWindowResize() {
   camera.bottom = -cameraSize;
   camera.updateProjectionMatrix();
   renderer.setSize(newWidth, newHeight);
+  if (composer) {
+    composer.setSize(newWidth, newHeight);
+    // Atualiza FXAA
+    const fxaa = composer.passes.find(p => p.material && p.material.uniforms && p.material.uniforms['resolution']);
+    if (fxaa) fxaa.material.uniforms['resolution'].value.set(1 / newWidth, 1 / newHeight);
+  }
 }
 
 // Captura a posição do mouse
@@ -708,7 +796,29 @@ function animate() {
     worldObjectPresenter.updateLightPosition(player.position);
   }
   
-  renderer.render(scene, camera);
+  if (composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
+  
+  // Atualiza o outline do alvo selecionado para seguir o alvo
+  if (selectedOutline && selectedTargetId) {
+    let mesh = null;
+    if (selectedTargetType === 'monster') {
+      mesh = monsterPresenter.getMonster(selectedTargetId);
+    } else if (selectedTargetType === 'player') {
+      mesh = playerPresenter.getPlayer(selectedTargetId);
+    }
+    if (mesh) {
+      selectedOutline.position.copy(mesh.position);
+      selectedOutline.rotation.copy(mesh.rotation);
+    }
+  }
+  
+  if (player && player.targetPosition) {
+    player.position.lerp(player.targetPosition, 0.25);
+  }
 }
 
 // Conexão ao servidor
@@ -974,12 +1084,13 @@ function highlightTarget(mesh) {
     selectedOutline = null;
   }
   if (!mesh) return;
-  // Cria uma borda brilhante ao redor do alvo
-  const outlineMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.BackSide });
+  // Cria uma borda sutil ao redor do alvo (não brilha com o Bloom)
+  const outlineMaterial = new THREE.MeshBasicMaterial({ color: 0x888800, side: THREE.BackSide, transparent: true, opacity: 0.7 });
   const outlineMesh = mesh.clone();
   outlineMesh.material = outlineMaterial;
   outlineMesh.scale.multiplyScalar(1.15);
   outlineMesh.position.copy(mesh.position);
+  outlineMesh.rotation.copy(mesh.rotation);
   outlineMesh.renderOrder = 999;
   scene.add(outlineMesh);
   selectedOutline = outlineMesh;
@@ -1835,20 +1946,54 @@ let chatFocused = false;
 window.addEventListener('chat:focus', () => { chatFocused = true; });
 window.addEventListener('chat:blur', () => { chatFocused = false; });
 
-// Função para atualizar a posição da câmera para seguir o jogador
+// --- Parâmetros globais de câmera estilo Diablo 3 ---
+let cameraDistance = 28; // Distância padrão (pode ser ajustada via zoom)
+const cameraHeightAngle = Math.PI / 4.7; // ~38°
+const cameraLerpSpeed = 0.15; // Suavidade da interpolação
+// --- Fim dos parâmetros globais ---
+
 function updateCameraPosition() {
   if (!player) return;
-  
-  // Calcula offset baseado na visão isométrica
-  const offsetX = 20;
-  const offsetY = 20;
-  const offsetZ = 20;
-  
-  // Mantém a câmera na posição isométrica relativa ao jogador
-  camera.position.set(
-    player.position.x + offsetX,
-    player.position.y + offsetY,
-    player.position.z + offsetZ
+
+  // Calcula direção isométrica
+  const lookAt = new THREE.Vector3(
+    player.position.x,
+    player.position.y,
+    player.position.z
   );
-  camera.lookAt(player.position);
+
+  // Player levemente abaixo do centro (offset na direção do olhar)
+  const offsetX = Math.cos(cameraHeightAngle) * cameraDistance;
+  const offsetY = Math.sin(cameraHeightAngle) * cameraDistance;
+  const offsetZ = Math.cos(cameraHeightAngle) * cameraDistance;
+
+  // Posição alvo da câmera (levemente à frente do player)
+  const cameraTarget = new THREE.Vector3(
+    player.position.x + offsetX * 0.7,
+    player.position.y + offsetY,
+    player.position.z + offsetZ * 0.7
+  );
+
+  // Se a distância for grande (ex: teleporte ou início), pula a interpolação
+  if (camera.position.distanceTo(cameraTarget) > 8) {
+    camera.position.copy(cameraTarget);
+  } else {
+    // Interpolação suave (lerp)
+    camera.position.lerp(cameraTarget, cameraLerpSpeed);
+  }
+
+  // Olha para o player
+  camera.lookAt(lookAt);
+
+  // --- Esqueleto para fade em obstáculos (ativar depois se desejar) ---
+  // // Raycasting da câmera ao player para detectar obstáculos
+  // const ray = new THREE.Raycaster(camera.position, lookAt.clone().sub(camera.position).normalize());
+  // const intersects = ray.intersectObjects(scene.children, true);
+  // for (const obj of intersects) {
+  //   if (obj.object.userData && obj.object.userData.type === 'worldObject') {
+  //     // Exemplo: obj.object.material.opacity = 0.3;
+  //     // Exemplo: obj.object.material.transparent = true;
+  //   }
+  // }
+  // --- Fim do esqueleto de fade ---
 } 
