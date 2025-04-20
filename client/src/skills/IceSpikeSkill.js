@@ -183,69 +183,76 @@ function createIceSpikes(center, radius, count, scene) {
   // Grupo para todas as estacas
   const spikeGroup = new THREE.Group();
   
-  // Cria as estacas distribuídas pela área
-  for (let i = 0; i < count; i++) {
-    // Posição aleatória dentro do círculo (mais concentrada no centro)
-    const angle = Math.random() * Math.PI * 2;
-    const distanceFactor = Math.pow(Math.random(), 0.7); // Distribui mais estacas próximas ao centro
-    const distance = distanceFactor * radius * 0.95;
-    const x = center.x + Math.cos(angle) * distance;
-    const z = center.z + Math.sin(angle) * distance;
-    
-    // Tamanho variável para cada estaca
-    const spikeHeight = 1.5 + Math.random() * 1.5;
-    const spikeWidth = 0.2 + Math.random() * 0.3;
-    
-    // Criar estaca básica (combinação de formas geométricas)
-    const spikeBase = new THREE.Group();
-    
-    // Parte principal (cone afiado)
-    const mainSpike = new THREE.Mesh(
-      new THREE.ConeGeometry(spikeWidth, spikeHeight, 8),
-      spikeMaterial.clone()
-    );
-    mainSpike.position.y = spikeHeight / 2;
-    spikeBase.add(mainSpike);
-    
-    // Adicionar pequenos fragmentos de gelo na base
-    const fragmentCount = 2 + Math.floor(Math.random() * 3);
-    for (let j = 0; j < fragmentCount; j++) {
-      const fragSize = spikeWidth * (0.4 + Math.random() * 0.3);
-      const fragHeight = spikeHeight * (0.2 + Math.random() * 0.3);
-      
-      // Varia entre diferentes formas para os fragmentos
-      let fragGeometry;
-      if (Math.random() > 0.5) {
-        fragGeometry = new THREE.ConeGeometry(fragSize, fragHeight, 6);
-      } else {
-        fragGeometry = new THREE.TetrahedronGeometry(fragSize);
+  // --- ONDAS DE ESTACAS ---
+  const waves = 3; // Número de ondas
+  const spikesPerWave = Math.ceil(count / waves);
+  const waveDelay = 80; // ms entre ondas
+  let spikeIndex = 0;
+
+  function spawnWave(waveNum) {
+    // Flash azul intenso no centro
+    createBlueFlash(center, radius * (0.7 + 0.1 * waveNum), scene);
+    // Partículas brilhantes (AdditiveBlending)
+    createIceParticlesBright(center, 10 + Math.floor(Math.random() * 6), scene);
+    for (let i = 0; i < spikesPerWave && spikeIndex < count; i++, spikeIndex++) {
+      // Posição aleatória dentro do círculo (mais concentrada no centro)
+      const angle = Math.random() * Math.PI * 2;
+      const distanceFactor = Math.pow(Math.random(), 0.7);
+      const distance = distanceFactor * radius * 0.95;
+      const x = center.x + Math.cos(angle) * distance;
+      const z = center.z + Math.sin(angle) * distance;
+      // Tamanho variável para cada estaca
+      const spikeHeight = 1.5 + Math.random() * 1.5;
+      const spikeWidth = 0.2 + Math.random() * 0.3;
+      // Criar estaca básica (combinação de formas geométricas)
+      const spikeBase = new THREE.Group();
+      // Parte principal (cone afiado)
+      const mainSpike = new THREE.Mesh(
+        new THREE.ConeGeometry(spikeWidth, spikeHeight, 8),
+        spikeMaterial.clone()
+      );
+      mainSpike.position.y = spikeHeight / 2;
+      spikeBase.add(mainSpike);
+      // Adicionar pequenos fragmentos de gelo na base
+      const fragmentCount = 2 + Math.floor(Math.random() * 3);
+      for (let j = 0; j < fragmentCount; j++) {
+        const fragSize = spikeWidth * (0.4 + Math.random() * 0.3);
+        const fragHeight = spikeHeight * (0.2 + Math.random() * 0.3);
+        let fragGeometry;
+        if (Math.random() > 0.5) {
+          fragGeometry = new THREE.ConeGeometry(fragSize, fragHeight, 6);
+        } else {
+          fragGeometry = new THREE.TetrahedronGeometry(fragSize);
+        }
+        const fragment = new THREE.Mesh(fragGeometry, spikeMaterial.clone());
+        const fragAngle = Math.random() * Math.PI * 2;
+        const fragDistance = spikeWidth * 0.8;
+        fragment.position.x = Math.cos(fragAngle) * fragDistance;
+        fragment.position.z = Math.sin(fragAngle) * fragDistance;
+        fragment.position.y = fragHeight / 3;
+        fragment.rotation.x = (Math.random() - 0.5) * 0.3;
+        fragment.rotation.y = Math.random() * Math.PI * 2;
+        fragment.rotation.z = (Math.random() - 0.5) * 0.3;
+        spikeBase.add(fragment);
       }
-      
-      const fragment = new THREE.Mesh(fragGeometry, spikeMaterial.clone());
-      
-      // Posiciona o fragmento ao redor da base principal
-      const fragAngle = Math.random() * Math.PI * 2;
-      const fragDistance = spikeWidth * 0.8;
-      fragment.position.x = Math.cos(fragAngle) * fragDistance;
-      fragment.position.z = Math.sin(fragAngle) * fragDistance;
-      fragment.position.y = fragHeight / 3;
-      
-      // Rotação aleatória para parecer mais natural
-      fragment.rotation.x = (Math.random() - 0.5) * 0.3;
-      fragment.rotation.y = Math.random() * Math.PI * 2;
-      fragment.rotation.z = (Math.random() - 0.5) * 0.3;
-      
-      spikeBase.add(fragment);
+      // Posiciona a estaca
+      spikeBase.position.set(x, -spikeHeight, z);
+      spikeGroup.add(spikeBase);
+      // Anima a estaca surgindo do chão
+      animateSpikeEmergence(spikeBase, spikeHeight);
+      // Fragmentos de gelo caindo após impacto
+      setTimeout(() => {
+        createFallingIceFragments(new THREE.Vector3(x, 0.2, z), scene);
+      }, 220 + Math.random() * 120);
     }
-    
-    // Posiciona a estaca
-    spikeBase.position.set(x, -spikeHeight, z);
-    spikeGroup.add(spikeBase);
-    
-    // Anima a estaca surgindo do chão
-    animateSpikeEmergence(spikeBase, spikeHeight);
+    // Próxima onda
+    if (waveNum + 1 < waves) {
+      setTimeout(() => spawnWave(waveNum + 1), waveDelay);
+    }
   }
-  
+  // Inicia a primeira onda
+  spawnWave(0);
+
   scene.add(spikeGroup);
   
   // Programa a remoção das estacas após um tempo
@@ -254,6 +261,9 @@ function createIceSpikes(center, radius, count, scene) {
     // Anima a retração das estacas para o chão
     animateSpikeRetraction(spikeGroup, scene, duration);
   }, duration);
+  
+  // Efeitos visuais de impacto geral
+  createFrostMist(center, radius, scene);
 }
 
 /**
@@ -340,6 +350,130 @@ function animateSpikeRetraction(spikeGroup, scene, delay) {
 }
 
 /**
+ * Cria um flash circular azulado no chão
+ * @param {THREE.Vector3} pos - Posição central
+ * @param {number} radius - Raio do flash
+ * @param {THREE.Scene} scene
+ */
+function createBlueFlash(pos, radius, scene) {
+  const geo = new THREE.RingGeometry(radius * 0.7, radius, 48);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x99e0ff,
+    transparent: true,
+    opacity: 0.45,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(pos.x, 0.11, pos.z);
+  mesh.rotation.x = -Math.PI/2;
+  scene.add(mesh);
+  const start = performance.now();
+  const duration = 320;
+  function animate() {
+    const now = performance.now();
+    const t = Math.min((now - start) / duration, 1);
+    mesh.scale.setScalar(1.0 + t * 1.7);
+    mat.opacity = 0.45 * (1 - t);
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      scene.remove(mesh);
+      geo.dispose();
+      mat.dispose();
+    }
+  }
+  animate();
+}
+
+/**
+ * Cria partículas de gelo voando para cima e para os lados
+ * @param {THREE.Vector3} pos - Centro da explosão
+ * @param {number} count - Quantidade de partículas
+ * @param {THREE.Scene} scene
+ */
+function createIceParticles(pos, count, scene) {
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.06 + Math.random() * 0.04, 6, 6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xcceeff,
+      emissive: 0x99ccff,
+      emissiveIntensity: 0.7,
+      transparent: true,
+      opacity: 0.7 + Math.random() * 0.2,
+      roughness: 0.4
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.position.x += (Math.random() - 0.5) * 1.2;
+    mesh.position.y += 0.1 + Math.random() * 0.2;
+    mesh.position.z += (Math.random() - 0.5) * 1.2;
+    group.add(mesh);
+    // Anima subida e fade
+    const start = performance.now();
+    const duration = 420 + Math.random() * 180;
+    const yStart = mesh.position.y;
+    const xDir = (Math.random() - 0.5) * 1.2;
+    const zDir = (Math.random() - 0.5) * 1.2;
+    function animate() {
+      const now = performance.now();
+      const t = Math.min((now - start) / duration, 1);
+      mesh.position.y = yStart + t * (0.7 + Math.random() * 0.3);
+      mesh.position.x += xDir * 0.01;
+      mesh.position.z += zDir * 0.01;
+      mat.opacity = (0.7 + Math.random() * 0.2) * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        group.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animate();
+  }
+  scene.add(group);
+  setTimeout(() => scene.remove(group), 900);
+}
+
+/**
+ * Cria uma névoa fria/frost na base das estacas
+ * @param {THREE.Vector3} pos - Centro
+ * @param {number} radius - Raio
+ * @param {THREE.Scene} scene
+ */
+function createFrostMist(pos, radius, scene) {
+  const geo = new THREE.CircleGeometry(radius * 0.8, 32);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xbbeeff,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(pos.x, 0.12, pos.z);
+  mesh.rotation.x = -Math.PI/2;
+  scene.add(mesh);
+  const start = performance.now();
+  const duration = 700;
+  function animate() {
+    const now = performance.now();
+    const t = Math.min((now - start) / duration, 1);
+    mesh.scale.setScalar(1.0 + t * 1.2);
+    mat.opacity = 0.22 * (1 - t);
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      scene.remove(mesh);
+      geo.dispose();
+      mat.dispose();
+    }
+  }
+  animate();
+}
+
+/**
  * Atualiza as posições e ciclo de vida dos projéteis de gelo
  * @param {number} delta - Tempo desde o último frame em segundos
  * @param {THREE.Scene} scene - Cena do Three.js para remover projéteis expirados
@@ -403,4 +537,224 @@ export function clearIceSpikeProjectiles(scene) {
  */
 export function getActiveIceSpikeProjectiles() {
   return activeProjectiles.filter(p => p.type === 'ice_spike');
+}
+
+/**
+ * Aplica efeito de congelamento visual em um inimigo
+ * @param {THREE.Object3D} enemyMesh - Mesh do inimigo
+ * @param {THREE.Scene} scene
+ * @param {number} duration - Duração do efeito em ms
+ */
+export function applyFreezeEffect(enemyMesh, scene, duration = 900) {
+  if (!enemyMesh) return;
+  // Overlay azulado
+  const overlayMat = new THREE.MeshBasicMaterial({
+    color: 0x99ccff,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false
+  });
+  // Aplica overlay em todos os materiais do mesh
+  const originalMaterials = Array.isArray(enemyMesh.material) ? enemyMesh.material.slice() : [enemyMesh.material];
+  enemyMesh.material = [ ...originalMaterials, overlayMat ];
+  // Partículas de gelo ao redor
+  const pos = enemyMesh.position.clone();
+  createIceParticles(pos, 8, scene);
+  // Remove overlay após a duração
+  setTimeout(() => {
+    if (enemyMesh.material && Array.isArray(enemyMesh.material)) {
+      enemyMesh.material = originalMaterials;
+    }
+  }, duration);
+}
+
+/**
+ * Cria um círculo de energia animado para o pré-cast da Ice Spike
+ * @param {THREE.Vector3} pos - Centro
+ * @param {number} radius - Raio
+ * @param {THREE.Scene} scene
+ * @param {number} duration - Duração do pré-cast em ms
+ */
+function createAnimatedPrecastCircle(pos, radius, scene, duration = 1000) {
+  // Círculo base
+  const geo = new THREE.RingGeometry(radius * 0.7, radius, 64);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x99e0ff,
+    transparent: true,
+    opacity: 0.38,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(pos.x, 0.13, pos.z);
+  mesh.rotation.x = -Math.PI/2;
+  scene.add(mesh);
+
+  // Névoa fria
+  const mistGeo = new THREE.CircleGeometry(radius * 0.8, 32);
+  const mistMat = new THREE.MeshBasicMaterial({
+    color: 0xbbeeff,
+    transparent: true,
+    opacity: 0.13,
+    depthWrite: false
+  });
+  const mist = new THREE.Mesh(mistGeo, mistMat);
+  mist.position.set(pos.x, 0.12, pos.z);
+  mist.rotation.x = -Math.PI/2;
+  scene.add(mist);
+
+  // Partículas de gelo saindo do círculo
+  const particles = [];
+  for (let i = 0; i < 18; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = radius * (0.7 + Math.random() * 0.3);
+    const px = pos.x + Math.cos(angle) * r;
+    const pz = pos.z + Math.sin(angle) * r;
+    const geo = new THREE.SphereGeometry(0.06 + Math.random() * 0.04, 6, 6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xcceeff,
+      emissive: 0x99ccff,
+      emissiveIntensity: 0.7,
+      transparent: true,
+      opacity: 0.7 + Math.random() * 0.2,
+      roughness: 0.4
+    });
+    const meshP = new THREE.Mesh(geo, mat);
+    meshP.position.set(px, 0.15, pz);
+    particles.push({mesh: meshP, angle, r, speed: 0.12 + Math.random() * 0.08});
+    scene.add(meshP);
+  }
+
+  // Animação
+  const start = performance.now();
+  function animate() {
+    const now = performance.now();
+    const t = Math.min((now - start) / duration, 1);
+    // Círculo pulsa e gira
+    mesh.scale.setScalar(1 + 0.08 * Math.sin(t * Math.PI * 2 * 2));
+    mesh.rotation.z += 0.015;
+    mat.opacity = 0.38 * (1 - t * 0.5);
+    // Névoa aumenta
+    mist.scale.setScalar(1 + t * 0.25);
+    mistMat.opacity = 0.13 + 0.18 * t * (1 - t);
+    // Partículas se afastam e sobem
+    particles.forEach(p => {
+      p.r += p.speed * 0.04;
+      p.mesh.position.x = pos.x + Math.cos(p.angle) * p.r;
+      p.mesh.position.z = pos.z + Math.sin(p.angle) * p.r;
+      p.mesh.position.y += 0.012 + 0.01 * Math.random();
+      p.mesh.material.opacity = 0.7 * (1 - t);
+    });
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      scene.remove(mesh);
+      geo.dispose();
+      mat.dispose();
+      scene.remove(mist);
+      mistGeo.dispose();
+      mistMat.dispose();
+      particles.forEach(p => {
+        scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        p.mesh.material.dispose();
+      });
+    }
+  }
+  animate();
+}
+
+/**
+ * Cria partículas de gelo brilhantes (AdditiveBlending)
+ */
+function createIceParticlesBright(pos, count, scene) {
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.07 + Math.random() * 0.05, 6, 6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xe0f6ff,
+      emissive: 0x99ccff,
+      emissiveIntensity: 1.5,
+      transparent: true,
+      opacity: 0.85,
+      roughness: 0.2,
+      blending: THREE.AdditiveBlending
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.position.x += (Math.random() - 0.5) * 1.2;
+    mesh.position.y += 0.1 + Math.random() * 0.2;
+    mesh.position.z += (Math.random() - 0.5) * 1.2;
+    group.add(mesh);
+    // Anima subida e fade
+    const start = performance.now();
+    const duration = 420 + Math.random() * 180;
+    const yStart = mesh.position.y;
+    const xDir = (Math.random() - 0.5) * 1.2;
+    const zDir = (Math.random() - 0.5) * 1.2;
+    function animate() {
+      const now = performance.now();
+      const t = Math.min((now - start) / duration, 1);
+      mesh.position.y = yStart + t * (0.9 + Math.random() * 0.4);
+      mesh.position.x += xDir * 0.012;
+      mesh.position.z += zDir * 0.012;
+      mat.opacity = 0.85 * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        group.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animate();
+  }
+  scene.add(group);
+  setTimeout(() => scene.remove(group), 900);
+}
+
+/**
+ * Cria fragmentos de gelo caindo após o impacto das estacas
+ */
+function createFallingIceFragments(pos, scene) {
+  const group = new THREE.Group();
+  const count = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.TetrahedronGeometry(0.08 + Math.random() * 0.05);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xcceeff,
+      emissive: 0x99ccff,
+      emissiveIntensity: 0.7,
+      transparent: true,
+      opacity: 0.8,
+      roughness: 0.4
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.position.x += (Math.random() - 0.5) * 0.3;
+    mesh.position.z += (Math.random() - 0.5) * 0.3;
+    mesh.position.y += 0.2 + Math.random() * 0.1;
+    group.add(mesh);
+    // Anima queda e fade
+    const start = performance.now();
+    const duration = 420 + Math.random() * 180;
+    const yStart = mesh.position.y;
+    const yEnd = yStart - (0.5 + Math.random() * 0.2);
+    function animate() {
+      const now = performance.now();
+      const t = Math.min((now - start) / duration, 1);
+      mesh.position.y = yStart + (yEnd - yStart) * t;
+      mat.opacity = 0.8 * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        group.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animate();
+  }
+  scene.add(group);
+  setTimeout(() => scene.remove(group), 900);
 } 

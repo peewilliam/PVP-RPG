@@ -16,6 +16,9 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
 import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectionShader.js';
+// Importa os efeitos visuais de status
+import { applyBurnEffect } from './skills/MeteorStormSkill.js';
+import { applyFreezeEffect } from './skills/IceSpikeSkill.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -1291,28 +1294,29 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
       if (!data.playerId && player) {
         // É o próprio jogador local
         targetMesh = player;
-        
+        // Salva a posição de origem antes do teleporte
+        const origem = player.position.clone();
         // Teleporta o jogador imediatamente
         player.position.set(
           data.teleportPosition.x,
           data.teleportPosition.y || player.position.y,
           data.teleportPosition.z
         );
-        
-        // Adiciona efeito visual de teleporte
-        floatingTextManager.createFloatingText({
-          text: '✨',
-          position: data.teleportPosition,
-          color: '#80ffff',
-          size: 2.0,
-          duration: 1000,
-          type: 'default'
-        });
-        
+        // Chama o efeito visual de teleporte
+        skillManager.spawnSkillEffect(2, origem, new THREE.Vector3(data.teleportPosition.x, data.teleportPosition.y || player.position.y, data.teleportPosition.z), player);
+        // (Opcional) Texto flutuante
+        // floatingTextManager.createFloatingText({
+        //   text: '✨',
+        //   position: data.teleportPosition,
+        //   color: '#80ffff',
+        //   size: 2.0,
+        //   duration: 1000,
+        //   type: 'default'
+        // });
         // Atualiza a câmera para seguir o jogador teleportado
-        camera.position.x = player.position.x;
-        camera.position.z = player.position.z + cameraDistance;
-        camera.lookAt(player.position);
+        // camera.position.x = player.position.x;
+        // camera.position.z = player.position.z + cameraDistance;
+        // camera.lookAt(player.position);
       } 
       else if (data.playerId) {
         // É outro jogador
@@ -1563,8 +1567,15 @@ function initServerEvents() {
           }
         }
       }
+
+      // --- INTEGRAÇÃO: Aplica efeito visual de status conforme a habilidade ---
+      if (targetEntity && data.abilityId) {
+        if (data.abilityId === 4) applyStatusEffectVisual(targetEntity, scene, 'burn');   // Meteor Storm
+        if (data.abilityId === 3) applyStatusEffectVisual(targetEntity, scene, 'freeze'); // Ice Spike
+        // Adicione outros efeitos/status aqui conforme necessário
+      }
     } catch (error) {
-      console.error('Erro ao processar evento de dano:', error);
+      console.error('Erro ao processar evento DAMAGE_DEALT:', error);
     }
   });
   
@@ -1996,4 +2007,37 @@ function updateCameraPosition() {
   //   }
   // }
   // --- Fim do esqueleto de fade ---
-} 
+}
+
+/**
+ * Aplica efeito visual de status em um inimigo
+ * @param {THREE.Object3D} enemyMesh - Mesh do inimigo
+ * @param {THREE.Scene} scene
+ * @param {string} status - 'burn', 'freeze', 'slow', etc
+ */
+function applyStatusEffectVisual(enemyMesh, scene, status) {
+  if (!enemyMesh) return;
+  console.log('[StatusVisual] Aplicando status', status, 'em mesh:', enemyMesh);
+  if (status === 'burn') {
+    console.log('[StatusVisual] Chamando applyBurnEffect');
+    applyBurnEffect(enemyMesh, scene);
+  }
+  if (status === 'freeze' || status === 'slow') {
+    console.log('[StatusVisual] Chamando applyFreezeEffect');
+    applyFreezeEffect(enemyMesh, scene);
+  }
+  // Adicione outros efeitos conforme necessário
+}
+
+// Exemplo de uso no handler de hit/dano:
+// (Adapte conforme sua lógica de combate/eventos)
+//
+// if (enemyMesh && status) {
+//   applyStatusEffectVisual(enemyMesh, scene, status);
+// }
+//
+// Para integração automática por habilidade:
+// if (enemyMesh && abilityId) {
+//   if (abilityId === 4) applyStatusEffectVisual(enemyMesh, scene, 'burn'); // Meteor Storm
+//   if (abilityId === 3) applyStatusEffectVisual(enemyMesh, scene, 'freeze'); // Ice Spike
+// }

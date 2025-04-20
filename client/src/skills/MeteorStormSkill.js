@@ -41,6 +41,63 @@ export function spawnMeteorStormEffect(origin, target, scene, effect = {}) {
   // Inicia a criação de meteoros
   startMeteorSequence(targetPos, areaRadius, scene, meteorCount, meteorInterval);
   
+  // --- Efeito de cinzas caindo durante a tempestade ---
+  const ashesGroup = new THREE.Group();
+  const ashesCount = 32;
+  for (let i = 0; i < ashesCount; i++) {
+    const geo = new THREE.SphereGeometry(0.07 + Math.random() * 0.04, 6, 6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x222222,
+      emissive: 0x111111,
+      emissiveIntensity: 0.2,
+      transparent: true,
+      opacity: 0.22 + Math.random() * 0.13,
+      roughness: 0.8
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    // Posição inicial aleatória acima da área
+    const angle = Math.random() * Math.PI * 2;
+    const r = Math.random() * areaRadius * 0.95;
+    mesh.position.set(
+      target.x + Math.cos(angle) * r,
+      3.5 + Math.random() * 2.5,
+      target.z + Math.sin(angle) * r
+    );
+    ashesGroup.add(mesh);
+    // Anima queda lenta
+    const yStart = mesh.position.y;
+    const yEnd = 0.1 + Math.random() * 0.2;
+    const xDrift = (Math.random() - 0.5) * 0.2;
+    const zDrift = (Math.random() - 0.5) * 0.2;
+    const start = performance.now();
+    const ashesDuration = duration * (0.7 + Math.random() * 0.4);
+    function animateAsh() {
+      const now = performance.now();
+      const t = Math.min((now - start) / ashesDuration, 1);
+      mesh.position.y = yStart + (yEnd - yStart) * t;
+      mesh.position.x += xDrift * 0.01;
+      mesh.position.z += zDrift * 0.01;
+      mat.opacity = (0.22 + Math.random() * 0.13) * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animateAsh);
+      } else {
+        ashesGroup.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animateAsh();
+  }
+  scene.add(ashesGroup);
+  // Remove todas as cinzas ao final
+  setTimeout(() => {
+    scene.remove(ashesGroup);
+    ashesGroup.children.forEach(mesh => {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    });
+  }, duration + 500);
+  
   // Remove o indicador de área após a duração da habilidade
   setTimeout(() => {
     if (scene.getObjectById(areaMesh.id)) {
@@ -204,50 +261,228 @@ function createSingleMeteor(start, end, scene) {
  * @param {THREE.Scene} scene - Cena para adicionar a explosão
  */
 function createExplosion(position, scene) {
-  // Geometria da explosão (esfera que expande)
-  const explosionGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-  const explosionMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff9900,
+  // --- Flash circular laranja/vermelho ---
+  const flashGeo = new THREE.RingGeometry(0.7, 2.1, 48);
+  const flashMat = new THREE.MeshBasicMaterial({
+    color: 0xffa040,
     transparent: true,
-    opacity: 0.8
+    opacity: 0.45,
+    side: THREE.DoubleSide,
+    depthWrite: false
   });
-  
-  const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
-  explosion.position.copy(position);
-  explosion.position.y += 0.2; // Ligeiramente acima do chão
-  scene.add(explosion);
-  
-  // Duração da explosão
-  const duration = 600; // ms
-  const startTime = Date.now();
-  const endTime = startTime + duration;
-  const maxScale = 2.0;
-  
-  function animateExplosion() {
-    const now = Date.now();
-    const elapsed = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    
-    if (progress < 1) {
-      // Expande a explosão
-      const scale = maxScale * progress;
-      explosion.scale.set(scale, scale, scale);
-      
-      // Reduz a opacidade conforme expande
-      explosionMaterial.opacity = 0.8 * (1 - progress);
-      
-      // Continua a animação
-      requestAnimationFrame(animateExplosion);
+  const flash = new THREE.Mesh(flashGeo, flashMat);
+  flash.position.copy(position);
+  flash.position.y += 0.12;
+  flash.rotation.x = -Math.PI/2;
+  scene.add(flash);
+  // Anima expansão e fade
+  const flashStart = performance.now();
+  const flashDuration = 220;
+  function animateFlash() {
+    const now = performance.now();
+    const t = Math.min((now - flashStart) / flashDuration, 1);
+    flash.scale.setScalar(1.0 + t * 2.2);
+    flashMat.opacity = 0.45 * (1 - t);
+    if (t < 1) {
+      requestAnimationFrame(animateFlash);
     } else {
-      // Remove a explosão
-      scene.remove(explosion);
-      
-      // Libera recursos
-      explosionGeometry.dispose();
-      explosionMaterial.dispose();
+      scene.remove(flash);
+      flashGeo.dispose();
+      flashMat.dispose();
     }
   }
-  
-  // Inicia a animação da explosão
-  animateExplosion();
+  animateFlash();
+
+  // --- Partículas de fogo e fumaça ---
+  for (let i = 0; i < 18; i++) {
+    const isSmoke = Math.random() > 0.5;
+    const geo = new THREE.SphereGeometry(isSmoke ? 0.22 : 0.13, 6, 6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: isSmoke ? 0x333333 : 0xffa040,
+      emissive: isSmoke ? 0x222222 : 0xff6600,
+      emissiveIntensity: isSmoke ? 0.2 : 1.2,
+      transparent: true,
+      opacity: isSmoke ? 0.32 : 0.7,
+      roughness: isSmoke ? 0.8 : 0.3,
+      metalness: isSmoke ? 0.1 : 0.7
+    });
+    if (!isSmoke) mat.blending = THREE.AdditiveBlending;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(position);
+    mesh.position.y += 0.2 + Math.random() * 0.2;
+    scene.add(mesh);
+    // Anima dispersão e fade
+    const dir = new THREE.Vector3(
+      (Math.random() - 0.5) * 2.2,
+      0.5 + Math.random() * 1.2,
+      (Math.random() - 0.5) * 2.2
+    );
+    const start = performance.now();
+    const duration = 420 + Math.random() * 180;
+    const yStart = mesh.position.y;
+    function animate() {
+      const now = performance.now();
+      const t = Math.min((now - start) / duration, 1);
+      mesh.position.x += dir.x * 0.012;
+      mesh.position.y = yStart + dir.y * t * 0.7;
+      mesh.position.z += dir.z * 0.012;
+      mat.opacity = (isSmoke ? 0.32 : 0.7) * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        scene.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animate();
+  }
+
+  // --- Fragmentos de rocha incandescente saltando ---
+  for (let i = 0; i < 7; i++) {
+    const geo = new THREE.TetrahedronGeometry(0.13 + Math.random() * 0.07);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xffa040,
+      emissive: 0xff6600,
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.8,
+      roughness: 0.5,
+      metalness: 0.7
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(position);
+    mesh.position.y += 0.18 + Math.random() * 0.12;
+    scene.add(mesh);
+    // Anima salto e fade
+    const dir = new THREE.Vector3(
+      (Math.random() - 0.5) * 1.2,
+      0.7 + Math.random() * 0.7,
+      (Math.random() - 0.5) * 1.2
+    );
+    const start = performance.now();
+    const duration = 520 + Math.random() * 180;
+    const yStart = mesh.position.y;
+    function animate() {
+      const now = performance.now();
+      const t = Math.min((now - start) / duration, 1);
+      mesh.position.x += dir.x * 0.012;
+      mesh.position.y = yStart + dir.y * t * 0.7 - 1.2 * t * t;
+      mesh.position.z += dir.z * 0.012;
+      mat.opacity = 0.8 * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        scene.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animate();
+  }
+
+  // --- Marca de queimado temporária no chão ---
+  const scorchGeo = new THREE.CircleGeometry(1.2 + Math.random() * 0.7, 24);
+  const scorchMat = new THREE.MeshBasicMaterial({
+    color: 0x222211,
+    transparent: true,
+    opacity: 0.32,
+    depthWrite: false
+  });
+  const scorch = new THREE.Mesh(scorchGeo, scorchMat);
+  scorch.position.copy(position);
+  scorch.position.y += 0.09;
+  scorch.rotation.x = -Math.PI/2;
+  scene.add(scorch);
+  // Fade out da marca
+  const scorchStart = performance.now();
+  const scorchDuration = 1800;
+  function animateScorch() {
+    const now = performance.now();
+    const t = Math.min((now - scorchStart) / scorchDuration, 1);
+    scorchMat.opacity = 0.32 * (1 - t);
+    if (t < 1) {
+      requestAnimationFrame(animateScorch);
+    } else {
+      scene.remove(scorch);
+      scorchGeo.dispose();
+      scorchMat.dispose();
+    }
+  }
+  animateScorch();
+}
+
+/**
+ * Aplica efeito visual de queimadura em um inimigo
+ * @param {THREE.Object3D} enemyMesh - Mesh do inimigo
+ * @param {THREE.Scene} scene
+ * @param {number} duration - Duração do efeito em ms
+ */
+export function applyBurnEffect(enemyMesh, scene, duration = 1200) {
+  if (!enemyMesh) return;
+  // Overlay avermelhado/brilhante
+  const overlayMat = new THREE.MeshBasicMaterial({
+    color: 0xff4400,
+    transparent: true,
+    opacity: 0.45,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  // Aplica overlay em todos os materiais do mesh
+  const originalMaterials = Array.isArray(enemyMesh.material) ? enemyMesh.material.slice() : [enemyMesh.material];
+  enemyMesh.material = [ ...originalMaterials, overlayMat ];
+  // Partículas flamejantes subindo
+  const pos = enemyMesh.position.clone();
+  createBurnParticles(pos, scene);
+  // Remove overlay após a duração
+  setTimeout(() => {
+    if (enemyMesh.material && Array.isArray(enemyMesh.material)) {
+      enemyMesh.material = originalMaterials;
+    }
+  }, duration);
+}
+
+/**
+ * Cria partículas flamejantes subindo
+ */
+function createBurnParticles(pos, scene) {
+  const group = new THREE.Group();
+  for (let i = 0; i < 10; i++) {
+    const geo = new THREE.SphereGeometry(0.06 + Math.random() * 0.04, 6, 6);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xffa040,
+      emissive: 0xff6600,
+      emissiveIntensity: 1.2,
+      transparent: true,
+      opacity: 0.7 + Math.random() * 0.2,
+      roughness: 0.3,
+      blending: THREE.AdditiveBlending
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    mesh.position.x += (Math.random() - 0.5) * 0.5;
+    mesh.position.z += (Math.random() - 0.5) * 0.5;
+    mesh.position.y += 0.2 + Math.random() * 0.2;
+    group.add(mesh);
+    // Anima subida e fade
+    const start = performance.now();
+    const duration = 420 + Math.random() * 180;
+    const yStart = mesh.position.y;
+    function animate() {
+      const now = performance.now();
+      const t = Math.min((now - start) / duration, 1);
+      mesh.position.y = yStart + t * (0.7 + Math.random() * 0.3);
+      mat.opacity = (0.7 + Math.random() * 0.2) * (1 - t);
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        group.remove(mesh);
+        geo.dispose();
+        mat.dispose();
+      }
+    }
+    animate();
+  }
+  scene.add(group);
+  setTimeout(() => scene.remove(group), 900);
 } 
