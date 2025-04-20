@@ -190,10 +190,10 @@ export class SpawnSystem {
    * Inicializa áreas de spawn padrão para o mundo
    */
   initializeDefaultSpawnAreas() {
-    // Área 1: Goblins perto do spawn (pequeno grupo)
+    // Área 1: Zumbis da Névoa Negra perto do spawn (pequeno grupo)
     this.registerSpawnArea({
-      id: 'spawn-goblins',
-      monsterType: 'GOBLIN',
+      id: 'spawn-blackmistzombies',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: 10, y: 0, z: 10 },
       radius: 5,
       maxMonsters: 3, // Reduzido para não sobrecarregar a área inicial
@@ -202,10 +202,10 @@ export class SpawnSystem {
       maxLevel: 1
     });
     
-    // Área 2: Floresta Norte (grupo médio de goblins)
+    // Área 2: Floresta Norte (grupo médio de zumbis)
     this.registerSpawnArea({
-      id: 'forest-north-goblins-1',
-      monsterType: 'GOBLIN',
+      id: 'forest-north-blackmistzombies-1',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: -40, y: 0, z: -60 },
       radius: 15,
       maxMonsters: 8,
@@ -216,8 +216,8 @@ export class SpawnSystem {
     
     // Área 3: Floresta Norte (segundo grupo)
     this.registerSpawnArea({
-      id: 'forest-north-goblins-2',
-      monsterType: 'GOBLIN',
+      id: 'forest-north-blackmistzombies-2',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: 30, y: 0, z: -70 },
       radius: 12,
       maxMonsters: 6,
@@ -228,8 +228,8 @@ export class SpawnSystem {
     
     // Área 4: Floresta Oeste (grupo denso)
     this.registerSpawnArea({
-      id: 'forest-west-goblins',
-      monsterType: 'GOBLIN',
+      id: 'forest-west-blackmistzombies',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: -70, y: 0, z: 0 },
       radius: 20,
       maxMonsters: 10,
@@ -238,10 +238,10 @@ export class SpawnSystem {
       maxLevel: 3
     });
     
-    // Área 5: Montanhas (goblins mais fortes)
+    // Área 5: Montanhas (zumbis mais fortes)
     this.registerSpawnArea({
-      id: 'mountain-goblins',
-      monsterType: 'GOBLIN',
+      id: 'mountain-blackmistzombies',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: 80, y: 0, z: 20 },
       radius: 25,
       maxMonsters: 12,
@@ -252,8 +252,8 @@ export class SpawnSystem {
     
     // Área 6: Planícies (grupo pequeno espalhado)
     this.registerSpawnArea({
-      id: 'plains-goblins',
-      monsterType: 'GOBLIN',
+      id: 'plains-blackmistzombies',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: 0, y: 0, z: 70 },
       radius: 30, // Mais espalhados
       maxMonsters: 7,
@@ -264,8 +264,8 @@ export class SpawnSystem {
     
     // Área 7: Pântano (grupo médio)
     this.registerSpawnArea({
-      id: 'swamp-goblins',
-      monsterType: 'GOBLIN',
+      id: 'swamp-blackmistzombies',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: 60, y: 0, z: 85 },
       radius: 15,
       maxMonsters: 8,
@@ -274,10 +274,10 @@ export class SpawnSystem {
       maxLevel: 4
     });
     
-    // Área 8: Ruínas (goblins mais fortes)
+    // Área 8: Ruínas (zumbis mais fortes)
     this.registerSpawnArea({
-      id: 'ruins-goblins',
-      monsterType: 'GOBLIN',
+      id: 'ruins-blackmistzombies',
+      monsterType: 'BLACK_MIST_ZOMBIE',
       position: { x: 70, y: 0, z: -70 },
       radius: 18,
       maxMonsters: 10,

@@ -89,9 +89,10 @@ export const PLAYER = {
 
 // Configurações de monstros
 export const MONSTERS = {
-  GOBLIN: {
+  BLACK_MIST_ZOMBIE: {
     ID: 1,
-    NAME: 'Goblin',
+    NAME: 'Zumbi da Névoa Negra',
+    INTERNAL_NAME: 'BlackMistZombie',
     HP: 50,
     DAMAGE: 50,
     DEFENSE: 2,

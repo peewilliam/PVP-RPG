@@ -1,7 +1,7 @@
 // Arquivo principal do cliente
 import * as THREE from 'three';
 import geckos from '@geckos.io/client';
-import { SERVER, EVENTS, PLAYER, WORLD, ABILITIES } from '../../shared/constants/gameConstants.js';
+import { SERVER, EVENTS, PLAYER, WORLD, ABILITIES, MONSTERS } from '../../shared/constants/gameConstants.js';
 import { SKILLS } from '../../shared/skills/skillsConfig.js';
 import { MonsterPresenter } from './presenters/MonsterPresenter.js';
 import { WorldObjectPresenter } from './presenters/WorldObjectPresenter.js';
@@ -1093,7 +1093,7 @@ window.addEventListener('mousedown', (event) => {
       const target = {
         id,
         type: 'monster',
-        name: monster?.monsterType || '???',
+        name: MONSTERS[monster?.monsterType]?.NAME || '???', // Agora exibe o nome em pt-br
         hp: monster?.stats?.hp,
         maxHp: monster?.stats?.maxHp,
         energy: 0,

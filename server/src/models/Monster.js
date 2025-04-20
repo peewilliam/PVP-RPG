@@ -70,7 +70,7 @@ export class Monster extends Entity {
    */
   getMonsterTypeConfig(type) {
     switch (type) {
-      case 'GOBLIN': return MONSTERS.GOBLIN;
+      case 'BLACK_MIST_ZOMBIE': return MONSTERS.BLACK_MIST_ZOMBIE;
       // Adicionar outros tipos de monstros aqui
       default: return null;
     }
