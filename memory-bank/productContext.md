@@ -63,4 +63,10 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 - Mundo com sensação de profundidade e vida.
 - Jogabilidade fluida, sem travamentos mesmo com muitos jogadores/objetos.
 - Feedback visual claro para ações, habilidades e interações.
-- **Chat em tempo real** integrado ao HUD, permitindo comunicação entre jogadores sem atrapalhar a experiência de jogo. O chat é essencial para a interação social e colaboração dentro do MMORPG. 
+- **Chat em tempo real** integrado ao HUD, permitindo comunicação entre jogadores sem atrapalhar a experiência de jogo. O chat é essencial para a interação social e colaboração dentro do MMORPG.
+
+- UX aprimorada: HUD central com feedback visual imediato de XP, borda dourada e fundo cinza sempre visível
+- Clareza visual: jogador sempre entende o progresso de XP, mesmo sem ter ganho XP ainda
+- Sincronização robusta: level, xp, nextLevelXp e name sempre atualizados entre servidor e cliente
+- Decisão: feedback visual e clareza são prioridades para engajamento e satisfação do jogador
+- Padrão: fallback visual no HUD para evitar sensação de "vazio" ou "invisível" 

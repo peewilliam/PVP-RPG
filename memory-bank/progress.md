@@ -21,6 +21,15 @@
 - ✅ Sistema de combate funcional com diferentes tipos de habilidades
 - ✅ Zonas de dano contínuo para habilidades como Meteor Storm
 - ✅ Aplicação de efeitos de controle (slow) com Estacas de Gelo
+- ✅ HUD central com borda de XP dinâmica e fundo visual (SVG, stroke-dasharray, fundo cinza translúcido)
+- ✅ Sincronização de level, xp, nextLevelXp e name entre servidor e cliente
+- ✅ Correção dos eventos do servidor para sempre enviar esses campos
+- ✅ Padrão de atualização do HUD usando dados recebidos do servidor
+- ✅ Ajustes visuais e UX do HUD central (borda dourada, fundo, clareza visual)
+- ✅ Garantia de feedback visual imediato para progresso de XP
+- ✅ Correção de bugs de HUD não atualizado ou valores undefined
+- ✅ Padrão: sempre atualizar player.userData e HUD ao receber eventos relevantes
+- ✅ Status: HUD agora reflete corretamente o progresso de XP desde o início do jogo, com visual consistente e feedback claro.
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens

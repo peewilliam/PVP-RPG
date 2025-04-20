@@ -278,3 +278,12 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 - Validação de dados recebidos.
 - Try/catch em handlers críticos.
 - Logs descritivos para depuração.
+
+## Padrões de HUD e Sincronização XP
+- HUD central utiliza SVG para borda de XP, com stroke-dasharray para progresso e fundo cinza translúcido sempre visível
+- Sempre sincronizar level, xp, nextLevelXp e name entre servidor e cliente em todos os eventos relevantes
+- Cliente deve atualizar player.userData e HUD imediatamente ao receber eventos do servidor
+- Eventos do servidor (JOINED, EXISTING, MOVED, RESPAWN, LEVEL_UP) devem sempre enviar esses campos
+- Padrão: HUD nunca deve mostrar valores undefined; fallback visual sempre presente
+- Decisão: clareza visual e feedback imediato são prioridade no HUD
+- Padrão: fundo da borda de XP sempre visível, mesmo sem progresso

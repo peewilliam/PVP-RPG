@@ -146,4 +146,11 @@
 ## Restrições
 - Modelos devem ser otimizados (baixo polycount, sem texturas pesadas).
 - Performance priorizada em dispositivos médios.
-- Atualizações de sombra e culling não são por frame, mas em intervalos. 
+- Atualizações de sombra e culling não são por frame, mas em intervalos.
+
+- HUD central utiliza SVG com múltiplos polígonos para borda de XP (fundo cinza translúcido + stroke dourado dinâmico)
+- Progresso de XP controlado via stroke-dasharray e stroke-dashoffset
+- Sincronização de level, xp, nextLevelXp e name garantida em todos os eventos relevantes do servidor
+- Cliente atualiza player.userData e HUD imediatamente ao receber eventos
+- Padrão: fallback visual sempre presente no HUD para evitar valores undefined ou sensação de vazio
+- Decisão: clareza visual e feedback imediato são prioridades técnicas para UX 

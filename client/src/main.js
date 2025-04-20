@@ -207,61 +207,32 @@ channel.on(EVENTS.PLAYER.INIT, data => {
 });
 channel.on(EVENTS.PLAYER.MOVED, data => {
   try {
-    // Verifica se os dados são válidos
     if (!data || !data.id || !data.position) {
       console.error('Dados de jogador inválidos:', data);
       return;
     }
-    
     const otherPlayerId = data.id;
-    
-    // Tratamento diferente para o jogador local vs. outros jogadores
     if (otherPlayerId === playerId) {
-      // Atualiza posição do jogador local
       if (player) {
-        // Valida os valores antes de atualizar
         const x = Number(data.position.x) || 0;
         const z = Number(data.position.z) || 0;
         player.targetPosition = new THREE.Vector3(x, 0.5, z);
         player.rotation.y = Number(data.rotation) || 0;
-        
-        // Atualiza estatísticas do jogador (HP, mana, etc)
         if (data.stats && player.userData) {
-          // Registra mudanças significativas na mana para depuração
-          if (data.stats.mana !== undefined && player.userData.stats) {
-            const oldMana = player.userData.stats.mana || 0;
-            const newMana = data.stats.mana;
-            const manaChange = newMana - oldMana;
-            
-            if (Math.abs(manaChange) > 1) {
-              // console.log(`Mana atualizada (MOVED): ${oldMana.toFixed(1)} → ${newMana.toFixed(1)} (${manaChange > 0 ? '+' : ''}${manaChange.toFixed(1)})`);
-            }
-          }
-          
-          // Atualiza todas as estatísticas
           player.userData.stats = { ...player.userData.stats, ...data.stats };
-          
-          // Atualiza o HUD
-          hudManager.update(player.userData.stats, player.userData.level, 'Arcane');
-          
-          // Atualiza o SkillManager com a mana atual
+          // Atualiza campos de progresso e nome
+          player.userData.level = data.level;
+          player.userData.xp = data.xp;
+          player.userData.nextLevelXp = data.nextLevelXp;
+          player.userData.name = data.name;
+          // Atualiza o HUD com os dados recebidos
+          hudManager.update(data.stats, data.level, data.name, data.xp, data.nextLevelXp); // Corrigido
           if (data.stats.mana !== undefined) {
             skillManager.updateMana(data.stats.mana);
           }
         }
-        
-        // A câmera segue o jogador mantendo a mesma vista isométrica
-        // Usamos a posição atual do jogador como centro da visualização
-        // const offsetX = 20; // Mesmo valor usado na inicialização da câmera
-        // const offsetY = 20;
-        // const offsetZ = 20;
-        // camera.position.x = player.position.x + offsetX;
-        // camera.position.y = player.position.y + offsetY;
-        // camera.position.z = player.position.z + offsetZ;
-        // camera.lookAt(player.position);
       }
     } else {
-      // Atualiza outros jogadores usando o PlayerPresenter
       playerPresenter.updatePlayer(data);
     }
   } catch (error) {
@@ -924,21 +895,22 @@ channel.on(EVENTS.PLAYER.DISCONNECTED, data => {
 // Recebe informações sobre jogadores que já estavam conectados
 channel.on(EVENTS.PLAYER.EXISTING, data => {
   try {
-    // Verifica se os dados são válidos
     if (!data || !data.id || !data.position) {
       console.error('Dados de jogador existente inválidos:', data);
       return;
     }
-    
     const existingPlayerId = data.id;
-    console.log(`Jogador existente encontrado: ${existingPlayerId}`);
-    
-    // Ignora se for o jogador local (não deveria acontecer)
-    if (existingPlayerId === playerId) return;
-    
-    // Atualiza outros jogadores usando o PlayerPresenter
-    playerPresenter.updatePlayer(data);
-    
+    if (existingPlayerId === playerId && player && player.userData) {
+      // Atualiza campos do jogador local
+      player.userData.stats = { ...player.userData.stats, ...data.stats };
+      player.userData.level = data.level;
+      player.userData.xp = data.xp;
+      player.userData.nextLevelXp = data.nextLevelXp;
+      player.userData.name = data.name;
+      hudManager.update(data.stats, data.level, data.name, data.xp, data.nextLevelXp); // Corrigido
+    } else if (existingPlayerId !== playerId) {
+      playerPresenter.updatePlayer(data);
+    }
   } catch (error) {
     console.error('Erro ao processar jogador existente:', error);
   }
@@ -947,21 +919,22 @@ channel.on(EVENTS.PLAYER.EXISTING, data => {
 // Recebe informações sobre novos jogadores que acabaram de se conectar
 channel.on(EVENTS.PLAYER.JOINED, data => {
   try {
-    // Verifica se os dados são válidos
     if (!data || !data.id || !data.position) {
       console.error('Dados de novo jogador inválidos:', data);
       return;
     }
-    
     const newPlayerId = data.id;
-    console.log(`Novo jogador entrou: ${newPlayerId}`);
-    
-    // Ignora se for o jogador local (não deveria acontecer)
-    if (newPlayerId === playerId) return;
-    
-    // Atualiza outros jogadores usando o PlayerPresenter
-    playerPresenter.updatePlayer(data);
-    
+    if (newPlayerId === playerId && player && player.userData) {
+      // Atualiza campos do jogador local
+      player.userData.stats = { ...player.userData.stats, ...data.stats };
+      player.userData.level = data.level;
+      player.userData.xp = data.xp;
+      player.userData.nextLevelXp = data.nextLevelXp;
+      player.userData.name = data.name;
+      hudManager.update(data.stats, data.level, data.name, data.xp, data.nextLevelXp); // Corrigido
+    } else if (newPlayerId !== playerId) {
+      playerPresenter.updatePlayer(data);
+    }
   } catch (error) {
     console.error('Erro ao processar novo jogador:', error);
   }

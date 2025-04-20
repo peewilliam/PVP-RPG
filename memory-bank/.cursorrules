@@ -242,3 +242,13 @@
 - Garantir que eventos de rede sejam enviados corretamente
 - Verificar sincronização de cooldowns e custos de mana
 - Validar todos os inputs antes do processamento 
+
+# Padrões e Regras de HUD/XP
+- Sempre sincronizar level, xp, nextLevelXp e name entre servidor e cliente em todos os eventos relevantes (JOINED, EXISTING, MOVED, RESPAWN, LEVEL_UP)
+- Cliente deve atualizar player.userData e HUD imediatamente ao receber eventos do servidor
+- HUD central utiliza SVG com polígono de fundo cinza translúcido e stroke dourado dinâmico para XP
+- Progresso de XP controlado via stroke-dasharray e stroke-dashoffset
+- Padrão: HUD nunca deve mostrar valores undefined; fallback visual sempre presente
+- Decisão: clareza visual e feedback imediato são prioridade no HUD
+- Fundo da borda de XP sempre visível, mesmo sem progresso
+- Correção de bugs: garantir que HUD reflete progresso de XP desde o início do jogo 

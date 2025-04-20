@@ -57,7 +57,10 @@ io.onConnection(channel => {
             position: player.position,
             rotation: player.rotation,
             stats: player.stats,
-            level: player.level
+            level: player.level,
+            xp: player.xp,
+            nextLevelXp: player.nextLevelXp,
+            name: player.name
           });
         }
         
@@ -67,7 +70,10 @@ io.onConnection(channel => {
           position: p.position,
           rotation: p.rotation,
           stats: p.stats,
-          level: p.level
+          level: p.level,
+          xp: p.xp,
+          nextLevelXp: p.nextLevelXp,
+          name: p.name
         });
       }
     }
@@ -251,7 +257,11 @@ io.onConnection(channel => {
           id: player.id,
           position: { ...player.position },
           rotation: player.rotation,
-          stats: { ...player.stats }
+          stats: { ...player.stats },
+          level: player.level,
+          xp: player.xp,
+          nextLevelXp: player.nextLevelXp,
+          name: player.name
         });
       } catch (error) {
         console.error('Erro ao processar sincronização:', error);
@@ -391,7 +401,11 @@ function broadcastUpdates() {
           id: player.id,
           position: { ...player.position },
           rotation: player.rotation,
-          stats: { ...player.stats }
+          stats: { ...player.stats },
+          level: player.level,
+          xp: player.xp,
+          nextLevelXp: player.nextLevelXp,
+          name: player.name
         };
       }
     }

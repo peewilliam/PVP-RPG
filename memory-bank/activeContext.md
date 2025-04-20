@@ -50,6 +50,12 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - ✅ Correção do loop de processamento de múltiplos ticks em DamageZone (`while` em vez de `if`)
 - ✅ Implementação de dicionário de IDs de habilidades em constants para evitar uso de valores literais
 - ✅ Adição de logs extensivos para debug do fluxo de execução de habilidades
+- ✅ Foco recente em refino visual e funcional do HUD central (borda de XP, SVG, feedback imediato)
+- ✅ Sincronização robusta de level, xp, nextLevelXp e name entre servidor e cliente
+- ✅ Correção de eventos do servidor para garantir envio desses campos
+- ✅ Padrão de atualização do HUD: sempre usar dados recebidos do servidor e atualizar player.userData
+- ✅ Garantia de clareza visual e UX consistente desde o início do jogo
+- ✅ Decisão: HUD deve sempre mostrar o fundo da borda de XP, mesmo sem progresso
 
 ## Próximos Passos
 - Refinar efeitos visuais das habilidades

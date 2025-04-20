@@ -72,10 +72,12 @@ export class HUDManager {
           <div id="hud-hp" style="position: absolute; left: 0; top: 0.5vw; height: 1vw; background: linear-gradient(90deg, #ff4444, #b80000); border-radius: 0.6vw 0 0 0; transition: width 0.2s;"></div>
           <div id="hud-hp-text" style="position: absolute; left: 1vw; top: 0.5vw; color: #fff; font-size: min(1vw, 13px); font-weight: bold; text-shadow: 1px 1px 2px #000; z-index:2;"></div>
         </div>
-        <div id="hud-center-diamond" style="width: 4vw; height: 4vw; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; position: relative; z-index:3; margin: 0 -0.5vw;">
-          <svg width="100%" height="100%" viewBox="0 0 64 64" style="position:absolute;left:0;top:0;z-index:1;">
+        <div id="hud-center-diamond" style="width: 4.5vw; height: 4.5vw; min-width: 54px; min-height: 54px; display: flex; align-items: center; justify-content: center; position: relative; z-index:3; margin: 0 -0.5vw; overflow: visible;">
+          <svg width="100%" height="100%" viewBox="-8 -8 80 80" style="position:absolute;left:0;top:0;z-index:1;overflow:visible;">
+            <!-- Fundo da borda de XP -->
+            <polygon points="32,4 60,32 32,60 4,32" fill="none" stroke="#8888" stroke-width="12" stroke-linejoin="round" /> <!-- Fundo cinza translúcido -->
             <!-- Borda de XP -->
-            <polygon id="hud-xp-border" points="32,4 60,32 32,60 4,32" fill="none" stroke="#ffe066" stroke-width="9" stroke-linejoin="round" style="filter: drop-shadow(0 0 4px #ffb700cc);" />
+            <polygon id="hud-xp-border" points="32,4 60,32 32,60 4,32" fill="none" stroke="#ffe066" stroke-width="12" stroke-linejoin="round" style="filter: drop-shadow(0 0 4px #ffb700cc);" />
             <!-- Losango de fundo -->
             <polygon points="32,4 60,32 32,60 4,32" fill="#000" stroke="#fff" stroke-width="3"/>
           </svg>
@@ -361,6 +363,7 @@ export class HUDManager {
   }
 
   update(stats, level, name, xp, nextLevelXp) {
+    console.log('[HUD] update - level:', level, 'xp:', xp, 'nextLevelXp:', nextLevelXp);
     const hp = Math.max(0, Math.round(stats.hp));
     const maxHp = Math.round(stats.maxHp);
     const mp = Math.max(0, Math.round(stats.mana));
@@ -389,9 +392,10 @@ export class HUDManager {
       xpBorder.style.opacity = '1';
     } else {
       const xpBorder = document.getElementById('hud-xp-border');
-      xpBorder.setAttribute('stroke-dasharray', 0);
-      xpBorder.setAttribute('stroke-dashoffset', 0);
-      xpBorder.style.opacity = '0.3';
+      const perimeter = 4 * Math.sqrt(Math.pow(32-60,2) + Math.pow(4-32,2));
+      xpBorder.setAttribute('stroke-dasharray', perimeter); // dasharray completo
+      xpBorder.setAttribute('stroke-dashoffset', perimeter); // dashoffset total (zerado)
+      xpBorder.style.opacity = '1'; // sempre visível
     }
   }
 
