@@ -33,6 +33,11 @@
 - ✅ Monstro Goblin renomeado para BlackMistZombie (interno) e Zumbi da Névoa Negra (exibido)
 - ✅ UI agora sempre exibe nomes localizados de monstros usando o campo NAME da configuração
 - ✅ Padrão de localização e clareza implementado para nomes de entidades
+- ✅ **HUD do alvo sincronizada**: vida, mana, nome pt-br e status sempre corretos ao receber dano ou atualização do mundo
+- ✅ **Painel visual (lil-gui)**: ajuste em tempo real de exposição, luzes e bloom
+- ✅ **Seleção de alvo robusta**: mantém alvo ao clicar em área vazia, remove ao clicar no próprio player ou ESC
+- ✅ **Refinamento visual**: iluminação, pós-processamento, clareza visual, feedback imediato
+- ✅ **Integração de eventos e presenters**: HUD do alvo sempre sincronizada, independente da ordem dos eventos
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens
@@ -42,9 +47,7 @@
 - [ ] Sistema de progressão de personagem mais complexo
 
 ## Status Atual
-O mundo do jogo está organizado em biomas distintos, com distribuição balanceada de árvores, rochas e arbustos, evitando sobreposição. O sistema de combate agora está totalmente funcional, com quatro habilidades implementadas e testadas: Bola de Fogo (projétil), Teleporte (mobilidade), Estacas de Gelo (área + slow) e Chuva de Meteoros (zona de dano contínuo). Cada habilidade tem seu próprio tipo e comportamento, aplicando dano e efeitos conforme esperado. O cliente exibe FPS e ping em tempo real na interface, facilitando o monitoramento de performance.
-
-O sistema de colisão garante que objetos do mundo não se sobreponham, e a arquitetura MCP está consolidada. O próximo passo é implementar o sistema de inventário e drops, além de expandir as possibilidades de habilidades e mecânicas de jogo.
+O mundo do jogo está organizado em biomas distintos, com distribuição balanceada de árvores, rochas e arbustos, evitando sobreposição. O sistema de combate está totalmente funcional, com quatro habilidades implementadas e testadas. O cliente exibe FPS e ping em tempo real na interface, facilitando o monitoramento de performance. A HUD do alvo agora é responsiva, localizada e sincronizada, e o painel visual permite calibrar o visual do jogo em tempo real.
 
 ## Próximos Marcos
 - Sistema de inventário e equipamentos

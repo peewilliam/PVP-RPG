@@ -1,5 +1,23 @@
 # Padrões do Sistema
 
+## Novos Padrões e Melhorias Recentes
+
+### HUD do Alvo Sincronizada
+- A HUD do alvo (target HUD) é atualizada instantaneamente sempre que o alvo sofre dano, seja causado pelo jogador local ou por outros jogadores.
+- O nome do alvo é sempre exibido em pt-br, usando o dicionário MONSTERS para monstros.
+- A HUD do alvo é sincronizada tanto por evento de dano (`combat:damageDealt`) quanto por atualização do mundo (`world:update`), garantindo consistência mesmo em situações de latência ou ordem diferente dos eventos.
+- Seleção de alvo robusta: o alvo só é removido ao clicar em outro alvo, no próprio player ou pressionar ESC. Clicar em área vazia mantém o alvo atual.
+- Uso consistente da função `formatTargetForHUD` para montar os dados do alvo em todos os fluxos (clique, dano, atualização).
+
+### Painel Visual (lil-gui)
+- Painel flutuante acessível por F10, permitindo ajuste em tempo real de exposição, intensidade das luzes (direcional, ambiente, hemisférica) e parâmetros do bloom.
+- Permite resetar para o preset visual Albion Online.
+- Facilita calibração visual sem necessidade de editar código.
+
+### Integração de Eventos e Presenters
+- O fluxo de atualização da HUD do alvo é robusto: usa dados do evento de dano para atualização imediata e dados do evento de mundo para garantir sincronização total.
+- Presenters e eventos trabalham juntos para garantir que a interface sempre reflita o estado real das entidades.
+
 ## Arquitetura do Sistema
 
 O MMORPG isométrico segue uma arquitetura cliente-servidor onde o servidor é autoritativo e gerencia todos os aspectos do mundo do jogo.

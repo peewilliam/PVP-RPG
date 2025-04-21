@@ -1,7 +1,10 @@
 # Active Context
 
 ## Foco atual
-- Refino visual e usabilidade da barra de skills, HUD e chat.
+- Refino visual e usabilidade da barra de skills, HUD, chat e HUD do alvo.
+- Sincronização e atualização instantânea da HUD do alvo (vida, mana, nome pt-br, status) ao receber dano ou atualização do mundo.
+- Painel visual (lil-gui) para ajuste em tempo real de exposição, luzes e bloom.
+- Seleção de alvo robusta: mantém alvo ao clicar em área vazia, remove ao clicar no próprio player ou ESC.
 - Correção de bugs de cooldown e nomes de habilidades/jogadores.
 - Aprimoramento visual dos modelos 3D (árvores, vegetação, rochas, etc).
 - Correção de cores escuras nas árvores (folhas e tronco).
@@ -9,17 +12,32 @@
 - Otimização de performance: LOD, culling, materiais simplificados para objetos distantes.
 - Estrutura para instanciamento futuro de objetos repetidos.
 - **Chat em tempo real** implementado e integrado ao HUD, com atalhos de teclado, foco automático e sem bloquear inputs de gameplay.
+- **NOVIDADE:** Sistema de nomes flutuantes para monstros implementado, exibindo nome pt-br acima da cabeça, centralizado, responsivo à distância e com visual MMORPG.
 
 ## Mudanças recentes
+- HUD do alvo agora sincronizada e localizada, com nome pt-br e atualização instantânea.
+- Painel visual (lil-gui) adicionado para ajuste fino de luzes, exposição e bloom.
+- Seleção de alvo aprimorada: só remove ao clicar no próprio player, em outro alvo ou pressionar ESC.
 - Troca de emojis por imagens reais nas skills.
 - Cooldown agora acompanha a habilidade ao trocar de slot.
 - Barra de skills com hover, glow, transições e número do slot sempre visível.
 - Chat sem borda inferior.
 - HUD com barras de vida/mana animadas e feedback visual para vida/mana baixa.
+- **Sistema de nomes flutuantes para monstros:**
+  - FloatingNameManager criado e integrado ao MonsterPresenter.
+  - Nomes pt-br exibidos acima da cabeça dos monstros, centralizados e com escala dinâmica baseada na distância da câmera.
+  - Visual aprimorado: fonte maior, sombra forte, fundo translúcido, padding, borda arredondada.
+  - Altura calibrada para diferentes tamanhos de monstros.
+  - Correção de bugs de escopo e inicialização do floatingNameManager.
+  - Decisão: nomes de monstros sempre localizados, nunca o identificador interno.
 
 ## Próximos passos
 - Refino de tooltips, responsividade mobile, e integração de novas habilidades.
 - Testes de usabilidade e coleta de feedback dos jogadores.
+- Implementar sistema de inventário e drops de itens.
+- Melhorias visuais e efeitos para habilidades.
+- Adicionar novos tipos de monstros e desafios.
+- **Expandir sistema de nomes flutuantes para outros tipos de entidades (players, NPCs, bosses) e refino visual adicional.**
 
 # Contexto Ativo
 
@@ -57,6 +75,7 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - ✅ Garantia de clareza visual e UX consistente desde o início do jogo
 - ✅ Decisão: HUD deve sempre mostrar o fundo da borda de XP, mesmo sem progresso
 - ✅ Decisão: UI agora exibe nomes localizados de monstros (campo NAME), nunca o identificador interno. Mudança melhora clareza, localização e experiência do usuário. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.
+- ✅ **Sistema de nomes flutuantes para monstros:** visual MMORPG, responsivo, centralizado, nome pt-br, integração total ao ciclo de animação.
 
 ## Próximos Passos
 - Refinar efeitos visuais das habilidades
@@ -66,6 +85,7 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - Reavaliar retorno de casas/cercas e estruturas especiais
 - Adicionar novos tipos de monstros e desafios
 - Melhorar feedback visual e efeitos
+- **Expandir nomes flutuantes para outros tipos de entidades (players, NPCs, bosses).**
 
 ## Decisões e Considerações Ativas
 - Mundo grande, explorável, com biomas distintos
@@ -74,6 +94,8 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - Interface do cliente com feedback de performance (FPS/ping)
 - Sistema de combate com habilidades de diferentes tipos (projétil, mobilidade, área, zona)
 - Aplicação de dano das habilidades através de sistema de zonas (DamageZone) bem testado
+- **Nomes de monstros sempre localizados, nunca o identificador interno.**
+- **Sistema de nomes flutuantes integrado ao ciclo de animação e presenters.**
 
 # Contexto Ativo do PVP-RPG
 

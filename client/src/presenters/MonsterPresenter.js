@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { Monsters } from './entities/index.js';
+import { MONSTERS } from '../../../shared/constants/gameConstants.js';
+import { FloatingNameManager } from './FloatingNameManager.js';
 
 /**
  * Presenter responsável por renderizar e gerenciar monstros no cliente.
@@ -9,10 +12,11 @@ export class MonsterPresenter {
   /**
    * @param {THREE.Scene} scene - Cena Three.js onde os monstros serão renderizados
    */
-  constructor(scene) {
+  constructor(scene, floatingNameManager) {
     this.scene = scene;
     this.monsters = new Map(); // Map para armazenar todos os monstros ativos por ID
     this.lastResetTime = Date.now(); // Timestamp da última limpeza completa
+    this.floatingNameManager = floatingNameManager;
   }
 
   /**
@@ -42,15 +46,26 @@ export class MonsterPresenter {
    * @param {Object} data - Dados do monstro
    */
   createMonster(id, data) {
-    // Representação visual temporária (cubo vermelho)
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 }); // Vermelho
-    
-    const monster = new THREE.Mesh(geometry, material);
-    
+    let monster;
+    if (data.monsterType === 'BLACK_MIST_ZOMBIE') {
+      monster = Monsters.createBlackMistZombieVisual();
+    } else {
+      // Fallback para outros tipos (placeholder antigo)
+      const geometry = new THREE.BoxGeometry(1, 1, 1);
+      const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+      monster = new THREE.Mesh(geometry, material);
+      // Adiciona um indicador de direção (cone)
+      const frontGeometry = new THREE.ConeGeometry(0.3, 1.0, 4);
+      const frontMaterial = new THREE.MeshStandardMaterial({ color: 0xff7700 });
+      const front = new THREE.Mesh(frontGeometry, frontMaterial);
+      front.position.set(0, 0, 0.8);
+      front.rotation.x = Math.PI / 2;
+      monster.add(front);
+    }
+
     // Adiciona à cena
     this.scene.add(monster);
-    
+
     // Posição inicial
     const position = data.position || { x: 0, y: 0, z: 0 };
     monster.position.set(
@@ -58,15 +73,7 @@ export class MonsterPresenter {
       Number(position.y) || 0.5, // Um pouco acima do chão
       Number(position.z) || 0
     );
-    
-    // Adiciona um indicador de direção (cone)
-    const frontGeometry = new THREE.ConeGeometry(0.3, 1.0, 4);
-    const frontMaterial = new THREE.MeshStandardMaterial({ color: 0xff7700 }); // Laranja
-    const front = new THREE.Mesh(frontGeometry, frontMaterial);
-    front.position.set(0, 0, 0.8);
-    front.rotation.x = Math.PI / 2;
-    monster.add(front);
-    
+
     // Armazena metadados junto com a mesh
     monster.userData = {
       id: id,
@@ -77,9 +84,16 @@ export class MonsterPresenter {
       created: Date.now(),
       lastUpdated: Date.now()
     };
-    
+
     // Armazena referência ao objeto
     this.monsters.set(id, monster);
+    
+    // Adiciona nome pt-br acima da cabeça
+    if (this.floatingNameManager) {
+      const monsterType = data.monsterType || 'BLACK_MIST_ZOMBIE';
+      const name = MONSTERS[monsterType]?.NAME || monsterType;
+      this.floatingNameManager.addName(id, monster, name);
+    }
     
     // console.log(`Monstro criado: ${id}, tipo: ${monster.userData.monsterType}`);
   }
@@ -135,6 +149,10 @@ export class MonsterPresenter {
     
     // Remove do mapa
     this.monsters.delete(id);
+    
+    if (this.floatingNameManager) {
+      this.floatingNameManager.removeName(id);
+    }
     
     console.log(`Monstro removido: ${id}`);
   }

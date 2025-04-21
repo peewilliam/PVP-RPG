@@ -35,6 +35,7 @@ Este MMORPG topdown isométrico foi concebido para oferecer uma experiência de 
 4. **Cooperação natural**: Facilitar a interação e cooperação entre jogadores sem necessidade de mecânicas complexas.
 5. **Controle responsivo**: Garantir que a movimentação e o uso de habilidades sejam precisos e responsivos.
 6. **Desafio balanceado**: Oferecer um nível adequado de desafio que incentive o aprendizado e a melhoria das habilidades do jogador.
+7. **Clareza visual e feedback imediato**: HUD do alvo sempre sincronizada, nome pt-br, painel visual para calibração, seleção de alvo robusta.
 
 ## Público-alvo
 - Jogadores de MMORPGs que procuram uma experiência mais direta e focada em ação
@@ -51,12 +52,14 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 - Interface de skills e HUD mais profissional e clara.
 - Feedback visual aprimorado para cooldown, mana, vida e ações do jogador.
 - Experiência de usuário moderna, inspirada em MMOs atuais.
+- HUD do alvo sincronizada, nome pt-br, painel visual para calibração, seleção de alvo robusta, clareza visual e feedback imediato.
 
 ## Como deve funcionar
 - Usuário pode arrastar habilidades entre slots e o cooldown acompanha a habilidade.
 - Chat sempre visível, sem borda inferior, com abas e atalhos de teclado.
 - HUD centralizado, com barras animadas e informações de XP, vida, mana e nível.
 - Skills exibem imagens reais, não emojis, e o número do slot é sempre visível.
+- HUD do alvo sempre sincronizada, nome pt-br, seleção robusta.
 
 ## Experiência do Usuário
 - Visual limpo, colorido e agradável.
@@ -64,7 +67,6 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 - Jogabilidade fluida, sem travamentos mesmo com muitos jogadores/objetos.
 - Feedback visual claro para ações, habilidades e interações.
 - **Chat em tempo real** integrado ao HUD, permitindo comunicação entre jogadores sem atrapalhar a experiência de jogo. O chat é essencial para a interação social e colaboração dentro do MMORPG.
-
 - UX aprimorada: HUD central com feedback visual imediato de XP, borda dourada e fundo cinza sempre visível
 - Clareza visual: jogador sempre entende o progresso de XP, mesmo sem ter ganho XP ainda
 - Sincronização robusta: level, xp, nextLevelXp e name sempre atualizados entre servidor e cliente

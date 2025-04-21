@@ -331,11 +331,6 @@ export class WorldObjectPresenter {
       LOW: 200     // Objetos entre 100-200 têm qualidade baixa
       // Objetos além de 200 não são renderizados (occlusion culling)
     };
-    // Parâmetros de iluminação para painel de controle
-    this.ambientIntensity = 0.8; // antes 0.35
-    this.sunIntensity = 2.2;     // antes 1.0
-    this.hemiIntensity = 1.3;    // antes 1.25
-    this.toneMappingExposure = 1.32; // antes 1.22
   }
 
   /**
@@ -353,21 +348,23 @@ export class WorldObjectPresenter {
 
     // Configurando o renderer para sombras com otimizações
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = this.toneMappingExposure;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves e realistas
+    renderer.outputColorSpace = THREE.SRGBColorSpace; // Correção de cor
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Mapeamento de tom realista
+    renderer.toneMappingExposure = 1.22; // Exposição mais alta para dia claro
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // --- LUZ AMBIENTE ---
-    const ambientColor = 0xfaf3e3;
-    const ambientLight = new THREE.AmbientLight(ambientColor, this.ambientIntensity);
+    // --- LUZ AMBIENTE (preenche sombras, mas não domina a cena) ---
+    const ambientColor = 0xfaf3e3; // Amarelo bem claro
+    const ambientIntensity = 0.35; // Sutil, só para preencher
+    const ambientLight = new THREE.AmbientLight(ambientColor, ambientIntensity);
     this.scene.add(ambientLight);
 
-    // --- LUZ DIRECIONAL (Sol) ---
-    const sunColor = 0xFFF6D6;
-    const dirLight = new THREE.DirectionalLight(sunColor, this.sunIntensity);
-    dirLight.position.set(60, 200, 0);
+    // --- LUZ DIRECIONAL (Sol, sombras suaves e claras) ---
+    const sunColor = 0xFFF6D6; // Amarelo quente, quase branco
+    const sunIntensity = 1.0; // Forte, mas não estoura
+    const dirLight = new THREE.DirectionalLight(sunColor, sunIntensity);
+    dirLight.position.set(60, 200, 0); // Sol alto
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
@@ -379,24 +376,25 @@ export class WorldObjectPresenter {
     dirLight.shadow.camera.bottom = -100;
     dirLight.shadow.bias = -0.0002;
     dirLight.shadow.normalBias = 0.01;
-    dirLight.shadow.radius = 12;
+    dirLight.shadow.radius = 12; // Sombras bem suaves
     dirLight.shadow.autoUpdate = false;
     this.lastShadowUpdateTime = 0;
     this.scene.add(dirLight);
 
-    // --- LUZ HEMISFÉRICA ---
-    const skyColor = 0xB3D8FF;
-    const groundColor = 0xFFFDF6;
-    const hemiLight = new THREE.HemisphereLight(skyColor, groundColor, this.hemiIntensity);
+    // --- LUZ HEMISFÉRICA (céu azul claro, solo quase branco) ---
+    const skyColor = 0xB3D8FF; // Azul claro do céu
+    const groundColor = 0xFFFDF6; // Solo quase branco
+    const hemiIntensity = 1.25; // Bem forte, estilo Albion
+    const hemiLight = new THREE.HemisphereLight(skyColor, groundColor, hemiIntensity);
     this.scene.add(hemiLight);
 
-    // --- NÉVOA MÁGICA ---
-    const fogColor = new THREE.Color(0xDDE6FF);
-    const fogDensity = 0.0010;
+    // --- NÉVOA MÁGICA (profundidade, não escurece) ---
+    const fogColor = new THREE.Color(0xDDE6FF); // Azul claro, mágico
+    const fogDensity = 0.0010; // Suave, só para profundidade
     this.scene.fog = new THREE.FogExp2(fogColor, fogDensity);
 
     // --- FUNDO DO CÉU ---
-    this.scene.background = new THREE.Color(0xB3D8FF);
+    this.scene.background = new THREE.Color(0xB3D8FF); // Azul claro do céu
 
     // --- Salvar referências ---
     this.sunLight = dirLight;

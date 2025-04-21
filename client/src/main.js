@@ -21,6 +21,7 @@ import { applyBurnEffect } from './skills/MeteorStormSkill.js';
 import { applyFreezeEffect } from './skills/IceSpikeSkill.js';
 // Painel de controle visual para calibração em tempo real
 import GUI from 'lil-gui';
+import { FloatingNameManager } from './presenters/FloatingNameManager.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -48,6 +49,7 @@ let monsterPresenter;
 let worldObjectPresenter;
 let playerPresenter;
 let skillManager; // Gerenciador de habilidades
+let floatingNameManager; // Gerenciador de nomes flutuantes
 
 // Variáveis para o sistema de rotação com o mouse
 let mousePosition = new THREE.Vector2();
@@ -432,7 +434,6 @@ function initThree() {
   createWorldBoundaries();
   
   // Inicializa os presenters
-  monsterPresenter = new MonsterPresenter(scene);
   worldObjectPresenter = new WorldObjectPresenter(scene);
   playerPresenter = new PlayerPresenter(scene);
   skillManager = new SkillManager(scene);
@@ -482,6 +483,13 @@ function initThree() {
   
   // Cria gerenciador de textos flutuantes
   floatingTextManager = new FloatingTextManager(scene, camera);
+
+  // Instancia o FloatingNameManager
+  const overlay = document.getElementById('overlay');
+  floatingNameManager = new FloatingNameManager(overlay, camera);
+
+  // Instancia MonsterPresenter com o gerenciador de nomes
+  monsterPresenter = new MonsterPresenter(scene, floatingNameManager);
 }
 
 /**
@@ -795,6 +803,11 @@ function animate() {
   if (player && player.targetPosition) {
     player.position.lerp(player.targetPosition, 0.25);
   }
+
+  // Atualiza nomes flutuantes
+  if (floatingNameManager) {
+    floatingNameManager.updateAll(window.innerWidth, window.innerHeight);
+  }
 }
 
 // Conexão ao servidor
@@ -981,9 +994,12 @@ channel.on(EVENTS.WORLD.UPDATE, data => {
       for (const monsterData of data.monsters) {
         if (monsterData && monsterData.id) {
           monsterPresenter.updateMonster(monsterData);
+          // Se o monstro atualizado for o alvo selecionado, atualiza a HUD
+          if (selectedTargetId === monsterData.id && selectedTargetType === 'monster') {
+            updateTargetHUD(formatTargetForHUD(monsterData, 'monster'));
+          }
         }
       }
-      
       // Limpa monstros obsoletos (que não foram atualizados recentemente)
       monsterPresenter.pruneStaleMonsters();
     }
@@ -993,6 +1009,18 @@ channel.on(EVENTS.WORLD.UPDATE, data => {
       for (const objectData of data.worldObjects) {
         if (objectData && objectData.id) {
           worldObjectPresenter.updateWorldObject(objectData);
+        }
+      }
+    }
+    
+    // Processa jogadores (se aplicável)
+    if (data.players && Array.isArray(data.players)) {
+      for (const playerData of data.players) {
+        if (playerData && playerData.id) {
+          playerPresenter.updatePlayer(playerData);
+          if (selectedTargetId === playerData.id && selectedTargetType === 'player') {
+            updateTargetHUD(formatTargetForHUD(playerData, 'player'));
+          }
         }
       }
     }
@@ -1092,53 +1120,39 @@ window.addEventListener('mousedown', (event) => {
       found = true;
       // INTEGRAÇÃO HUD
       const monster = monsterPresenter.getMonsterData(id);
-      const target = {
-        id,
-        type: 'monster',
-        name: MONSTERS[monster?.monsterType]?.NAME || '???', // Agora exibe o nome em pt-br
-        hp: monster?.stats?.hp,
-        maxHp: monster?.stats?.maxHp,
-        energy: 0,
-        maxEnergy: 0,
-        status: []
-      };
-      if (monster?.status?.slowedUntil && monster.status.slowedUntil > Date.now()) {
-        target.status.push({ type: 'slow', icon: '❄️', tooltip: 'Lento' });
-      }
-      updateTargetHUD(target);
+      if (monster) updateTargetHUD(formatTargetForHUD(monster, 'monster'));
       break;
     }
   }
   if (!found) {
     for (const [id, mesh] of playerPresenter.players.entries()) {
-      if (id === playerId) continue;
       const intersects = raycaster.intersectObject(mesh, true);
       if (intersects.length > 0) {
-        selectedTargetId = id;
-        selectedTargetType = 'player';
-        highlightTarget(mesh);
-        found = true;
-        // INTEGRAÇÃO HUD
-        const playerData = playerPresenter.getPlayerData(id);
-        const target = {
-          id,
-          type: 'player',
-          name: playerData?.name || '???',
-          hp: playerData?.stats?.hp,
-          maxHp: playerData?.stats?.maxHp,
-          energy: playerData?.stats?.mana || 0,
-          maxEnergy: playerData?.stats?.maxMana || 0,
-          status: []
-        };
-        if (playerData?.status?.slowedUntil && playerData.status.slowedUntil > Date.now()) {
-          target.status.push({ type: 'slow', icon: '❄️', tooltip: 'Lento' });
+        // Se clicou no próprio player, remove o alvo
+        if (id === playerId) {
+          selectedTargetId = null;
+          selectedTargetType = null;
+          highlightTarget(null);
+          updateTargetHUD(null);
+        } else {
+          selectedTargetId = id;
+          selectedTargetType = 'player';
+          highlightTarget(mesh);
+          // INTEGRAÇÃO HUD
+          const playerData = playerPresenter.getPlayerData(id);
+          if (playerData) updateTargetHUD(formatTargetForHUD(playerData, 'player'));
         }
-        updateTargetHUD(target);
+        found = true;
         break;
       }
     }
   }
-  if (!found) {
+  // Se não encontrou nada, NÃO remove o alvo atual
+});
+
+// ESC remove o alvo
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
     selectedTargetId = null;
     selectedTargetType = null;
     highlightTarget(null);
@@ -1549,6 +1563,31 @@ function initServerEvents() {
         if (data.abilityId === 3) applyStatusEffectVisual(targetEntity, scene, 'freeze'); // Ice Spike
         // Adicione outros efeitos/status aqui conforme necessário
       }
+
+      // ATUALIZAÇÃO DA HUD DO ALVO: sempre que o alvo selecionado sofre dano
+      if (selectedTargetId === data.targetId && selectedTargetType === data.targetType) {
+        let targetData = null;
+        if (data.targetType === 'monster') {
+          // Monta objeto HUD usando dados do evento para garantir hp correto
+          targetData = monsterPresenter.getMonsterData(data.targetId) || {};
+          targetData.id = data.targetId;
+          targetData.monsterType = targetData.monsterType || data.monsterType;
+          targetData.stats = targetData.stats || {};
+          targetData.stats.hp = data.remainingHp ?? data.hp ?? targetData.stats.hp;
+          targetData.stats.maxHp = data.maxHp ?? targetData.stats.maxHp;
+          updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
+        } else if (data.targetType === 'player') {
+          targetData = playerPresenter.getPlayerData(data.targetId) || {};
+          targetData.id = data.targetId;
+          targetData.stats = targetData.stats || {};
+          targetData.stats.hp = data.remainingHp ?? data.hp ?? targetData.stats.hp;
+          targetData.stats.maxHp = data.maxHp ?? targetData.stats.maxHp;
+          targetData.stats.mana = data.remainingMana ?? targetData.stats.mana;
+          targetData.stats.maxMana = data.maxMana ?? targetData.stats.maxMana;
+          targetData.name = targetData.name || data.name;
+          updateTargetHUD(formatTargetForHUD(targetData, 'player'));
+        }
+      }
     } catch (error) {
       console.error('Erro ao processar evento DAMAGE_DEALT:', error);
     }
@@ -1818,39 +1857,20 @@ animate = function() {
 };
 
 function formatTargetForHUD(data, type) {
-  // Verificações de alvo morto
-  let hp = data.stats?.hp;
-  const maxHp = data.stats?.maxHp || 1;
-  
-  // Verificação se o HP é menor ou igual a zero
-  if (hp <= 0) {
-    hp = 0;
+  let hp = data.stats?.hp ?? data.hp ?? 0;
+  let maxHp = data.stats?.maxHp ?? data.maxHp ?? 0;
+  let name = data.name || data.monsterType || '???';
+  if (type === 'monster' && data.monsterType && MONSTERS[data.monsterType]) {
+    name = MONSTERS[data.monsterType].NAME;
   }
-  
-  // Verificação adicional para monstros: se está deitado (rotação aproximada a Math.PI/2), está morto
-  if (type === 'monster' && data.id) {
-    const mesh = monsterPresenter.getMonster(data.id);
-    if (mesh && mesh.rotation && Math.abs(mesh.rotation.x - Math.PI/2) < 0.1) {
-      hp = 0; // Monstro está deitado (morto), então HP é zero
-    }
-  }
-  
-  // Verificação para jogadores: se está deitado, está morto
-  if (type === 'player' && data.id) {
-    const mesh = playerPresenter.getPlayer(data.id);
-    if (mesh && mesh.rotation && Math.abs(mesh.rotation.x - Math.PI/2) < 0.1) {
-      hp = 0; // Jogador está deitado (morto), então HP é zero
-    }
-  }
-  
   return {
     id: data.id,
     type,
-    name: data.name || data.monsterType || '???',
+    name,
     hp: hp,
     maxHp: maxHp,
-    energy: data.stats?.mana || 0,
-    maxEnergy: data.stats?.maxMana || 0,
+    energy: data.stats?.mana || data.energy || 0,
+    maxEnergy: data.stats?.maxMana || data.maxEnergy || 0,
     status: [
       ...(data.status?.slowedUntil && data.status.slowedUntil > Date.now()
         ? [{ icon: '❄️', alt: 'Slow', tooltip: 'Lento (movimento reduzido)' }]

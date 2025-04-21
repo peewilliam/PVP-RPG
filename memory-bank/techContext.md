@@ -6,7 +6,8 @@
 - Estrutura modular: `/client`, `/server`, `/shared`.
 
 ## Dependências
-- Nenhuma dependência externa obrigatória para HUD/skills/chat.
+- **lil-gui**: Utilizado para painel visual de calibração de luzes, exposição e bloom no cliente.
+- Nenhuma dependência externa obrigatória para HUD/skills/chat além do painel visual.
 
 ## Restrições
 - Foco em performance e responsividade.
@@ -24,6 +25,7 @@
 - **JavaScript Vanilla**: Sem frameworks para o código do cliente
 - **Three.js**: Biblioteca para renderização 3D no navegador
 - **WebGL**: API utilizada pelo Three.js para renderização 3D
+- **lil-gui**: Painel visual para ajuste em tempo real de exposição, luzes e bloom
 
 ### Ferramentas de Desenvolvimento
 - **npm**: Gerenciador de pacotes para dependências do projeto
@@ -121,12 +123,10 @@
 
 ## Decisões e Compromissos Técnicos
 
+- **Visual e UX**: O projeto prioriza clareza visual, feedback imediato e controle total do visual via painel lil-gui. HUD do alvo sempre sincronizada, nome pt-br, seleção robusta e pós-processamento calibrado.
 - **Vanilla JS vs Framework**: Optamos por JavaScript puro para o cliente para minimizar overhead e manter o controle preciso sobre o ciclo de renderização, essencial para jogos.
-
 - **WebRTC vs WebSockets**: Escolhemos geckos.io (WebRTC) pela menor latência e comunicação P2P, com fallback para WebSockets.
-
 - **Three.js vs Engine de Jogos**: Three.js foi escolhido por ser leve e focado na renderização 3D, sem as complexidades de uma engine completa que não seria totalmente aproveitada em um jogo isométrico.
-
 - **Servidor Node.js**: Permite compartilhar código entre cliente e servidor (ambos em JavaScript) e oferece boa performance para um servidor de jogos do porte planejado.
 
 ## Tecnologias
