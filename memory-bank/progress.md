@@ -30,6 +30,9 @@
 - ✅ Correção de bugs de HUD não atualizado ou valores undefined
 - ✅ Padrão: sempre atualizar player.userData e HUD ao receber eventos relevantes
 - ✅ Status: HUD agora reflete corretamente o progresso de XP desde o início do jogo, com visual consistente e feedback claro.
+- ✅ Monstro Goblin renomeado para BlackMistZombie (interno) e Zumbi da Névoa Negra (exibido)
+- ✅ UI agora sempre exibe nomes localizados de monstros usando o campo NAME da configuração
+- ✅ Padrão de localização e clareza implementado para nomes de entidades
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens

@@ -19,6 +19,8 @@ import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectio
 // Importa os efeitos visuais de status
 import { applyBurnEffect } from './skills/MeteorStormSkill.js';
 import { applyFreezeEffect } from './skills/IceSpikeSkill.js';
+// Painel de controle visual para calibração em tempo real
+import GUI from 'lil-gui';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -442,10 +444,12 @@ function initThree() {
   // Tonemapping e exposição para cores naturais e vibrantes
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12; // Deixe a cena clara, mas sem estourar
+  renderer.toneMappingExposure = worldObjectPresenter.toneMappingExposure; // agora usa valor dinâmico
   
   // --- PÓS-PROCESSAMENTO LEVE E PROFISSIONAL ---
+  window._threeRenderer = renderer; // Expor globalmente para painel
   composer = new EffectComposer(renderer);
+  window._threeComposer = composer; // Expor globalmente para painel
   composer.addPass(new RenderPass(scene, camera));
   // Bloom sutil, só realça magias/luzes intensas
   const bloomPass = new UnrealBloomPass(
@@ -455,20 +459,18 @@ function initThree() {
     0.85 // threshold
   );
   composer.addPass(bloomPass);
+  window._bloomPass = bloomPass; // Expor globalmente para painel
   // FXAA para suavizar serrilhados
   const fxaaPass = new ShaderPass(FXAAShader);
   fxaaPass.material.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
   composer.addPass(fxaaPass);
-  // Vinheta REMOVIDA para visual Albion
-  // const vignettePass = new ShaderPass(VignetteShader);
-  // vignettePass.uniforms['offset'].value = 1.05;
-  // vignettePass.uniforms['darkness'].value = 1.1;
-  // composer.addPass(vignettePass);
+  window._fxaaPass = fxaaPass;
   // --- COLOR CORRECTION PASS (Albion: sutil, só realça um pouco) ---
   const colorCorrectionPass = new ShaderPass(ColorCorrectionShader);
   colorCorrectionPass.uniforms['powRGB'].value.set(1.05, 1.05, 1.05); // leve aumento de saturação
   colorCorrectionPass.uniforms['mulRGB'].value.set(1.05, 1.05, 1.05); // leve aumento de brilho/contraste
   composer.addPass(colorCorrectionPass);
+  window._colorCorrectionPass = colorCorrectionPass;
   // Color space correto para fidelidade de cor
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   
@@ -2014,3 +2016,79 @@ function applyStatusEffectVisual(enemyMesh, scene, status) {
 //   if (abilityId === 4) applyStatusEffectVisual(enemyMesh, scene, 'burn'); // Meteor Storm
 //   if (abilityId === 3) applyStatusEffectVisual(enemyMesh, scene, 'freeze'); // Ice Spike
 // }
+
+// Função utilitária para atualizar exposição dinamicamente
+window.setThreeExposure = (value) => {
+  renderer.toneMappingExposure = value;
+};
+
+let visualGui = null;
+let guiVisible = false;
+
+function setupVisualPanel(worldObjectPresenter) {
+  if (visualGui) return; // já criado
+  visualGui = new GUI({ width: 340 });
+  visualGui.domElement.style.zIndex = 10000;
+  visualGui.domElement.style.position = 'fixed';
+  visualGui.domElement.style.top = '60px';
+  visualGui.domElement.style.right = '20px';
+  visualGui.domElement.style.display = 'none';
+
+  // Parâmetros para controle
+  const params = {
+    'Exposição': worldObjectPresenter.toneMappingExposure,
+    'Luz Direcional': worldObjectPresenter.sunIntensity,
+    'Luz Ambiente': worldObjectPresenter.ambientIntensity,
+    'Luz Hemisférica': worldObjectPresenter.hemiIntensity,
+    'Bloom Intensity': window._bloomPass.strength,
+    'Bloom Threshold': window._bloomPass.threshold,
+    'Bloom Radius': window._bloomPass.radius,
+    'Reset Preset Albion': () => {
+      params['Exposição'] = 1.32;
+      params['Luz Direcional'] = 2.2;
+      params['Luz Ambiente'] = 0.8;
+      params['Luz Hemisférica'] = 1.3;
+      params['Bloom Intensity'] = 0.6;
+      params['Bloom Threshold'] = 0.85;
+      params['Bloom Radius'] = 0.4;
+      applyVisualParams();
+      visualGui.controllersRecursive().forEach(c => c.updateDisplay());
+    }
+  };
+
+  function applyVisualParams() {
+    worldObjectPresenter.toneMappingExposure = params['Exposição'];
+    window._threeRenderer.toneMappingExposure = params['Exposição'];
+    worldObjectPresenter.sunIntensity = params['Luz Direcional'];
+    worldObjectPresenter.ambientIntensity = params['Luz Ambiente'];
+    worldObjectPresenter.hemiIntensity = params['Luz Hemisférica'];
+    if (worldObjectPresenter.sunLight) worldObjectPresenter.sunLight.intensity = params['Luz Direcional'];
+    if (worldObjectPresenter.ambientLight) worldObjectPresenter.ambientLight.intensity = params['Luz Ambiente'];
+    if (worldObjectPresenter.hemisphereLight) worldObjectPresenter.hemisphereLight.intensity = params['Luz Hemisférica'];
+    window._bloomPass.strength = params['Bloom Intensity'];
+    window._bloomPass.threshold = params['Bloom Threshold'];
+    window._bloomPass.radius = params['Bloom Radius'];
+  }
+
+  visualGui.add(params, 'Exposição', 0.8, 2.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Luz Direcional', 0.5, 4.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Luz Ambiente', 0.0, 2.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Luz Hemisférica', 0.0, 2.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Bloom Intensity', 0.0, 2.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Bloom Threshold', 0.0, 1.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Bloom Radius', 0.0, 2.0, 0.01).onChange(applyVisualParams);
+  visualGui.add(params, 'Reset Preset Albion');
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'F10') {
+    guiVisible = !guiVisible;
+    if (!visualGui) setupVisualPanel(worldObjectPresenter);
+    if (visualGui) visualGui.domElement.style.display = guiVisible ? 'block' : 'none';
+  }
+});
+
+// Chamar setupVisualPanel após worldObjectPresenter estar pronto
+setTimeout(() => {
+  if (window.worldObjectPresenter) setupVisualPanel(window.worldObjectPresenter);
+}, 2000);

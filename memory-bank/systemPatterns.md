@@ -287,3 +287,8 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 - Padrão: HUD nunca deve mostrar valores undefined; fallback visual sempre presente
 - Decisão: clareza visual e feedback imediato são prioridade no HUD
 - Padrão: fundo da borda de XP sempre visível, mesmo sem progresso
+
+## Padrão de nomes localizados na UI
+- Sempre integrar nomes localizados de entidades (monstros, jogadores, etc) na UI usando o campo NAME da configuração.
+- Nunca exibir identificador/código interno para o usuário final.
+- Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.

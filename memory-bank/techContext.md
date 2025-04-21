@@ -153,4 +153,5 @@
 - Sincronização de level, xp, nextLevelXp e name garantida em todos os eventos relevantes do servidor
 - Cliente atualiza player.userData e HUD imediatamente ao receber eventos
 - Padrão: fallback visual sempre presente no HUD para evitar valores undefined ou sensação de vazio
-- Decisão: clareza visual e feedback imediato são prioridades técnicas para UX 
+- Decisão: clareza visual e feedback imediato são prioridades técnicas para UX
+- UI sempre usa o campo NAME da configuração do monstro para exibição, nunca o identificador/código. Padrão de localização e clareza implementado. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'. 

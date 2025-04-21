@@ -363,7 +363,7 @@ export class HUDManager {
   }
 
   update(stats, level, name, xp, nextLevelXp) {
-    console.log('[HUD] update - level:', level, 'xp:', xp, 'nextLevelXp:', nextLevelXp);
+    // console.log('[HUD] update - level:', level, 'xp:', xp, 'nextLevelXp:', nextLevelXp);
     const hp = Math.max(0, Math.round(stats.hp));
     const maxHp = Math.round(stats.maxHp);
     const mp = Math.max(0, Math.round(stats.mana));

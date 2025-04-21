@@ -56,6 +56,7 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - ✅ Padrão de atualização do HUD: sempre usar dados recebidos do servidor e atualizar player.userData
 - ✅ Garantia de clareza visual e UX consistente desde o início do jogo
 - ✅ Decisão: HUD deve sempre mostrar o fundo da borda de XP, mesmo sem progresso
+- ✅ Decisão: UI agora exibe nomes localizados de monstros (campo NAME), nunca o identificador interno. Mudança melhora clareza, localização e experiência do usuário. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.
 
 ## Próximos Passos
 - Refinar efeitos visuais das habilidades

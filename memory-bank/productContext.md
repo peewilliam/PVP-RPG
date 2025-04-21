@@ -69,4 +69,5 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 - Clareza visual: jogador sempre entende o progresso de XP, mesmo sem ter ganho XP ainda
 - Sincronização robusta: level, xp, nextLevelXp e name sempre atualizados entre servidor e cliente
 - Decisão: feedback visual e clareza são prioridades para engajamento e satisfação do jogador
-- Padrão: fallback visual no HUD para evitar sensação de "vazio" ou "invisível" 
+- Padrão: fallback visual no HUD para evitar sensação de "vazio" ou "invisível"
+- UI exibe nomes localizados de monstros (campo NAME), nunca o identificador interno. Garante clareza, localização e experiência de usuário consistente. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'. 

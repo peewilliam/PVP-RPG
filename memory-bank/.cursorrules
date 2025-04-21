@@ -252,3 +252,8 @@
 - Decisão: clareza visual e feedback imediato são prioridade no HUD
 - Fundo da borda de XP sempre visível, mesmo sem progresso
 - Correção de bugs: garantir que HUD reflete progresso de XP desde o início do jogo 
+
+# Padrão de exibição de nomes na UI
+- Sempre exibir nomes de monstros e entidades na UI usando o campo NAME localizado da configuração, nunca o identificador interno/código.
+- Garantir localização e clareza para o jogador.
+- Exemplo: 'Zumbi da Névoa Negra' para BLACK_MIST_ZOMBIE. 

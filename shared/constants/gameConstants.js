@@ -93,6 +93,7 @@ export const MONSTERS = {
     ID: 1,
     NAME: 'Zumbi da Névoa Negra',
     INTERNAL_NAME: 'BlackMistZombie',
+    monsterType: 'BLACK_MIST_ZOMBIE',
     HP: 50,
     DAMAGE: 50,
     DEFENSE: 2,
