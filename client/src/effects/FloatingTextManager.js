@@ -51,35 +51,6 @@ export class FloatingTextManager {
       return null;
     }
 
-    // --- Agrupamento e cooldown de mensagens iguais ---
-    const key = `${type}:${text}`;
-    const now = performance.now();
-    const minCooldown = 500; // ms
-    // Verifica cooldown
-    if (this.lastMessageTimestamps.has(key)) {
-      const lastTime = this.lastMessageTimestamps.get(key);
-      if (now - lastTime < minCooldown) {
-        // Flood: não cria novo texto
-        return null;
-      }
-    }
-    this.lastMessageTimestamps.set(key, now);
-
-    // Verifica se já existe texto igual ativo
-    let existing = this.texts.find(t => t.textKey === key);
-    if (existing) {
-      // Reinicia duração e incrementa contador
-      existing.createdAt = now;
-      existing.duration = duration;
-      existing.count = (existing.count || 1) + 1;
-      // Atualiza texto para mostrar contador
-      const countText = existing.count > 1 ? ` (${existing.count}x)` : '';
-      existing.displayText = text + countText;
-      // Atualiza canvas/texture
-      this._redrawFloatingText(existing);
-      return existing;
-    }
-
     // Fonte grande e bold
     let fontSize = 120;
     if (text.length > 12) fontSize = 90;
@@ -159,8 +130,9 @@ export class FloatingTextManager {
     // Escala do sprite baseada no tamanho real do canvas para manter qualidade e proporção
     const baseWorldWidth = 5; // O texto ocupará até 5 unidades do mundo em largura
     const baseWorldHeight = 2.5; // E até 2.5 unidades em altura
-    const scaleX = (canvasWidth / 384) * baseWorldWidth;
-    const scaleY = (canvasHeight / 192) * baseWorldHeight;
+    // Aplica o multiplicador de tamanho
+    const scaleX = (canvasWidth / 384) * baseWorldWidth * limitedSize;
+    const scaleY = (canvasHeight / 192) * baseWorldHeight * limitedSize;
     sprite.scale.set(scaleX, scaleY, 1);
     
     // Offset vertical para múltiplos textos
@@ -174,14 +146,14 @@ export class FloatingTextManager {
     // Cria objeto do texto flutuante
     const floatingText = {
       sprite,
-      createdAt: now,
+      createdAt: performance.now(),
       duration,
       fadeOut,
       velocity: { y: 0.003 },
       distanceScale: true,
       baseScale: limitedSize,
       type,
-      textKey: key,
+      textKey: type,
       count: 1,
       displayText: text
     };

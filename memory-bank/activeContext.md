@@ -30,6 +30,16 @@
   - Altura calibrada para diferentes tamanhos de monstros.
   - Correção de bugs de escopo e inicialização do floatingNameManager.
   - Decisão: nomes de monstros sempre localizados, nunca o identificador interno.
+- **Textos flutuantes de dano/cura padronizados:**
+  - Sempre exibem apenas 1 dígito após o ponto decimal (toFixed(1)).
+  - Tamanho visual uniforme para todos os tipos de dano/cura.
+  - Lógica de anti-flood removida: múltiplos textos iguais aparecem sem bloqueio.
+- **Reformulação total do visual da aranha:**
+  - Novo modelo cartoon: abdômen ovalado, cefalotórax separado, pernas segmentadas e arqueadas, olhos vermelhos, proporções ajustadas.
+  - Pernas longas, afastadas do corpo, com faixas vermelhas grandes e bem visíveis.
+  - Escala maior, grupo elevado para pernas não afundarem no chão.
+  - Foco em silhueta clara, visual cartoon, destaque mesmo em ambientes escuros.
+  - Decisão: remover detalhes desnecessários, priorizar legibilidade e estilo cartoon.
 
 ## Próximos passos
 - Refino de tooltips, responsividade mobile, e integração de novas habilidades.
@@ -38,6 +48,7 @@
 - Melhorias visuais e efeitos para habilidades.
 - Adicionar novos tipos de monstros e desafios.
 - **Expandir sistema de nomes flutuantes para outros tipos de entidades (players, NPCs, bosses) e refino visual adicional.**
+- Refinar efeitos visuais das habilidades da aranha (salto, tiro de teia) para combinar com o novo visual cartoon e garantir clareza visual.
 
 # Contexto Ativo
 

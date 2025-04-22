@@ -94,4 +94,37 @@ export class Entity {
     const dz = this.position.z - entity.position.z;
     return Math.sqrt(dx * dx + dz * dz);
   }
+
+  /**
+   * Aplica um efeito temporal na entidade
+   * @param {Object} effect - O efeito a ser aplicado
+   * @param {string} effect.type - Tipo do efeito (ex: 'slow', 'stun', 'poison')
+   * @param {number} effect.duration - Duração em milissegundos
+   * @param {number} effect.value - Valor do efeito (ex: 0.4 para slow de 60%)
+   */
+  applyEffect(effect) {
+    if (!effect || !effect.type || !effect.duration) return;
+    
+    console.log(`Aplicando efeito ${effect.type} em ${this.id} por ${effect.duration}ms`);
+    
+    // Garantir que existe o objeto de status
+    if (!this.status) this.status = {};
+    
+    // Aplicar efeito baseado no tipo
+    switch (effect.type) {
+      case 'slow':
+        this.status.slowedUntil = Date.now() + effect.duration;
+        this.lastSlowValue = effect.value || 0.4;
+        break;
+      case 'stun':
+        this.status.stunnedUntil = Date.now() + effect.duration;
+        break;
+      case 'poison':
+        this.status.poisonedUntil = Date.now() + effect.duration;
+        this.poisonDamage = effect.value || 1;
+        this.lastPoisonTick = Date.now();
+        break;
+      // Outros efeitos podem ser adicionados aqui
+    }
+  }
 } 

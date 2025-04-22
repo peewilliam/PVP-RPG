@@ -165,6 +165,128 @@ export class GameWorld {
   }
   
   /**
+   * Aplica dano em área às entidades próximas
+   * @param {Object} params - Parâmetros do dano em área
+   * @param {Object} params.source - Entidade que causou o dano
+   * @param {Object} params.position - Posição central da área
+   * @param {number} params.radius - Raio da área de dano
+   * @param {number} params.damage - Quantidade de dano a ser aplicada
+   * @param {string} params.type - Tipo do dano (opcional)
+   * @param {string} params.color - Cor do texto flutuante (opcional)
+   * @param {string} params.floatingText - Texto a ser exibido (opcional)
+   * @returns {Object} - Resultado da aplicação do dano
+   */
+  applyAreaDamage(params) {
+    if (!params || !params.position || !params.radius || !params.damage || !params.source) {
+      console.error("applyAreaDamage: parâmetros inválidos", params);
+      return { success: false };
+    }
+    
+    const center = params.position;
+    const radius = params.radius;
+    const damage = params.damage;
+    const source = params.source;
+    
+    console.log(`GameWorld.applyAreaDamage: Aplicando dano em área em (${center.x}, ${center.z}), raio ${radius}, dano ${damage}`);
+    
+    // Criar um objeto de resultado para rastrear as entidades atingidas
+    const result = { 
+      success: true,
+      hits: [],
+      areaEffect: { center, radius }
+    };
+    
+    // Aplicar dano a monstros dentro da área
+    for (const monster of this.entityManager.monsters.values()) {
+      // Ignorar a própria fonte do dano ou entidades mortas
+      if (!monster.active || monster.stats.hp <= 0 || monster.id === source.id) continue;
+      
+      // Calcular distância
+      const dx = monster.position.x - center.x;
+      const dz = monster.position.z - center.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      
+      // Debug
+      console.log(`Distância até monstro ${monster.id}: ${dist} (raio: ${radius})`);
+      
+      // Verificar se está dentro do raio
+      if (dist <= radius) {
+        // Aplicar dano
+        console.log(`Aplicando dano de área (${damage}) ao monstro ${monster.id}`);
+        const died = monster.takeDamage(damage, source);
+        
+        // Registrar o hit
+        result.hits.push({
+          id: monster.id,
+          type: 'monster',
+          damage: damage,
+          died: died,
+          position: { ...monster.position }
+        });
+      }
+    }
+    
+    // Aplicar dano a jogadores dentro da área
+    for (const player of this.entityManager.players.values()) {
+      // Ignorar a própria fonte do dano ou entidades mortas
+      if (!player.active || player.stats.hp <= 0 || player.id === source.id) continue;
+      
+      // Calcular distância
+      const dx = player.position.x - center.x;
+      const dz = player.position.z - center.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      
+      // Debug
+      console.log(`Distância até jogador ${player.id}: ${dist} (raio: ${radius})`);
+      
+      // Verificar se está dentro do raio
+      if (dist <= radius) {
+        // Aplicar dano
+        console.log(`Aplicando dano de área (${damage}) ao jogador ${player.id}`);
+        const died = player.takeDamage(damage, source);
+        
+        // Registrar o hit
+        result.hits.push({
+          id: player.id,
+          type: 'player',
+          damage: damage,
+          died: died,
+          position: { ...player.position }
+        });
+        
+        // Se o jogador tem canal, emitir evento de texto flutuante
+        if (player.channel && params.floatingText) {
+          player.channel.emit('combat:floatingText', {
+            targetId: player.id,
+            targetType: 'player',
+            text: params.floatingText || `-${damage}`,
+            color: params.color || '#ff3333'
+          });
+        }
+      }
+    }
+    
+    // Notificar todos os jogadores sobre o dano em área
+    for (const hit of result.hits) {
+      for (const player of this.entityManager.players.values()) {
+        if (player.channel) {
+          player.channel.emit('combat:damageDealt', {
+            sourceId: source.id,
+            sourceType: source.type || 'monster',
+            targetId: hit.id,
+            targetType: hit.type,
+            damage: hit.damage,
+            died: hit.died,
+            position: hit.position
+          });
+        }
+      }
+    }
+    
+    return result;
+  }
+  
+  /**
    * Processa o uso de uma habilidade por um jogador
    * @param {Player} player - Jogador que usou a habilidade
    * @param {number} abilityId - ID da habilidade

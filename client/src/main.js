@@ -19,6 +19,8 @@ import { ColorCorrectionShader } from 'three/examples/jsm/shaders/ColorCorrectio
 // Importa os efeitos visuais de status
 import { applyBurnEffect } from './skills/MeteorStormSkill.js';
 import { applyFreezeEffect } from './skills/IceSpikeSkill.js';
+import { showWebShotEffect } from './skills/WebShotSkill.js';
+import { showSpiderLeapEffect } from './skills/SpiderLeapSkill.js';
 // Painel de controle visual para calibração em tempo real
 import GUI from 'lil-gui';
 import { FloatingNameManager } from './presenters/FloatingNameManager.js';
@@ -49,7 +51,7 @@ let monsterPresenter;
 let worldObjectPresenter;
 let playerPresenter;
 let skillManager; // Gerenciador de habilidades
-let floatingNameManager; // Gerenciador de nomes flutuantes
+let floatingNameManager;
 
 // Variáveis para o sistema de rotação com o mouse
 let mousePosition = new THREE.Vector2();
@@ -257,49 +259,16 @@ function getMouseWorldPosition() {
 
 // Efeito de dano flutuante
 function showFloatingDamage(targetMesh, damage) {
-  if (!targetMesh) return;
-  
-  // Limita o tamanho baseado no dano
-  const damageValue = parseInt(damage) || 0;
-  const scale = Math.min(0.7 + (damageValue / 50), 1.5);
-  
-  // Cria um sprite de texto para o dano
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  
-  // Reduz o tamanho da fonte
-  ctx.font = 'bold 28px Arial'; // Reduzido de 32px
-  ctx.fillStyle = '#ff4444';
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 3;
-  ctx.textAlign = 'center';
-  ctx.strokeText(damage, 64, 32);
-  ctx.fillText(damage, 64, 32);
-  
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.SpriteMaterial({ 
-    map: texture, 
-    transparent: true,
-    depthTest: false, // Não testamos profundidade para garantir visibilidade
-    depthWrite: false // Não escrevemos no buffer de profundidade
-  });
-  
-  const sprite = new THREE.Sprite(material);
-  
-  // Escala mais controlada
-  sprite.scale.set(scale * 1.5, scale * 0.75, 1);
-  
-  // Posição acima do alvo, mais próxima
-  sprite.position.set(0, 1.5, 0);
-  
-  targetMesh.add(sprite);
-  floatingDamages.push({ 
-    sprite, 
-    targetMesh, 
-    startTime: performance.now(),
-    duration: 1200 // Duração reduzida, para consistência
+  if (!targetMesh || !floatingTextManager) return;
+  // Posição acima do alvo
+  const worldPos = targetMesh.getWorldPosition(new THREE.Vector3());
+  floatingTextManager.createFloatingText({
+    text: `-${Number(damage).toFixed(1)}`,
+    position: { x: worldPos.x, y: worldPos.y + 2.2, z: worldPos.z },
+    type: 'damage',
+    size: 1, // GRANDE!
+    duration: 1600,
+    fadeOut: true
   });
 }
 
@@ -434,6 +403,7 @@ function initThree() {
   createWorldBoundaries();
   
   // Inicializa os presenters
+  monsterPresenter = new MonsterPresenter(scene);
   worldObjectPresenter = new WorldObjectPresenter(scene);
   playerPresenter = new PlayerPresenter(scene);
   skillManager = new SkillManager(scene);
@@ -1323,7 +1293,7 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
             text: '✨',
             position: data.teleportPosition,
             color: '#80ffff',
-            size: 2.0,
+            size: 1,
             duration: 1000,
             type: 'default'
           });
@@ -1494,11 +1464,11 @@ function initServerEvents() {
       
       // Cria texto flutuante de dano
       floatingTextManager.createFloatingText({
-        text: data.damage.toString(),
+        text: data.damage ? Number(data.damage).toFixed(1) : '',
         position: targetPosition,
         color: '#ff0000',
-        size: sizeMultiplier,  // Tamanho mais controlado
-        duration: 1200,        // Reduzido de 1500 para 1200ms
+        size: 1,  // Tamanho padronizado para todos os danos
+        duration: 1200,
         type: 'damage'
       });
       
@@ -1823,6 +1793,46 @@ function initServerEvents() {
       
     } catch (error) {
       console.error('Erro ao processar morte de monstro:', error);
+    }
+  });
+  
+  // Eventos de habilidades da aranha e outros monstros
+  channel.on('monster:webShot', data => {
+    try {
+      // Obter a aranha e o alvo
+      const spider = monsterPresenter.getMonster(data.sourceId);
+      let target = null;
+      
+      if (data.targetId === playerId) {
+        // Alvo é o jogador local
+        target = player;
+      } else if (data.targetType === 'player') {
+        // Alvo é outro jogador
+        target = playerPresenter.getPlayer(data.targetId);
+      } else if (data.targetType === 'monster') {
+        // Alvo é um monstro
+        target = monsterPresenter.getMonster(data.targetId);
+      }
+      
+      if (spider && target) {
+        // Exibir o efeito visual da teia
+        showWebShotEffect(spider, target, scene);
+      }
+    } catch (error) {
+      console.error('Erro ao processar monster:webShot:', error);
+    }
+  });
+  
+  channel.on('monster:spiderLeap', data => {
+    try {
+      // Obter a aranha
+      const spider = monsterPresenter.getMonster(data.sourceId);
+      if (spider) {
+        // Exibir o efeito visual de pulo da aranha
+        showSpiderLeapEffect(spider, data.targetPos, scene);
+      }
+    } catch (error) {
+      console.error('Erro ao processar monster:spiderLeap:', error);
     }
   });
 }

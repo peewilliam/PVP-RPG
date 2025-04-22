@@ -285,6 +285,43 @@ export class SpawnSystem {
       minLevel: 4,
       maxLevel: 5
     });
+    
+    // Áreas de spawn para aranhas (SPIDER)
+    // Área 1: Aranhas na Floresta Oeste (pequena área)
+    this.registerSpawnArea({
+      id: 'forest-west-spiders',
+      monsterType: 'SPIDER',
+      position: { x: -60, y: 0, z: 20 },
+      radius: 10,
+      maxMonsters: 4,
+      respawnTime: 18000, // 18 segundos
+      minLevel: 1,
+      maxLevel: 2
+    });
+    
+    // Área 2: Aranhas no Pântano (área média)
+    this.registerSpawnArea({
+      id: 'swamp-spiders',
+      monsterType: 'SPIDER',
+      position: { x: 60, y: 0, z: 80 },
+      radius: 15,
+      maxMonsters: 7,
+      respawnTime: 22000, // 22 segundos
+      minLevel: 2,
+      maxLevel: 3
+    });
+    
+    // Área 3: Aranhas nas Ruínas (área grande com aranhas mais fortes)
+    this.registerSpawnArea({
+      id: 'ruins-spiders',
+      monsterType: 'SPIDER',
+      position: { x: 70, y: 0, z: -70 },
+      radius: 18,
+      maxMonsters: 9,
+      respawnTime: 25000, // 25 segundos
+      minLevel: 3,
+      maxLevel: 4
+    });
   }
   
   /**

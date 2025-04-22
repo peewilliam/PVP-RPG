@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Player } from './Player.js';
-import { Monster } from './Monster.js';
+import { MonsterTypes } from './monsters/index.js';
 import { Projectile } from './Projectile.js';
 import { DamageZone } from './DamageZone.js';
 
@@ -51,8 +51,10 @@ export class EntityManager {
   createMonster(type, position = { x: 0, y: 0, z: 0 }, level = 1) {
     const id = `monster-${uuidv4()}`;
     
-    // Cria o monstro
-    const monster = new Monster(id, type, position, level);
+    // Cria o monstro usando a factory dinâmica
+    const MonsterClass = MonsterTypes[type];
+    if (!MonsterClass) throw new Error(`Tipo de monstro desconhecido: ${type}`);
+    const monster = new MonsterClass(id, position, level);
     
     // Adiciona às coleções
     this.entities.set(id, monster);

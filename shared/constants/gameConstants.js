@@ -34,7 +34,13 @@ export const EVENTS = {
     MOVE: 'monster:move',
     ATTACK: 'monster:attack',
     DAMAGE: 'monster:damage',
-    DEATH: 'monster:death'
+    DEATH: 'monster:death',
+    ABILITY: 'monster:ability', // Eventos de habilidades de monstros como 'monster:webShot' e 'monster:spiderLeap'
+    SPAWNED: 'monster:spawned',
+    MOVED: 'monster:moved',
+    ATTACKED: 'monster:attacked',
+    DIED: 'monster:died',
+    DAMAGED: 'monster:damaged'
   },
   COMBAT: {
     HIT: 'combat:hit',         // Indica um acerto bem-sucedido
@@ -101,7 +107,20 @@ export const MONSTERS = {
     XP_REWARD: 20,
     ATTACK_RANGE: 1.5,
     ATTACK_COOLDOWN: 2000 // ms
-  }
+  },
+  SPIDER: {
+    NAME: 'Aranha Sombria',
+    HP: 80,
+    DAMAGE: 60,
+    DEFENSE: 3,
+    SPEED: 0.15, // Ajustado para ficar consistente com outros monstros
+    ATTACK_RANGE: 3.0,
+    ATTACK_COOLDOWN: 600,
+    XP_REWARD: 35,
+    // Habilidades especiais:
+    // - webShot: Lança teia que reduz a velocidade de movimento do alvo
+    // - spiderLeap: Salta em direção ao alvo causando dano extra
+  },
 };
 
 // Tipos de objetos do mundo
@@ -203,5 +222,10 @@ export const WORLD = {
   BOUNDARIES: {
     ENABLED: true,    // Se verdadeiro, impõe limites físicos no mundo
     BORDER_WIDTH: 2   // Largura da borda ao redor do mundo
+  },
+  MONSTER_TYPES: {
+    BLACK_MIST_ZOMBIE: 'BLACK_MIST_ZOMBIE',
+    SPIDER: 'SPIDER',
+    // Adicione novos tipos de monstros aqui
   }
 }; 

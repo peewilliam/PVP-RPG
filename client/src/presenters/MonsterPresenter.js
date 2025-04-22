@@ -49,6 +49,8 @@ export class MonsterPresenter {
     let monster;
     if (data.monsterType === 'BLACK_MIST_ZOMBIE') {
       monster = Monsters.createBlackMistZombieVisual();
+    } else if (data.monsterType === 'SPIDER') {
+      monster = Monsters.createSpiderVisual();
     } else {
       // Fallback para outros tipos (placeholder antigo)
       const geometry = new THREE.BoxGeometry(1, 1, 1);
