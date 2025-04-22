@@ -2,6 +2,7 @@
 import geckos from '@geckos.io/server';
 import { SERVER, EVENTS, WORLD } from '../../shared/constants/gameConstants.js';
 import { GameWorld } from './models/GameWorld.js';
+import zlib from 'zlib';
 
 // Inicializa o servidor geckos.io com configurações para desenvolvimento
 const io = geckos({
@@ -25,6 +26,9 @@ console.log(`Servidor iniciado na porta ${SERVER.PORT}`);
 
 // Inicializa o mundo com objetos e áreas de spawn
 gameWorld.initialize();
+
+// Snapshot do último estado enviado para cada jogador
+const lastSentState = {};
 
 // Gerenciamento de conexões
 io.onConnection(channel => {
@@ -411,10 +415,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Função para enviar atualizações aos clientes
 function broadcastUpdates() {
   try {
-    // Serializa o estado atual de todos os jogadores para envio eficiente
     const serializedPlayers = {};
-    
-    // Pré-serializa todos os jogadores para evitar fazer isso várias vezes
     for (const player of gameWorld.entityManager.players.values()) {
       if (player.active) {
         serializedPlayers[player.id] = {
@@ -429,48 +430,60 @@ function broadcastUpdates() {
         };
       }
     }
-    
-    // Para cada jogador, envia as atualizações relevantes
+
     for (const player of gameWorld.entityManager.players.values()) {
       if (!player.active || !player.channel) continue;
-      
-      // Envia a posição atualizada do próprio jogador
+
       player.channel.emit(EVENTS.PLAYER.MOVED, serializedPlayers[player.id]);
-      
-      // Envia posições de outros jogadores
       for (const otherPlayerId in serializedPlayers) {
         if (otherPlayerId !== player.id) {
           player.channel.emit(EVENTS.PLAYER.MOVED, serializedPlayers[otherPlayerId]);
         }
       }
-      
-      // Envia atualizações de entidades próximas (monstros e objetos do mundo)
-      const nearbyMonsters = [];
-      const nearbyWorldObjects = [];
-      
-      // Coleta monstros próximos
+
+      // --- DELTA UPDATE ---
+      if (!lastSentState[player.id]) {
+        lastSentState[player.id] = { monsters: {}, worldObjects: {} };
+      }
+      const prev = lastSentState[player.id];
+      const deltaMonsters = [];
+      const deltaWorldObjects = [];
+      // Monstros próximos
       for (const monster of gameWorld.entityManager.monsters.values()) {
         if (monster.active && player.distanceTo(monster) < 30) {
-          nearbyMonsters.push(monster.serialize());
+          const serialized = monster.serialize();
+          const prevSerialized = prev.monsters[monster.id];
+          if (!prevSerialized || JSON.stringify(prevSerialized) !== JSON.stringify(serialized)) {
+            deltaMonsters.push(serialized);
+            prev.monsters[monster.id] = serialized;
+          }
         }
       }
-      
-      // Coleta objetos do mundo próximos
+      // Objetos do mundo próximos
       for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
         if (worldObject.active && player.distanceTo(worldObject) < 40) {
-          nearbyWorldObjects.push(worldObject.serialize());
+          const serialized = worldObject.serialize();
+          const prevSerialized = prev.worldObjects[worldObject.id];
+          if (!prevSerialized || JSON.stringify(prevSerialized) !== JSON.stringify(serialized)) {
+            deltaWorldObjects.push(serialized);
+            prev.worldObjects[worldObject.id] = serialized;
+          }
         }
       }
-      
-      // Envia atualização do mundo se houver entidades para enviar
-      if (nearbyMonsters.length > 0 || nearbyWorldObjects.length > 0) {
+      // Envia apenas se houver delta
+      if (deltaMonsters.length > 0 || deltaWorldObjects.length > 0) {
         const updatePayload = {
-          monsters: nearbyMonsters,
-          worldObjects: nearbyWorldObjects
+          monsters: deltaMonsters,
+          worldObjects: deltaWorldObjects
         };
-        const updatePayloadSize = Buffer.byteLength(JSON.stringify(updatePayload));
-        console.log(`[UPDATE] Enviando WORLD.UPDATE para ${player.id}: ${updatePayloadSize} bytes | Objetos: ${nearbyWorldObjects.length} | Monstros: ${nearbyMonsters.length}`);
-        player.channel.emit(EVENTS.WORLD.UPDATE, updatePayload);
+        const json = JSON.stringify(updatePayload);
+        const compressed = zlib.deflateSync(json);
+        const base64 = compressed.toString('base64');
+        console.log(`[DELTA] Enviando WORLD.UPDATE para ${player.id}: ${json.length} bytes (original), ${compressed.length} bytes (compactado) | Objetos: ${deltaWorldObjects.length} | Monstros: ${deltaMonsters.length}`);
+        player.channel.emit(EVENTS.WORLD.UPDATE, {
+          compressed: true,
+          data: base64
+        });
       }
     }
   } catch (error) {

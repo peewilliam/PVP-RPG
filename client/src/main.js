@@ -24,6 +24,8 @@ import { showSpiderLeapEffect } from './skills/SpiderLeapSkill.js';
 // Painel de controle visual para calibração em tempo real
 import GUI from 'lil-gui';
 import { FloatingNameManager } from './presenters/FloatingNameManager.js';
+// Importa pako para descompressão
+import pako from 'pako';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -815,8 +817,29 @@ channel.on(EVENTS.WORLD.INIT, data => {
   try {
     console.log('[WORLD] Recebendo dados iniciais do mundo:', data);
     
-    worldObjects = data.worldObjects || [];
-    monsters = data.monsters || [];
+    // Verifica se os dados estão compactados
+    let worldData = data;
+    if (data.compressed && data.data) {
+      try {
+        // Decodifica base64 para Uint8Array
+        const binaryString = atob(data.data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        // Descompacta com pako
+        const decompressed = pako.inflate(bytes, { to: 'string' });
+        worldData = JSON.parse(decompressed);
+        console.log('[WORLD] Dados descompactados com sucesso:', worldData);
+      } catch (decompressError) {
+        console.error('[ERRO] Falha ao descompactar dados:', decompressError);
+        return;
+      }
+    }
+    
+    const worldObjects = worldData.worldObjects || [];
+    const monsters = worldData.monsters || [];
     
     // Processa objetos do mundo
     if (worldObjects && worldObjects.length > 0) {
@@ -839,7 +862,6 @@ channel.on(EVENTS.WORLD.INIT, data => {
       console.log('[WORLD] Contagem de objetos por bioma:', objectsByBiome);
       
       // Agora que temos muitos objetos carregados, otimizamos a cena
-      // Isso tentará usar instanciamento para tipos comuns de objetos
       if (worldObjectPresenter.optimizeSceneWithInstancing) {
         console.log('[WORLD] Aplicando otimizações de renderização...');
         worldObjectPresenter.optimizeSceneWithInstancing();
@@ -957,11 +979,29 @@ channel.on(EVENTS.WORLD.UPDATE, data => {
       return;
     }
     
-    // console.log('Recebendo atualização do mundo:', data);
+    // Verifica se os dados estão compactados
+    let update = data;
+    if (data.compressed && data.data) {
+      try {
+        // Decodifica base64 para Uint8Array
+        const binaryString = atob(data.data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        // Descompacta com pako
+        const decompressed = pako.inflate(bytes, { to: 'string' });
+        update = JSON.parse(decompressed);
+      } catch (decompressError) {
+        console.error('Erro ao descompactar dados:', decompressError);
+        return;
+      }
+    }
     
     // Processa monstros
-    if (data.monsters && Array.isArray(data.monsters)) {
-      for (const monsterData of data.monsters) {
+    if (update.monsters && Array.isArray(update.monsters)) {
+      for (const monsterData of update.monsters) {
         if (monsterData && monsterData.id) {
           monsterPresenter.updateMonster(monsterData);
           // Se o monstro atualizado for o alvo selecionado, atualiza a HUD
@@ -975,8 +1015,8 @@ channel.on(EVENTS.WORLD.UPDATE, data => {
     }
     
     // Processa objetos do mundo
-    if (data.worldObjects && Array.isArray(data.worldObjects)) {
-      for (const objectData of data.worldObjects) {
+    if (update.worldObjects && Array.isArray(update.worldObjects)) {
+      for (const objectData of update.worldObjects) {
         if (objectData && objectData.id) {
           worldObjectPresenter.updateWorldObject(objectData);
         }
@@ -984,8 +1024,8 @@ channel.on(EVENTS.WORLD.UPDATE, data => {
     }
     
     // Processa jogadores (se aplicável)
-    if (data.players && Array.isArray(data.players)) {
-      for (const playerData of data.players) {
+    if (update.players && Array.isArray(update.players)) {
+      for (const playerData of update.players) {
         if (playerData && playerData.id) {
           playerPresenter.updatePlayer(playerData);
           if (selectedTargetId === playerData.id && selectedTargetType === 'player') {
