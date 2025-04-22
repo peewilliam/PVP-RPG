@@ -37,11 +37,26 @@ io.onConnection(channel => {
     // Envia ID para o cliente
     channel.emit(EVENTS.PLAYER.INIT, { id: player.id });
     
-    // Envia informações sobre objetos do mundo para o novo jogador
-    channel.emit(EVENTS.WORLD.INIT, {
-      worldObjects: gameWorld.getSerializedWorldObjects(),
-      monsters: gameWorld.getSerializedMonsters()
-    });
+    // Envia informações sobre objetos do mundo para o novo jogador (apenas próximos)
+    const nearbyMonsters = [];
+    const nearbyWorldObjects = [];
+    for (const monster of gameWorld.entityManager.monsters.values()) {
+      if (monster.active && player.distanceTo(monster) < 30) {
+        nearbyMonsters.push(monster.serialize());
+      }
+    }
+    for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
+      if (worldObject.active && player.distanceTo(worldObject) < 40) {
+        nearbyWorldObjects.push(worldObject.serialize());
+      }
+    }
+    const initialPayload = {
+      worldObjects: nearbyWorldObjects,
+      monsters: nearbyMonsters
+    };
+    const initialPayloadSize = Buffer.byteLength(JSON.stringify(initialPayload));
+    console.log(`[INIT] Enviando WORLD.INIT para ${channel.id}: ${initialPayloadSize} bytes | Objetos: ${initialPayload.worldObjects.length} | Monstros: ${initialPayload.monsters.length}`);
+    channel.emit(EVENTS.WORLD.INIT, initialPayload);
     
     // Informa outros jogadores sobre o novo jogador que entrou
     // e envia informações sobre jogadores existentes para o novo jogador
@@ -373,6 +388,11 @@ io.onConnection(channel => {
     } else {
       console.log(`[CHAT:NOME] Nome já definido para ${player.id}: ${player.name}`);
     }
+
+    // Handler de ping para medir latência
+    channel.on('ping', () => {
+      channel.emit('pong');
+    });
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
   }
@@ -444,10 +464,13 @@ function broadcastUpdates() {
       
       // Envia atualização do mundo se houver entidades para enviar
       if (nearbyMonsters.length > 0 || nearbyWorldObjects.length > 0) {
-        player.channel.emit(EVENTS.WORLD.UPDATE, {
+        const updatePayload = {
           monsters: nearbyMonsters,
           worldObjects: nearbyWorldObjects
-        });
+        };
+        const updatePayloadSize = Buffer.byteLength(JSON.stringify(updatePayload));
+        console.log(`[UPDATE] Enviando WORLD.UPDATE para ${player.id}: ${updatePayloadSize} bytes | Objetos: ${nearbyWorldObjects.length} | Monstros: ${nearbyMonsters.length}`);
+        player.channel.emit(EVENTS.WORLD.UPDATE, updatePayload);
       }
     }
   } catch (error) {
