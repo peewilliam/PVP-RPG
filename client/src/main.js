@@ -1541,7 +1541,22 @@ function initServerEvents() {
         // Quando você recebe dano (seu ID é o alvo)
         if (data.targetId === playerId) {
           console.log(`[DEBUG] Você recebeu ${data.damage} de dano!`);
-          hudManager.chatManager.addDamageMessage(`Você recebeu ${data.damage} de dano!`);
+          // Mostrar quem causou o dano, se disponível
+          if (data.sourceType === 'monster' && data.sourceName) {
+            // Usar o nome pt-br do monstro enviado pelo servidor
+            hudManager.chatManager.addDamageMessage(`Você recebeu ${data.damage} de dano do ${data.sourceName}!`);
+          } else if (data.sourceType === 'player' && data.sourceId) {
+            // Dano causado por outro jogador
+            const sourcePlayer = playerPresenter.getPlayerData(data.sourceId);
+            if (sourcePlayer && sourcePlayer.name) {
+              hudManager.chatManager.addDamageMessage(`Você recebeu ${data.damage} de dano de ${sourcePlayer.name}!`);
+            } else {
+              hudManager.chatManager.addDamageMessage(`Você recebeu ${data.damage} de dano de outro jogador!`);
+            }
+          } else {
+            // Fonte desconhecida
+            hudManager.chatManager.addDamageMessage(`Você recebeu ${data.damage} de dano!`);
+          }
         } 
         // Quando você causa dano (seu ID é a fonte)
         // O servidor não está enviando sourceId corretamente,

@@ -80,6 +80,7 @@ export class GameWorld {
     // Posição inicial aleatória dentro da zona de spawn definida nas constantes
     const spawnZone = WORLD.ZONES.SPAWN;
     
+    
     const position = {
       x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN), 
       y: 0, 
