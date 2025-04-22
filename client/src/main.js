@@ -462,6 +462,16 @@ function initThree() {
 
   // Instancia MonsterPresenter com o gerenciador de nomes
   monsterPresenter = new MonsterPresenter(scene, floatingNameManager);
+  // PATCH: restaurar cor do monstro ao respawnar
+  const oldUpdateMonster = monsterPresenter.updateMonster.bind(monsterPresenter);
+  monsterPresenter.updateMonster = function(monsterData) {
+    oldUpdateMonster(monsterData);
+    const mesh = this.getMonster(monsterData.id);
+    if (mesh && mesh.userData && mesh.userData._wasGray && monsterData.stats && monsterData.stats.hp > 0) {
+      // Restaurar cor original do monstro
+      removeGrayDeathEffect(mesh, 0xff0000); // Vermelho padrão para monstros
+    }
+  };
 }
 
 /**
@@ -1542,15 +1552,8 @@ function initServerEvents() {
             (data.targetType === 'player' && data.targetId !== playerId)) {
           console.log(`[DEBUG] Você causou ${data.damage} de dano em ${data.targetType} ${data.targetId}!`);
           if (data.targetType === 'monster') {
-            // Obter o nome do monstro, se disponível
-            let monsterName = "monstro";
-            const monsterData = monsterPresenter.getMonsterData(data.targetId);
-            if (monsterData && monsterData.monsterType) {
-              monsterName = monsterData.monsterType;
-            } else {
-              // Nome genérico com ID curto para identificação
-              monsterName = `Monstro ${data.targetId.substring(0, 6)}`;
-            }
+            // Usar o nome pt-br do monstro enviado pelo servidor
+            let monsterName = data.targetName || "monstro";
             hudManager.chatManager.addDamageMessage(`Você causou ${data.damage} de dano no ${monsterName}!`);
           } else if (data.targetType === 'player' && data.targetId !== playerId) {
             // Obter o nome do jogador, se disponível
@@ -1559,7 +1562,6 @@ function initServerEvents() {
             if (playerData && playerData.name) {
               playerName = playerData.name;
             } else {
-              // Nome genérico com ID curto para identificação
               playerName = `Jogador ${data.targetId.substring(0, 6)}`;
             }
             hudManager.chatManager.addDamageMessage(`Você causou ${data.damage} de dano em ${playerName}!`);
@@ -1632,9 +1634,6 @@ function initServerEvents() {
         // Adiciona mensagem de morte à HUD
         hudManager.showDeathMessage(true);
         
-        // Desativa controles temporariamente
-        playerControlsEnabled = false;
-        
         // Zera a vida do jogador local
         if (player && player.userData && player.userData.stats) {
           player.userData.stats.hp = 0;
@@ -1694,9 +1693,6 @@ function initServerEvents() {
         
         // Remove mensagem de morte
         hudManager.showDeathMessage(false);
-        
-        // Reativa controles
-        playerControlsEnabled = true;
       } else {
         // Outro jogador respawnou
         const otherPlayerMesh = playerPresenter.getPlayer(data.id);
@@ -1793,47 +1789,13 @@ function initServerEvents() {
 
   // Evento de morte de monstro
   channel.on(EVENTS.MONSTER.DEATH, data => {
-    try {
-      if (!data || !data.id) {
-        console.warn('Dados de morte de monstro inválidos:', data);
-        return;
-      }
-      
-      console.log(`Monstro morreu: ${data.id}`);
-      
-      // Monstro agora está morto - atualiza seus dados para mostrar HP 0
-      const monsterMesh = monsterPresenter.getMonster(data.id);
-      if (monsterMesh && monsterMesh.userData && monsterMesh.userData.stats) {
-        monsterMesh.userData.stats.hp = 0; // Garante que HP é zero quando morto
-      }
-      
-      // Se o monstro era o alvo selecionado, limpa a HUD do alvo IMEDIATAMENTE
-      if (selectedTargetId === data.id && selectedTargetType === 'monster') {
-        selectedTargetId = null;
-        selectedTargetType = null;
-        updateTargetHUD(null); // Esconde HUD
-        highlightTarget(null); // Remove destaque visual
-      }
-      
-      // Adiciona efeito visual de morte (opcional)
-      if (monsterMesh) {
-        // Efeito visual de morte - pode ser uma animação, textura ou partícula
-        monsterMesh.rotation.x = Math.PI / 2; // Deita o monstro
-        monsterMesh.position.y = 0.1; // Coloca próximo ao chão
-        if (monsterMesh.material) {
-          monsterMesh.material.opacity = 0.7; // Deixa translúcido
-          monsterMesh.material.transparent = true;
-        }
-      }
-      
-      // Remove o corpo do monstro após um curto delay (para animações)
-      setTimeout(() => {
-        monsterPresenter.removeMonster(data.id);
-      }, 2000); // 2 segundos de delay para mostrar animação de morte
-      
-    } catch (error) {
-      console.error('Erro ao processar morte de monstro:', error);
-    }
+    if (!data || !data.id) return;
+    const mesh = monsterPresenter.getMonster(data.id);
+    if (mesh) applyGrayDeathEffect(mesh);
+    // Remove o corpo do monstro após um curto delay (para animações)
+    setTimeout(() => {
+      monsterPresenter.removeMonster(data.id);
+    }, 2000); // 2 segundos de delay para mostrar animação de morte
   });
   
   // Eventos de habilidades da aranha e outros monstros
@@ -2162,3 +2124,93 @@ window.addEventListener('keydown', (e) => {
 setTimeout(() => {
   if (window.worldObjectPresenter) setupVisualPanel(window.worldObjectPresenter);
 }, 2000);
+
+// Variável global para bloquear controles enquanto morto
+let isPlayerDead = false;
+
+// Função utilitária para aplicar efeito cinza/translúcido
+function applyGrayDeathEffect(mesh) {
+  if (!mesh) return;
+  if (mesh.material) {
+    mesh.material.color.set(0x888888);
+    mesh.material.opacity = 0.5;
+    mesh.material.transparent = true;
+  }
+  mesh.userData._wasGray = true;
+  // Deitar o corpo
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.y = 0.1;
+}
+
+// Função utilitária para restaurar cor original
+function removeGrayDeathEffect(mesh, originalColor = 0x0000ff) {
+  if (!mesh) return;
+  if (mesh.material) {
+    mesh.material.color.set(originalColor);
+    mesh.material.opacity = 1.0;
+    mesh.material.transparent = false;
+  }
+  mesh.userData._wasGray = false;
+  // Levantar o corpo
+  mesh.rotation.x = 0;
+  mesh.position.y = 0.5;
+}
+
+// Handler de morte do player
+channel.on(EVENTS.PLAYER.DEATH, data => {
+  isPlayerDead = true;
+  hudManager.showDeathModal(data);
+  window.addEventListener('keydown', blockDeadInputs, true);
+  window.addEventListener('mousedown', blockDeadInputs, true);
+  setTimeout(() => {
+    const btn = document.getElementById('btn-respawn');
+    if (btn) {
+      btn.onclick = () => {
+        channel.emit(EVENTS.PLAYER.RESPAWN);
+      };
+    }
+  }, 100);
+  // Efeito visual: corpo cinza para o player morto
+  if (data.id === playerId && player) {
+    applyGrayDeathEffect(player);
+  } else {
+    const mesh = playerPresenter.getPlayer(data.id);
+    if (mesh) applyGrayDeathEffect(mesh);
+  }
+});
+
+// Handler de respawn do player
+channel.on(EVENTS.PLAYER.RESPAWN, data => {
+  isPlayerDead = false;
+  hudManager.hideDeathModal();
+  window.removeEventListener('keydown', blockDeadInputs, true);
+  window.removeEventListener('mousedown', blockDeadInputs, true);
+  // Restaurar cor original do player
+  if (data.id === playerId && player) {
+    removeGrayDeathEffect(player, 0x0000ff); // Azul padrão
+  } else {
+    const mesh = playerPresenter.getPlayer(data.id);
+    if (mesh) removeGrayDeathEffect(mesh, 0x0000ff);
+  }
+});
+
+// Handler de morte de monstro
+channel.on(EVENTS.MONSTER.DEATH, data => {
+  if (!data || !data.id) return;
+  const mesh = monsterPresenter.getMonster(data.id);
+  if (mesh) applyGrayDeathEffect(mesh);
+  // Remove o corpo do monstro após um curto delay (para animações)
+  setTimeout(() => {
+    monsterPresenter.removeMonster(data.id);
+  }, 2000); // 2 segundos de delay para mostrar animação de morte
+});
+
+
+// Função para bloquear inputs enquanto morto
+function blockDeadInputs(e) {
+  if (isPlayerDead) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    return false;
+  }
+}

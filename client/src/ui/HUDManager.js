@@ -465,55 +465,17 @@ export class HUDManager {
 
   /**
    * Mostra ou esconde a mensagem de morte no HUD
-   * @param {boolean} show - Se deve mostrar ou esconder a mensagem
    */
   showDeathMessage(show) {
     let deathMessage = document.getElementById('death-message');
-    
-    // Se não existir, cria o elemento
-    if (!deathMessage && show) {
-      deathMessage = document.createElement('div');
-      deathMessage.id = 'death-message';
-      deathMessage.style.position = 'absolute';
-      deathMessage.style.top = '40%';
-      deathMessage.style.left = '50%';
-      deathMessage.style.transform = 'translate(-50%, -50%)';
-      deathMessage.style.color = '#ff0000';
-      deathMessage.style.fontSize = '48px';
-      deathMessage.style.fontWeight = 'bold';
-      deathMessage.style.textAlign = 'center';
-      deathMessage.style.textShadow = '0 0 10px #000000';
-      deathMessage.style.zIndex = '1000';
-      deathMessage.style.fontFamily = 'Arial, sans-serif';
+    if (deathMessage && !show) {
       deathMessage.style.opacity = '0';
-      deathMessage.style.transition = 'opacity 0.5s ease-in-out';
-      
-      // Adiciona o texto da mensagem
-      deathMessage.innerHTML = `
-        <div>VOCÊ MORREU</div>
-        <div style="font-size: 24px; margin-top: 20px;">Perdeu todo seu progresso e XP</div>
-        <div style="font-size: 20px; margin-top: 40px;">Você será teletransportado para o ponto de respawn...</div>
-      `;
-      
-      // Adiciona ao corpo do documento
-      document.body.appendChild(deathMessage);
-      
-      // Força um reflow para garantir que a transição funcione
-      void deathMessage.offsetWidth;
-    }
-    
-    // Mostra ou esconde
-    if (deathMessage) {
-      deathMessage.style.opacity = show ? '1' : '0';
-      
-      // Remove o elemento do DOM após a transição se estiver escondendo
-      if (!show) {
-        setTimeout(() => {
-          if (deathMessage && deathMessage.parentNode) {
-            deathMessage.parentNode.removeChild(deathMessage);
-          }
-        }, 600); // Um pouco mais que a duração da transição
-      }
+      setTimeout(() => {
+        if (deathMessage && deathMessage.parentNode) {
+          deathMessage.parentNode.removeChild(deathMessage);
+        }
+      }, 500);
+      return;
     }
   }
 
@@ -787,5 +749,69 @@ export class HUDManager {
     } else {
       this.manaBar.style.background = 'linear-gradient(to right, #2980b9, #3498db)';
     }
+  }
+
+  /**
+   * Exibe o modal de morte com penalidade, killer e botão de respawn
+   * @param {Object} deathData - Dados do evento de morte
+   */
+  showDeathModal(deathData) {
+    // Remove modal anterior se existir
+    if (this.deathModal && this.deathModal.parentNode) {
+      this.deathModal.parentNode.removeChild(this.deathModal);
+    }
+    this.deathModal = document.createElement('div');
+    this.deathModal.id = 'death-modal';
+    this.deathModal.style.position = 'fixed';
+    this.deathModal.style.left = '0';
+    this.deathModal.style.top = '0';
+    this.deathModal.style.width = '100vw';
+    this.deathModal.style.height = '100vh';
+    this.deathModal.style.background = 'rgba(20, 10, 30, 0.92)';
+    this.deathModal.style.display = 'flex';
+    this.deathModal.style.flexDirection = 'column';
+    this.deathModal.style.alignItems = 'center';
+    this.deathModal.style.justifyContent = 'center';
+    this.deathModal.style.zIndex = '9999';
+    this.deathModal.style.fontFamily = 'Segoe UI, sans-serif';
+    this.deathModal.innerHTML = `
+      <div style="background: rgba(30,30,40,0.98); border-radius: 14px; box-shadow: 0 0 24px #000a; padding: 32px 28px; min-width: 260px; max-width: 92vw; text-align: center; border: 1.5px solid #444;">
+        <div style="color: #ffe066; font-size: 1.6em; font-family: 'Segoe UI', serif; letter-spacing: 1px; margin-bottom: 0.5em;">
+          <span style="vertical-align: middle; margin-right: 8px;">&#9760;</span>
+          Você morreu
+        </div>
+        <div style="color: #fff; font-size: 1.1em; margin-bottom: 0.7em; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+          <span>
+            <b style='color:#ffe066;'>Nível:</b> Perdeu <b style='color:#ffe066;'>${deathData.lostLevel}</b> (agora: <b>${deathData.newLevel}</b>)
+          </span>
+          <span>
+            <b style='color:#ffe066;'>XP:</b> Perdeu <b style='color:#ffe066;'>${deathData.lostXP}</b> (agora: <b>${deathData.newXP}</b>)
+          </span>
+        </div>
+        <div style="color: #ffb700; font-size: 1em; margin-bottom: 1.1em;">
+          <span style="vertical-align:middle;margin-right:4px;">⚔️</span>
+          <b>${deathData.killerName || 'Desconhecido'}</b>
+          <span style="color:#888; font-size:0.9em;">(${deathData.killerType || 'desconhecido'})</span>
+        </div>
+        <button id="btn-respawn" style="background: linear-gradient(90deg,#ffe066,#ffb700); color: #222; font-weight: bold; font-size: 1.1em; border: none; border-radius: 8px; padding: 10px 34px; cursor: pointer; box-shadow: 0 2px 8px #0007; transition: background 0.2s;">Respawnar</button>
+      </div>
+    `;
+    document.body.appendChild(this.deathModal);
+    // Bloqueia rolagem e inputs
+    document.body.style.overflow = 'hidden';
+    // Foco no botão
+    const btn = this.deathModal.querySelector('#btn-respawn');
+    if (btn) btn.focus();
+  }
+
+  /**
+   * Remove o modal de morte e desbloqueia controles
+   */
+  hideDeathModal() {
+    if (this.deathModal && this.deathModal.parentNode) {
+      this.deathModal.parentNode.removeChild(this.deathModal);
+      this.deathModal = null;
+    }
+    document.body.style.overflow = '';
   }
 } 

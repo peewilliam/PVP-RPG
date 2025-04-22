@@ -1,5 +1,5 @@
 import { Entity } from './Entity.js';
-import { PLAYER, EVENTS } from '../../../shared/constants/gameConstants.js';
+import { PLAYER, EVENTS, MONSTERS } from '../../../shared/constants/gameConstants.js';
 
 /**
  * Classe que representa um jogador no jogo.
@@ -205,9 +205,7 @@ export class Player extends Entity {
   takeDamage(amount, source) {
     // Cálculo de dano considerando defesa (fórmula básica)
     const damageTaken = Math.max(1, amount - (this.stats.defense * 0.5));
-    
     this.stats.hp -= damageTaken;
-    
     // Envia evento de dano ao cliente
     if (this.channel) {
       this.channel.emit(EVENTS.PLAYER.DAMAGE, {
@@ -217,14 +215,83 @@ export class Player extends Entity {
         remainingHp: this.stats.hp
       });
     }
-    
     // Verifica se o jogador morreu
     if (this.stats.hp <= 0) {
       this.stats.hp = 0;
+      this.die(source); // Chama o novo método die
       return true; // Jogador morreu
     }
-    
     return false; // Jogador ainda vivo
+  }
+  
+  /**
+   * Método de morte do jogador: aplica penalidade, envia evento e bloqueia ações
+   * @param {Entity} killer - Entidade que matou o jogador
+   */
+  die(killer) {
+    if (this.dead) return; // Evita múltiplas execuções
+    this.dead = true;
+    // Calcula penalidade
+    const oldLevel = this.level;
+    const oldXP = this.xp;
+    const lostLevel = Math.max(1, Math.floor(this.level * 0.5));
+    const lostXP = Math.floor(this.xp * 0.5);
+    // Aplica penalidade
+    this.level = Math.max(1, this.level - lostLevel);
+    this.xp = Math.max(0, this.xp - lostXP);
+    this.nextLevelXp = PLAYER.XP_PER_LEVEL[this.level] || Infinity;
+    // Zera HP e bloqueia regeneração
+    this.stats.hp = 0;
+    this.stats.mana = 0;
+    this.isAttacking = false;
+    this.movementState = { forward: false, backward: false, left: false, right: false };
+    // Envia evento detalhado para o cliente
+    let killerName = null;
+    if (killer) {
+      if (killer.type === 'monster' && MONSTERS[killer.monsterType]) {
+        killerName = MONSTERS[killer.monsterType].NAME;
+      } else if (killer.name) {
+        killerName = killer.name;
+      }
+    }
+    if (this.channel) {
+      this.channel.emit(EVENTS.PLAYER.DEATH, {
+        id: this.id,
+        lostLevel,
+        lostXP,
+        newLevel: this.level,
+        newXP: this.xp,
+        killerId: killer ? killer.id : null,
+        killerName: killerName,
+        killerType: killer ? killer.type : null
+      });
+    }
+    // Opcional: notificar outros jogadores (broadcast)
+    // ...
+  }
+  
+  /**
+   * Método chamado pelo servidor para respawnar o jogador
+   * Restaura HP, mana e desbloqueia ações
+   * @param {Object} position - Posição de respawn
+   */
+  respawn(position) {
+    this.dead = false;
+    this.stats.hp = this.stats.maxHp;
+    this.stats.mana = this.stats.maxMana;
+    this.position = { ...position };
+    this.isAttacking = false;
+    this.movementState = { forward: false, backward: false, left: false, right: false };
+    // Envia evento de respawn para o cliente
+    if (this.channel) {
+      this.channel.emit(EVENTS.PLAYER.RESPAWN, {
+        id: this.id,
+        position: { ...this.position },
+        stats: { ...this.stats },
+        level: this.level,
+        xp: this.xp
+      });
+    }
   }
   
   /**

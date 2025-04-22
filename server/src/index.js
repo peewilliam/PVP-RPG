@@ -60,7 +60,7 @@ io.onConnection(channel => {
     };
     const initialPayloadSize = Buffer.byteLength(JSON.stringify(initialPayload));
     console.log(`[INIT] Enviando WORLD.INIT para ${channel.id}: ${initialPayloadSize} bytes | Objetos: ${initialPayload.worldObjects.length} | Monstros: ${initialPayload.monsters.length}`);
-    channel.emit(EVENTS.WORLD.INIT, initialPayload);
+    compressAndSend(channel, EVENTS.WORLD.INIT, initialPayload);
     
     // Informa outros jogadores sobre o novo jogador que entrou
     // e envia informações sobre jogadores existentes para o novo jogador
@@ -168,7 +168,7 @@ io.onConnection(channel => {
         if (!result.success) return;
         
         // Notifica o cliente que a habilidade foi usada
-        channel.emit(EVENTS.PLAYER.ABILITY_USED, {
+        compressAndSend(channel, EVENTS.PLAYER.ABILITY_USED, {
           id: player.id,
           abilityId: data.abilityId,
           position: player.position,
@@ -187,7 +187,7 @@ io.onConnection(channel => {
         for (const otherPlayer of gameWorld.entityManager.players.values()) {
           if (otherPlayer.id !== player.id && otherPlayer.channel && 
               otherPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE) {
-            otherPlayer.channel.emit(EVENTS.PLAYER.ABILITY_USED, {
+            compressAndSend(otherPlayer.channel, EVENTS.PLAYER.ABILITY_USED, {
               playerId: player.id,
               abilityId: data.abilityId,
               position: player.position,
@@ -209,7 +209,7 @@ io.onConnection(channel => {
                    (hit.position && nearbyPlayer.distanceTo({position: hit.position}) < WORLD.SIZE.VISIBLE_RANGE))) {
                 
                 // Envia evento de dano
-                nearbyPlayer.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+                compressAndSend(nearbyPlayer.channel, EVENTS.COMBAT.DAMAGE_DEALT, {
                   sourceId: player.id,
                   targetId: hit.id,
                   targetType: hit.type,
@@ -262,7 +262,7 @@ io.onConnection(channel => {
           }
         }
         
-        channel.emit(EVENTS.PLAYER.SYNC_RESPONSE, {
+        compressAndSend(channel, EVENTS.PLAYER.SYNC_RESPONSE, {
           mana: player.stats.mana,
           maxMana: player.stats.maxMana,
           hp: player.stats.hp,
@@ -272,7 +272,7 @@ io.onConnection(channel => {
         });
         
         // Adicionalmente, enviamos um evento MOVED para garantir que os stats estejam sincronizados
-        channel.emit(EVENTS.PLAYER.MOVED, {
+        compressAndSend(channel, EVENTS.PLAYER.MOVED, {
           id: player.id,
           position: { ...player.position },
           rotation: player.rotation,
@@ -310,7 +310,7 @@ io.onConnection(channel => {
           if (!other.channel) continue;
           if (other.id === player.id || player.distanceTo(other) < 25) {
             console.log(`[CHAT:MAIN] Enviando para ${other.id} (${other.name}):`, text);
-            other.channel.emit('chat:main', {
+            compressAndSend(other.channel, 'chat:main', {
               from: player.name || 'Player',
               text
             });
@@ -336,7 +336,7 @@ io.onConnection(channel => {
         for (const other of gameWorld.entityManager.players.values()) {
           if (other.channel) {
             console.log(`[CHAT:GLOBAL] Enviando para ${other.id} (${other.name}):`, text);
-            other.channel.emit('chat:global', {
+            compressAndSend(other.channel, 'chat:global', {
               from: player.name || 'Player',
               text
             });
@@ -363,19 +363,19 @@ io.onConnection(channel => {
         const toPlayer = Array.from(gameWorld.entityManager.players.values()).find(p => p.name === data.to);
         if (toPlayer && toPlayer.channel) {
           console.log(`[CHAT:PRIVATE] Enviando para ${toPlayer.id} (${toPlayer.name}):`, text);
-          toPlayer.channel.emit('chat:private', {
+          compressAndSend(toPlayer.channel, 'chat:private', {
             from: player.name || 'Player',
             text
           });
           // Feedback para quem enviou
-          channel.emit('chat:private', {
+          compressAndSend(channel, 'chat:private', {
             from: player.name || 'Player',
             text,
             to: data.to
           });
         } else {
           console.log(`[CHAT:PRIVATE] Destinatário não encontrado: ${data.to}`);
-          channel.emit('chat:private', {
+          compressAndSend(channel, 'chat:private', {
             from: 'Sistema',
             text: `Jogador '${data.to}' não encontrado.`
           });
@@ -396,6 +396,21 @@ io.onConnection(channel => {
     // Handler de ping para medir latência
     channel.on('ping', () => {
       channel.emit('pong');
+    });
+
+    // Handler para respawn do player
+    channel.on(EVENTS.PLAYER.RESPAWN, () => {
+      const player = gameWorld.entityManager.getPlayer(channel.id);
+      if (!player || !player.dead) return;
+      // Define posição de respawn (spawn zone)
+      const spawnZone = WORLD.ZONES.SPAWN;
+      const pos = {
+        x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
+        y: 0,
+        z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
+      };
+      player.respawn(pos);
+      // (O método respawn já envia o evento de confirmação para o cliente)
     });
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
@@ -433,11 +448,14 @@ function broadcastUpdates() {
 
     for (const player of gameWorld.entityManager.players.values()) {
       if (!player.active || !player.channel) continue;
-
-      player.channel.emit(EVENTS.PLAYER.MOVED, serializedPlayers[player.id]);
+      
+      // Envia a posição atualizada do próprio jogador
+      compressAndSend(player.channel, EVENTS.PLAYER.MOVED, serializedPlayers[player.id]);
+      
+      // Envia posições de outros jogadores
       for (const otherPlayerId in serializedPlayers) {
         if (otherPlayerId !== player.id) {
-          player.channel.emit(EVENTS.PLAYER.MOVED, serializedPlayers[otherPlayerId]);
+          compressAndSend(player.channel, EVENTS.PLAYER.MOVED, serializedPlayers[otherPlayerId]);
         }
       }
 
@@ -476,14 +494,11 @@ function broadcastUpdates() {
           monsters: deltaMonsters,
           worldObjects: deltaWorldObjects
         };
-        const json = JSON.stringify(updatePayload);
-        const compressed = zlib.deflateSync(json);
-        const base64 = compressed.toString('base64');
-        console.log(`[DELTA] Enviando WORLD.UPDATE para ${player.id}: ${json.length} bytes (original), ${compressed.length} bytes (compactado) | Objetos: ${deltaWorldObjects.length} | Monstros: ${deltaMonsters.length}`);
-        player.channel.emit(EVENTS.WORLD.UPDATE, {
-          compressed: true,
-          data: base64
-        });
+        const updatePayloadSize = Buffer.byteLength(JSON.stringify(updatePayload));
+        // console.log(`[DELTA] Enviando WORLD.UPDATE para ${player.id}: ${updatePayloadSize} bytes | Objetos: ${deltaWorldObjects.length} | Monstros: ${deltaMonsters.length}`);
+        
+        // Usar a função global de compactação
+        compressAndSend(player.channel, EVENTS.WORLD.UPDATE, updatePayload);
       }
     }
   } catch (error) {
@@ -525,4 +540,31 @@ function sanitizeText(text, maxLen = 200) {
   t = t.replace(/[<>]/g, ''); // Remove < >
   t = t.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove chars de controle
   return t;
+}
+
+// Função utilitária para compactar dados antes de enviar
+function compressAndSend(channel, eventName, data) {
+  try {
+    const json = JSON.stringify(data);
+    const jsonSize = json.length;
+    // Só compacta se o payload for maior que 500 bytes
+    if (jsonSize > 500) {
+      const compressed = zlib.deflateSync(json);
+      const compressedSize = compressed.length;
+      const base64 = compressed.toString('base64');
+      // Log de diagnóstico para monitorar a compactação
+      // console.log(`[COMPRESS] ${eventName}: ${jsonSize} bytes → ${compressedSize} bytes (${Math.round((compressedSize/jsonSize)*100)}%)`);
+      channel.emit(eventName, {
+        compressed: true,
+        data: base64
+      });
+    } else {
+      // Payloads pequenos são enviados normalmente
+      channel.emit(eventName, data);
+    }
+  } catch (error) {
+    console.error(`Erro ao compactar dados para ${eventName}:`, error);
+    // Fallback: envia sem compressão em caso de erro
+    channel.emit(eventName, data);
+  }
 } 

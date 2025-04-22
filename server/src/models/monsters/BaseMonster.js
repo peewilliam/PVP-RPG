@@ -68,9 +68,9 @@ export class BaseMonster extends Entity {
         break;
       case 'chasing':
         const target = this.findPlayerById(players, this.targetId);
-        if (!target || this.distanceTo(target) > this.aggroRange * 1.5) {
+        if (!target || target.stats.hp <= 0 || target.dead) {
           this.targetId = null;
-          this.setAIState('returning');
+          this.setAIState('idle');
           break;
         }
         this.moveTowardsTarget(target, deltaTime);
@@ -78,8 +78,9 @@ export class BaseMonster extends Entity {
         break;
       case 'attacking':
         const attackTarget = this.findPlayerById(players, this.targetId);
-        if (!attackTarget || this.distanceTo(attackTarget) > this.attackRange) {
-          this.setAIState('chasing');
+        if (!attackTarget || attackTarget.stats.hp <= 0 || attackTarget.dead) {
+          this.targetId = null;
+          this.setAIState('idle');
           break;
         }
         this.velocity.x = 0;

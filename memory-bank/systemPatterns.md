@@ -310,3 +310,379 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 - Sempre integrar nomes localizados de entidades (monstros, jogadores, etc) na UI usando o campo NAME da configuração.
 - Nunca exibir identificador/código interno para o usuário final.
 - Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.
+
+## Arquitetura Geral
+
+O projeto segue uma arquitetura MCP (Model-Controller-Presenter) adaptada para jogos multijogador em tempo real:
+
+- **Model (Servidor)**: Gerencia todo o estado do jogo, lógica de negócios e processamento
+- **Controller (Servidor)**: Gerencia entradas e saídas, coordena a lógica de alto nível
+- **Presenter (Cliente)**: Responsável pela renderização e envio de inputs do usuário
+
+Esta arquitetura garante a separação de responsabilidades e mantém o servidor como fonte de verdade.
+
+```mermaid
+graph TD
+    subgraph Cliente
+        Input[Input do Usuário] --> ClientController
+        ClientController --> Presenter
+        Presenter --> Rendering[Renderização]
+    end
+    
+    subgraph Servidor
+        ServerController --> Model
+        Model --> ServerController
+    end
+    
+    ClientController -.-> |Eventos de Input| ServerController
+    ServerController -.-> |Estado do Jogo| ClientController
+```
+
+## Sistema de Rede
+
+### Princípios
+- Servidor é sempre autoritativo
+- Cliente apenas envia intenções (inputs), nunca altera estado diretamente
+- Toda lógica de jogo roda no servidor
+
+### Eventos de Comunicação
+O sistema usa eventos nomeados no formato `categoria:ação`:
+
+```mermaid
+sequenceDiagram
+    participant C as Cliente
+    participant S as Servidor
+    
+    C->>S: player:move {direction}
+    S->>C: player:moved {id, position, rotation}
+    
+    C->>S: player:useAbility {id, target}
+    S->>C: player:abilityUsed {id, type, position}
+    S->>C: combat:damageDealt {source, target, amount}
+```
+
+### Sistema de Otimização de Rede
+
+O sistema implementa várias estratégias para otimizar o tráfego de rede e garantir performance mesmo com muitas entidades:
+
+```mermaid
+graph TD
+    subgraph "Sistema de Otimização de Rede"
+        DeltaUpdates[Delta Updates] --> Compressão
+        EnvioSeletivo[Envio Seletivo] --> Compressão
+        Compressão --> Monitoramento
+        Monitoramento --> Análise
+    end
+```
+
+#### Delta Updates
+Cada jogador tem um snapshot do último estado enviado:
+- O servidor compara o estado atual com o snapshot
+- Apenas entidades com mudanças são enviadas
+- Reduz o tamanho das mensagens em até 80%
+
+```javascript
+// Exemplo simplificado
+const playerLastState = playerSnapshots.get(playerId) || {};
+const updatedEntities = [];
+
+for (const entity of worldEntities) {
+    if (entityHasChanged(entity, playerLastState[entity.id])) {
+        updatedEntities.push(entity);
+        playerLastState[entity.id] = {...entity};
+    }
+}
+
+// Envia apenas entidades atualizadas
+sendToPlayer(playerId, updatedEntities);
+```
+
+#### Envio Seletivo
+- Na conexão inicial, apenas entidades próximas ao jogador são enviadas
+- Utiliza um sistema de raio de visibilidade configurável
+- Reduz o payload inicial de ~200KB para ~7KB
+
+```javascript
+// Exemplo simplificado
+const visibleEntities = worldEntities.filter(entity => 
+    isWithinRadius(entity.position, player.position, VISIBILITY_RADIUS)
+);
+
+sendToPlayer(playerId, visibleEntities);
+```
+
+#### Compressão de Dados
+- Sistema global de compressão adaptativa
+- Mensagens acima de 500 bytes são comprimidas
+- Utiliza zlib no servidor e pako no cliente
+- Reduz ainda mais o tamanho dos payloads (até 70% adicionais)
+
+```javascript
+// Exemplo simplificado
+function compressAndSend(playerId, data) {
+    const message = JSON.stringify(data);
+    
+    if (message.length > 500) {
+        const compressed = zlib.deflateSync(message);
+        send(playerId, {compressed: true, data: compressed});
+    } else {
+        send(playerId, {compressed: false, data: message});
+    }
+}
+```
+
+#### Monitoramento
+- Logs detalhados do tamanho original e comprimido dos payloads
+- Rastreamento do número de entidades enviadas por atualização
+- Análise em tempo real da economia de banda
+
+#### Resultados
+- Redução de ~95% no tráfego de rede
+- Eliminação dos erros de "maxMessageSize exceeded"
+- Experiência mais fluida mesmo com centenas de entidades
+- Suporte a conexões mais lentas e maior número de jogadores
+
+## Sistema de Controle de Entidades
+
+### EntityManager
+Gerencia a criação, atualização e remoção de todas as entidades do jogo:
+
+```mermaid
+classDiagram
+    class EntityManager {
+        +entities: Map
+        +add(entity)
+        +remove(id)
+        +getById(id)
+        +getByType(type)
+        +update(delta)
+    }
+    
+    class Entity {
+        +id: string
+        +type: string
+        +position: Vector3
+        +update(delta)
+    }
+    
+    EntityManager "1" --> "*" Entity
+```
+
+### Sistema de IDs
+- IDs únicos para cada entidade usando UUIDs
+- Prefixos para facilitar depuração:
+  - `p_` para jogadores
+  - `m_` para monstros
+  - `o_` para objetos do mundo
+  - `z_` para zonas de dano
+
+## Sistema de Colisão
+
+O sistema de colisão usa um algoritmo de detecção de colisão baseado em círculos (sphere collision):
+
+```mermaid
+graph TD
+    A[Verificar Colisões] --> B{Entidades Colidem?}
+    B -->|Sim| C[Resolver Colisão]
+    B -->|Não| D[Próximo Par]
+    C --> E[Calcular Vetor de Empurramento]
+    E --> F[Aplicar Separação]
+```
+
+### Matriz de Colisão
+Define quais tipos de entidades colidem entre si:
+
+| | Jogador | Monstro | Objeto | Habilidade |
+|---|---|---|---|---|
+| **Jogador** | ✗ | ✓ | ✓ | ✗ |
+| **Monstro** | ✓ | ✓ | ✓ | ✓ |
+| **Objeto** | ✓ | ✓ | ✓ | ✗ |
+| **Habilidade** | ✗ | ✓ | ✗ | ✗ |
+
+## Sistema de Habilidades
+
+O sistema suporta 4 tipos principais de habilidades:
+
+```mermaid
+classDiagram
+    class AbilitySystem {
+        +useAbility(playerId, abilityId, targetPos)
+        +resolveAbilityEffects(ability)
+    }
+    
+    class Ability {
+        +id: number
+        +type: string
+        +damage: number
+        +cost: number
+        +cooldown: number
+    }
+    
+    class ProjectileAbility {
+        +speed: number
+        +range: number
+    }
+    
+    class AreaAbility {
+        +radius: number
+        +applyEffects()
+    }
+    
+    class MobilityAbility {
+        +range: number
+        +teleport()
+    }
+    
+    class ZoneAbility {
+        +radius: number
+        +duration: number
+        +tickInterval: number
+        +createDamageZone()
+    }
+    
+    Ability <|-- ProjectileAbility
+    Ability <|-- AreaAbility
+    Ability <|-- MobilityAbility
+    Ability <|-- ZoneAbility
+    
+    AbilitySystem --> Ability
+```
+
+### Processo de Habilidades
+1. Cliente envia `player:useAbility` com ID de habilidade e posição alvo
+2. Servidor valida mana, cooldown e posição
+3. Servidor processa a habilidade baseado no tipo:
+   - Projétil: cria objeto que se move e causa dano no impacto
+   - Área: aplica efeito imediato em uma área circular
+   - Mobilidade: move o jogador instantaneamente
+   - Zona: cria uma área que causa dano ao longo do tempo
+4. Servidor emite eventos de feedback (`player:abilityUsed`, `combat:damageDealt`)
+5. Cliente apresenta efeitos visuais
+
+## Sistema de Combate
+
+O sistema de combate gerencia dano, efeitos de status e morte:
+
+```mermaid
+sequenceDiagram
+    participant P as Player
+    participant CS as CombatSystem
+    participant T as Target
+    
+    P->>CS: applyDamage(target, amount)
+    CS->>T: takeDamage(amount)
+    alt Target HP > 0
+        T->>CS: damageDealt
+        CS->>P: damageDealt event
+    else Target HP <= 0
+        T->>CS: death
+        CS->>P: death event
+        Note over CS,T: Processo de Drop e XP
+    end
+```
+
+### CombatSystem
+- Processa todas as interações de dano
+- Gerencia efeitos de status (slow, stun, etc.)
+- Calcula modificadores de dano
+- Emite eventos de feedback
+
+## Sistema de Renderização
+
+O cliente usa Three.js para renderização 3D isométrica:
+
+```mermaid
+graph TD
+    A[Scene Setup] --> B[Camera Setup]
+    B --> C[Renderer Setup]
+    C --> D[Lighting Setup]
+    D --> E[Load Assets]
+    E --> F[Main Loop]
+    
+    F --> G[Process Inputs]
+    G --> H[Update Scene]
+    H --> I[Render]
+    I --> F
+```
+
+### Presenters
+Cada tipo de entidade tem um Presenter responsável pela sua representação visual:
+
+- `PlayerPresenter`: Renderiza jogadores
+- `MonsterPresenter`: Renderiza monstros
+- `WorldObjectPresenter`: Renderiza objetos do mundo
+- `AbilityPresenter`: Renderiza efeitos visuais de habilidades
+
+## Sistema de Input
+
+O sistema processa entradas do usuário e as converte em comandos:
+
+```mermaid
+graph TD
+    A[Event Listeners] --> B[Input Manager]
+    B --> C{Type of Input}
+    C -->|Movement| D[Send Move Command]
+    C -->|Ability| E[Send Ability Command]
+    C -->|Interaction| F[Send Interact Command]
+```
+
+### Sistema de UI
+
+A interface do usuário é composta por vários elementos:
+
+- Barras de HP e Mana
+- Cooldowns de habilidades
+- Contador de FPS e Ping
+- HUD de alvo selecionado
+- Painel de chat
+- Floating Names para identificação visual de entidades
+
+## Sistema de Eventos
+
+O sistema usa um padrão baseado em eventos para comunicação entre componentes:
+
+```mermaid
+classDiagram
+    class EventEmitter {
+        +on(event, callback)
+        +emit(event, ...args)
+        +off(event, callback)
+    }
+    
+    class GameClient {
+        +eventEmitter: EventEmitter
+        +connect()
+        +disconnect()
+    }
+    
+    class GameServer {
+        +eventEmitter: EventEmitter
+        +broadcast(event, data)
+        +sendTo(playerId, event, data)
+    }
+    
+    GameClient --> EventEmitter
+    GameServer --> EventEmitter
+```
+
+### Exemplos de Eventos
+- `player:joined`: Novo jogador conectado
+- `player:moved`: Jogador moveu-se
+- `monster:spawned`: Novo monstro surgiu
+- `combat:damageDealt`: Dano aplicado a uma entidade
+
+## Estratégias de Otimização
+
+Além do sistema de otimização de rede, o projeto implementa várias estratégias para garantir performance:
+
+### No Servidor
+- Processamento apenas de entidades em áreas ocupadas
+- Sistema de ticks assíncronos para lógica pesada
+- Pooling de objetos para evitar garbage collection excessivo
+
+### No Cliente
+- Level of Detail (LOD) para renderização
+- Frustum culling para evitar renderizar objetos fora da visão
+- Object pooling para efeitos visuais
+- Throttling para reduzir eventos de input
+- Lazy loading de assets

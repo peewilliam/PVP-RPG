@@ -2,7 +2,7 @@
  * Sistema de combate que gerencia interações de combate entre jogadores e monstros
  * Suporta tanto combate PvE (Player vs Environment) quanto PvP (Player vs Player)
  */
-import { WORLD, EVENTS, ABILITY_IDS } from '../../../shared/constants/gameConstants.js';
+import { WORLD, EVENTS, ABILITY_IDS, MONSTERS } from '../../../shared/constants/gameConstants.js';
 
 export class CombatSystem {
   /**
@@ -328,31 +328,8 @@ export class CombatSystem {
    */
   handlePlayerDeath(player, killer) {
     console.log(`Processando morte do jogador ${player.id}`);
-    
-    // Reset do jogador após morte
-    player.resetAfterDeath();
-    
-    // Teleporta de volta para o spawn
-    const spawnZone = WORLD.ZONES.SPAWN;
-    player.position.x = spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN);
-    player.position.z = spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN);
-    
-    // Notifica todos sobre a morte
-    if (player.channel) {
-      player.channel.emit(EVENTS.PLAYER.DEATH, {
-        id: player.id,
-        killerId: killer ? killer.id : null
-      });
-      
-      // Notifica sobre o respawn
-      setTimeout(() => {
-        player.channel.emit(EVENTS.PLAYER.RESPAWN, {
-          position: { ...player.position },
-          stats: { ...player.stats },
-          level: player.level
-        });
-      }, 2000); // 2 segundos de "tela de morte"
-    }
+    player.die(killer);
+    // O respawn será feito apenas quando o cliente requisitar
   }
 
   /**
@@ -386,6 +363,7 @@ export class CombatSystem {
               player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
                 targetId: monster.id,
                 targetType: 'monster',
+                targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
                 damage,
                 died,
                 position: { ...monster.position }
@@ -415,8 +393,12 @@ export class CombatSystem {
           // Feedback visual: emitir evento de dano para o lançador
           if (projectile.owner && projectile.owner.channel) {
             projectile.owner.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+              sourceId: projectile.owner.id,
+              sourceType: 'player',
+              sourceName: MONSTERS[projectile.owner.monsterType]?.NAME || projectile.owner.monsterType,
               targetId: player.id,
               targetType: 'player',
+              targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
               damage,
               died,
               position: { ...player.position }
@@ -428,6 +410,7 @@ export class CombatSystem {
             player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
               targetId: player.id,
               targetType: 'player',
+              targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
               damage,
               died,
               position: { ...player.position }
@@ -480,6 +463,7 @@ export class CombatSystem {
                   player.channel.emit('combat:slow', {
                     targetId: monster.id,
                     targetType: 'monster',
+                    targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
                     slowDuration,
                     slowUntil: monster.status.slowedUntil
                   });
@@ -492,6 +476,7 @@ export class CombatSystem {
                 player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
                   targetId: monster.id,
                   targetType: 'monster',
+                  targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
                   damage,
                   died,
                   position: { ...monster.position }
@@ -528,6 +513,7 @@ export class CombatSystem {
                   p.channel.emit('combat:slow', {
                     targetId: player.id,
                     targetType: 'player',
+                    targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
                     slowDuration,
                     slowUntil: player.status.slowedUntil
                   });
@@ -540,6 +526,7 @@ export class CombatSystem {
                 p.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
                   targetId: player.id,
                   targetType: 'player',
+                  targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
                   damage,
                   died,
                   position: { ...player.position }
