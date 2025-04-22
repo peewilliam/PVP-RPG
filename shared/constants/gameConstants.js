@@ -70,25 +70,32 @@ export const PLAYER = {
   // Valores menores significam movimento mais lento, valores maiores significam movimento mais rápido
   SPEED: 0.3, // Velocidade por tick
   BASE_STATS: {
-    HP: 100,
-    MANA: 250,
+    HP: 240,
+    MANA: 400,
     ATTACK: 10,
     DEFENSE: 5
   },
   // Configurações de regeneração de recursos
   REGENERATION: {
     HP_PERCENT: 0.01, // 1% do HP máximo por segundo
-    MANA_PERCENT: 0.01, // 5% da mana máxima por segundo
+    MANA_PERCENT: 0.05, // 1% da mana máxima por segundo
     NOTIFY_THRESHOLD: 0.25 // Notificar cliente quando recursos abaixo de 25%
   },
-  XP_PER_LEVEL: [
-    0, // Nível 1
-    100, // Nível 2
-    250, // Nível 3
-    450, // Nível 4
-    700, // Nível 5
-    1000 // Nível 6
-  ],
+  // Sistema de níveis
+  LEVEL_SYSTEM: {
+    MAX_LEVEL: 50, // Nível máximo que um jogador pode atingir
+    BASE_XP: 100,  // XP base para o nível 2
+    GROWTH_FACTOR: 1.5, // Fator de crescimento da curva de XP
+    // Os valores de XP por nível são calculados com a fórmula:
+    // XP necessário para o nível N = BASE_XP * (GROWTH_FACTOR ^ (N-1))
+    // Exemplo:
+    // Nível 1: 0 XP
+    // Nível 2: 100 XP
+    // Nível 3: 100 * (1.5^1) = 150 XP
+    // Nível 4: 100 * (1.5^2) = 225 XP
+    // Nível 5: 100 * (1.5^3) = 337.5 XP
+    // e assim por diante...
+  },
   // Habilidades do jogador centralizadas
   ABILITIES: SKILLS
 };

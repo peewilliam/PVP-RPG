@@ -1,5 +1,6 @@
 import { Entity } from '../Entity.js';
-import { MONSTERS } from '../../../../shared/constants/gameConstants.js';
+import { MONSTERS, PLAYER } from '../../../../shared/constants/gameConstants.js';
+import { getXpForLevel } from '../../../../shared/utils/levelUtils.js';
 
 export class BaseMonster extends Entity {
   constructor(id, type, position = { x: 0, y: 0, z: 0 }, level = 1) {
@@ -190,7 +191,35 @@ export class BaseMonster extends Entity {
     this.velocity.x = 0;
     this.velocity.z = 0;
     if (killer && killer.type === 'player' && typeof killer.addExperience === 'function') {
-      killer.addExperience(this.xpReward);
+      // Ajusta a recompensa de XP com base na diferença de nível
+      let adjustedXpReward = this.xpReward;
+      
+      // Se o nível do jogador for maior que o do monstro, reduz o XP
+      if (killer.level > this.level) {
+        const levelDiff = killer.level - this.level;
+        // Reduz 10% por nível de diferença, até um mínimo de 10% do XP original
+        const reductionFactor = Math.max(0.1, 1 - (levelDiff * 0.1));
+        adjustedXpReward = Math.floor(this.xpReward * reductionFactor);
+      } 
+      // Se o nível do jogador for menor, aumenta o XP (bônus por derrotar monstro mais forte)
+      else if (killer.level < this.level) {
+        const levelDiff = this.level - killer.level;
+        // Aumenta 20% por nível de diferença, até um máximo de 100% extra (dobro do XP)
+        const bonusFactor = Math.min(2.0, 1 + (levelDiff * 0.2));
+        adjustedXpReward = Math.floor(this.xpReward * bonusFactor);
+      }
+      
+      // Garante um mínimo de XP (1% do próximo nível)
+      const minXpReward = Math.ceil(getXpForLevel(killer.level + 1) * 0.01);
+      adjustedXpReward = Math.max(minXpReward, adjustedXpReward);
+      
+      // Limita o XP máximo a 50% do necessário para o próximo nível
+      const maxXpReward = Math.floor(getXpForLevel(killer.level + 1) * 0.5);
+      adjustedXpReward = Math.min(maxXpReward, adjustedXpReward);
+      
+      console.log(`XP ajustado para jogador ${killer.id} (nível ${killer.level}): ${adjustedXpReward} (original: ${this.xpReward})`);
+      
+      killer.addExperience(adjustedXpReward);
     }
     if (global.gameWorld) {
       global.gameWorld.monsterDied(this.id);

@@ -1,5 +1,6 @@
 import { Entity } from './Entity.js';
 import { PLAYER, EVENTS, MONSTERS } from '../../../shared/constants/gameConstants.js';
+import { getXpForLevel } from '../../../shared/utils/levelUtils.js';
 
 /**
  * Classe que representa um jogador no jogo.
@@ -31,7 +32,7 @@ export class Player extends Entity {
     // Sistema de nível
     this.level = 1;
     this.xp = 0;
-    this.nextLevelXp = PLAYER.XP_PER_LEVEL[this.level]; // XP necessário para o próximo nível
+    this.nextLevelXp = getXpForLevel(2); // XP necessário para o próximo nível
     
     // Estado de movimento
     this.movementState = {
@@ -239,7 +240,7 @@ export class Player extends Entity {
     // Aplica penalidade
     this.level = Math.max(1, this.level - lostLevel);
     this.xp = Math.max(0, this.xp - lostXP);
-    this.nextLevelXp = PLAYER.XP_PER_LEVEL[this.level] || Infinity;
+    this.nextLevelXp = getXpForLevel(this.level + 1);
     // Zera HP e bloqueia regeneração
     this.stats.hp = 0;
     this.stats.mana = 0;
@@ -347,7 +348,7 @@ export class Player extends Entity {
     this.xp += amount;
     
     // Verifica se há XP suficiente para subir de nível
-    if (this.xp >= this.nextLevelXp && this.level < PLAYER.XP_PER_LEVEL.length - 1) {
+    if (this.xp >= this.nextLevelXp && this.level < PLAYER.LEVEL_SYSTEM.MAX_LEVEL) {
       this.levelUp();
       return true;
     }
@@ -362,7 +363,7 @@ export class Player extends Entity {
     this.level++;
     
     // Atualiza XP necessário para o próximo nível
-    this.nextLevelXp = PLAYER.XP_PER_LEVEL[this.level] || Infinity;
+    this.nextLevelXp = getXpForLevel(this.level + 1);
     
     // Aumenta atributos base (exemplo: 10% por nível)
     const multiplier = 1.1; // 10% de aumento
@@ -379,6 +380,8 @@ export class Player extends Entity {
       this.channel.emit(EVENTS.PLAYER.LEVEL_UP, {
         id: this.id,
         level: this.level,
+        xp: this.xp,
+        nextLevelXp: this.nextLevelXp,
         stats: { ...this.stats }
       });
     }
@@ -393,7 +396,7 @@ export class Player extends Entity {
     
     // Zera a experiência
     this.xp = 0;
-    this.nextLevelXp = PLAYER.XP_PER_LEVEL[this.level];
+    this.nextLevelXp = getXpForLevel(2);
     
     // Restaura estatísticas base
     this.stats = {

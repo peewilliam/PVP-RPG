@@ -1,22 +1,15 @@
-// Configurações carregadas de variáveis de ambiente ou valores padrão
-
-// Detecta se estamos no ambiente de cliente (navegador) ou servidor (Node.js)
-const isBrowser = typeof window !== 'undefined';
-
-// Configurações para servidor/cliente
+/**
+ * Configurações padrão para o projeto
+ */
 export const config = {
   server: {
-    // No cliente, tenta usar variáveis de ambiente do Vite, senão usa valores padrão
-    port: isBrowser 
-      ? (import.meta.env?.VITE_SERVER_PORT || 3000) 
-      : (process.env.SERVER_PORT || 3000),
-    url: isBrowser
-      ? (import.meta.env?.VITE_SERVER_URL || 'http://localhost')
-      : (process.env.SERVER_URL || 'http://localhost')
+    port: 3000,
   },
   game: {
-    // 20 ticks por segundo = 50ms por tick
-    // Este valor precisa estar sincronizado com velocidades de movimento e atualizações
-    tickRate: 50 
+    tickRate: 20, // 20 ticks por segundo (50ms por tick)
+    debug: {
+      collisions: false,
+      ai: false
+    }
   }
 }; 
