@@ -378,7 +378,7 @@ function initThree() {
   
   // --- TEXTURA TILEADA PARA O CHÃO ---
   const textureLoader = new THREE.TextureLoader();
-  const groundTexture = textureLoader.load('public/textures/environment/tiled_stone_texture.png', (tex) => {
+  const groundTexture = textureLoader.load('/textures/environment/tiled_stone_texture.png', (tex) => {
     console.log('Textura do chão carregada:', tex);
   });
   groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;

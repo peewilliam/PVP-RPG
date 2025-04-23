@@ -3,6 +3,22 @@ import geckos from '@geckos.io/server';
 import { SERVER, EVENTS, WORLD } from '../../shared/constants/gameConstants.js';
 import { GameWorld } from './models/GameWorld.js';
 import zlib from 'zlib';
+import express from 'express';
+import path from 'path';
+
+const app = express();
+const __dirname = path.resolve();
+
+app.get('/play', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/client/index.html'));
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/index.html'));
+});
+
+app.use(express.static('dist'));
+app.listen(3001, () => console.log('Servidor rodando na porta 3001'));
 
 // Inicializa o servidor geckos.io com configurações para desenvolvimento
 const io = geckos({

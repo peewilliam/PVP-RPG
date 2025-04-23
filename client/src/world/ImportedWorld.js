@@ -7,7 +7,7 @@ export class ImportedWorld {
     this.root = new THREE.Group();
     this.loader = new GLTFLoader();
     // Caminho do arquivo GLB do mundo
-    this.glbPath = '/assets/world/world.glb'; // Ajuste conforme necessário
+    this.glbPath = '/models-3d/world.glb'; // Ajuste conforme necessário
     this.loaded = false;
     this.planeMesh = null; // Mesh do chão importado
   }

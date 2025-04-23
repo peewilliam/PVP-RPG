@@ -11,7 +11,7 @@ export const SKILLS = {
     AREA_DAMAGE: 10, // 50% do dano base
     AREA_RADIUS: 2, // metros
     RANGE: 20, // metros
-    ICON: 'src/imagens/skills/fireball.png',
+    ICON: '/textures/skills/fireball.png',
     EFFECTS: ['explosion', 'burn'],
   },
   TELEPORT: {
@@ -22,7 +22,7 @@ export const SKILLS = {
     COOLDOWN: 10000, // ms
     MANA_COST: 25,
     RANGE: 15, // metros
-    ICON: 'src/imagens/skills/teleport.png',
+    ICON: '/textures/skills/teleport.png',
     EFFECTS: ['fade', 'particles'],
   },
   FROST_SPIKES: {
@@ -38,7 +38,7 @@ export const SKILLS = {
     DELAY: 1000, // ms
     SLOW: 0.4, // 40% de lentidão
     SLOW_DURATION: 3000, // ms
-    ICON: 'src/imagens/skills/frost_spikes.png',
+    ICON: '/textures/skills/frost_spikes.png',
     EFFECTS: ['spikes', 'slow'],
   },
   METEOR_STORM: {
@@ -55,7 +55,7 @@ export const SKILLS = {
     METEORS: 10,
     METEOR_INTERVAL: 500, // ms
     TICK_INTERVAL:500,
-    ICON: 'src/imagens/skills/meteor_storm.png',
+    ICON: '/textures/skills/meteor_storm.png',
     EFFECTS: ['meteor', 'fire', 'smoke'],
   },
   DASH: {
@@ -67,7 +67,7 @@ export const SKILLS = {
     MANA_COST: 20,
     RANGE: 6,             // metros deslocados
     INVULNERABILITY: 200, // ms de invulnerabilidade
-    ICON: 'src/imagens/skills/dash.png',
+    ICON: '/textures/skills/dash.png',
     EFFECTS: ['dash', 'invuln'],
   },
 
@@ -81,7 +81,7 @@ export const SKILLS = {
     DURATION: 6000,    // ms de duração da parede
     DAMAGE_PER_SECOND: 10,
     WIDTH: 8,          // metros de comprimento
-    ICON: 'src/imagens/skills/fire_wall.png',
+    ICON: '/textures/skills/fire_wall.png',
     EFFECTS: ['wall', 'burn'],
   },
 
@@ -94,7 +94,7 @@ export const SKILLS = {
     MANA_COST: 70,
     HEAL_AMOUNT: 100,
     AREA_RADIUS: 4,     // metros de raio de cura
-    ICON: 'src/imagens/skills/celestial_heal.png',
+    ICON: '/textures/skills/celestial_heal.png',
     EFFECTS: ['heal', 'light'],
   },
   UNSTABLE_CURSE: {
@@ -107,7 +107,7 @@ export const SKILLS = {
     DAMAGE: 30,
     AREA_RADIUS: 3,
     DELAY: 4000, // ms até a explosão
-    ICON: 'src/imagens/skills/unstable_curse.png',
+    ICON: '/textures/skills/unstable_curse.png',
     EFFECTS: ['curse', 'explosion', 'corruption'],
   },
 
@@ -121,7 +121,7 @@ export const SKILLS = {
     DAMAGE_PER_SECOND: 12,
     DURATION: 3000,
     LIFESTEAL: 0.25, // 25% do dano convertido em cura
-    ICON: 'src/imagens/skills/dark_beam.png',
+    ICON: '/textures/skills/dark_beam.png',
     EFFECTS: ['beam', 'lifesteal', 'dark'],
   },
 
@@ -135,7 +135,7 @@ export const SKILLS = {
     RANGE: 10,
     SPREAD_RADIUS: 5,
     EFFECT_REDUCTION: 0.5,
-    ICON: 'src/imagens/skills/curse_expansion.png',
+    ICON: '/textures/skills/curse_expansion.png',
     EFFECTS: ['spread', 'curse'],
   },
 
@@ -148,7 +148,7 @@ export const SKILLS = {
     MANA_COST: 55,
     DURATION: 3000,
     DAMAGE_PER_SECOND: 10,
-    ICON: 'src/imagens/skills/shadow_prison.png',
+    ICON: '/textures/skills/shadow_prison.png',
     EFFECTS: ['root', 'dark', 'zone'],
   },
 }; 
