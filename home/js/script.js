@@ -117,4 +117,73 @@ document.addEventListener('DOMContentLoaded', function() {
       window.location.href = '/play';
     });
   }
+
+  // Patch notes (exemplo, edite conforme necessário)
+  const patchNotes = [
+    { id: 'patch-1-0', title: 'Patch 1.0 - Lançamento', content: 'Primeira versão do jogo lançada com sistema de combate, progressão e mundo inicial.' },
+    { id: 'patch-1-1', title: 'Patch 1.1 - Novos Recursos', content: 'Adicionados novos monstros, sistema de XP em dobro para eventos e melhorias na HUD.' },
+    { id: 'patch-1-2', title: 'Patch 1.2 - Balanceamento', content: 'Balanceamento de dano PvP/PvE, ajuste de defesa e melhorias na IA dos monstros.' },
+  ];
+
+  // Cria a sidebar flutuante
+  const patchSidebar = document.createElement('div');
+  patchSidebar.className = 'patchnote-sidebar';
+  patchSidebar.innerHTML = `
+    <div class="patchnote-title">Patch Notes</div>
+    <ul class="patchnote-list">
+      ${patchNotes.map((p, i) => `<li data-patch="${p.id}" tabindex="0">${p.title}</li>`).join('')}
+    </ul>
+    <button class="patchnote-all-btn">Ver todos os patch notes</button>
+  `;
+  document.body.appendChild(patchSidebar);
+
+  // Cria o modal (inicialmente oculto)
+  const patchModalOverlay = document.createElement('div');
+  patchModalOverlay.className = 'patchnote-modal-overlay';
+  patchModalOverlay.style.display = 'none';
+  const patchModal = document.createElement('div');
+  patchModal.className = 'patchnote-modal';
+  patchModalOverlay.appendChild(patchModal);
+  document.body.appendChild(patchModalOverlay);
+
+  function openPatchModal(selectedId = null) {
+    patchModal.innerHTML = `
+      <button class="patchnote-modal-close">&times;</button>
+      <div class="patchnote-modal-content">
+        ${patchNotes.map(p => `
+          <div id="${p.id}" class="patchnote-block${selectedId === p.id ? ' selected' : ''}">
+            <h3>${p.title}</h3>
+            <p>${p.content}</p>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    patchModalOverlay.style.display = 'flex';
+    // Scroll até o patch selecionado
+    if (selectedId) {
+      setTimeout(() => {
+        const el = document.getElementById(selectedId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }
+
+  // Fecha o modal
+  patchModalOverlay.addEventListener('click', function(e) {
+    if (e.target === patchModalOverlay || e.target.classList.contains('patchnote-modal-close')) {
+      patchModalOverlay.style.display = 'none';
+    }
+  });
+
+  // Clique nos itens da sidebar
+  patchSidebar.querySelectorAll('.patchnote-list li').forEach(li => {
+    li.addEventListener('click', function() {
+      openPatchModal(this.getAttribute('data-patch'));
+    });
+  });
+
+  // Clique no botão "Ver todos"
+  patchSidebar.querySelector('.patchnote-all-btn').addEventListener('click', function() {
+    openPatchModal();
+  });
 }); 

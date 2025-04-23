@@ -1,0 +1,151 @@
+/* Patch Notes Sidebar */
+.patchnote-sidebar {
+  position: fixed;
+  top: 80px;
+  left: 0;
+  width: 260px;
+  background: rgba(30, 30, 40, 0.97);
+  color: #fff;
+  border-radius: 0 12px 12px 0;
+  box-shadow: 2px 4px 16px rgba(0,0,0,0.18);
+  z-index: 1000;
+  padding: 18px 12px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.patchnote-title {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+.patchnote-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+  width: 100%;
+}
+.patchnote-list li {
+  cursor: pointer;
+  padding: 7px 10px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  transition: background 0.18s;
+  outline: none;
+}
+.patchnote-list li:hover, .patchnote-list li:focus {
+  background: #2e2e4a;
+}
+.patchnote-all-btn {
+  width: 100%;
+  padding: 7px 0;
+  background: #ffd700;
+  color: #222;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.18s;
+  margin-top: 6px;
+}
+.patchnote-all-btn:hover {
+  background: #ffe066;
+}
+
+/* Patch Notes Modal */
+.patchnote-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(20, 20, 30, 0.85);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.patchnote-modal {
+  background: #23233a;
+  color: #fff;
+  border-radius: 12px;
+  max-width: 540px;
+  width: 95vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  padding: 28px 24px 18px 24px;
+  position: relative;
+}
+.patchnote-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 2em;
+  cursor: pointer;
+  z-index: 10;
+  transition: color 0.18s;
+}
+.patchnote-modal-close:hover {
+  color: #ffd700;
+}
+.patchnote-modal-content {
+  margin-top: 10px;
+}
+.patchnote-block {
+  margin-bottom: 32px;
+  padding: 18px 14px 12px 14px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: background 0.18s;
+}
+.patchnote-block.selected {
+  background: #ffd70022;
+  border: 2px solid #ffd700;
+}
+.patchnote-block h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.1em;
+  color: #ffd700;
+}
+.patchnote-block p {
+  margin: 0;
+  font-size: 1em;
+  color: #eee;
+}
+
+@media (max-width: 700px) {
+  .patchnote-sidebar {
+    width: 90vw;
+    left: 0;
+    top: unset;
+    bottom: 0;
+    border-radius: 12px 12px 0 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 6px 10px 10px;
+    gap: 6px;
+  }
+  .patchnote-title {
+    display: none;
+  }
+  .patchnote-list {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    width: auto;
+  }
+  .patchnote-list li {
+    margin-bottom: 0;
+    padding: 6px 8px;
+    font-size: 0.98em;
+  }
+  .patchnote-all-btn {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 0.98em;
+  }
+} 

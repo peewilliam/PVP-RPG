@@ -17,8 +17,8 @@ export function getXpForLevel(level) {
 export function getLevelBenefits(level) {
   // Exemplo: cada level dá +10 HP, +5 Mana, +2 Defesa, +2 Dano
   return {
-    maxHp: 100 + (level - 1) * 10,
-    maxMana: 50 + (level - 1) * 5,
+    maxHp: 140 + (level - 1) * 10,
+    maxMana: 150 + (level - 1) * 5,
     defense: 5 + (level - 1) * 2,
     attack: 10 + (level - 1) * 2,
   };
