@@ -49,6 +49,9 @@
   - Diminuição de 35% na latência média
   - Mecanismo adaptativo que decide quando comprimir baseado no tamanho da mensagem
   - Implementação de protocolo próprio de sincronização delta
+- ✅ **Script de simulação de XP (test-xp.js) integrado com gameConstants.js**: permite prever, balancear e simular o progresso de níveis, grind, quests e impacto de cada monstro real do jogo.
+- ✅ Simulações de quests, grind, tempo estimado para upar e comparação de monstros reais disponíveis.
+- ✅ Ferramenta essencial para ajuste fino do balanceamento de XP e progressão.
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens
@@ -352,3 +355,12 @@ O sistema atual representa uma base sólida para futuras otimizações, com foco
   - Diminuição significativa na latência média (~35%)
   - Eliminação de erros de maxMessageSize
   - Monitoramento detalhado do uso de banda em tempo real 
+
+## O que falta/conferir
+- [ ] Balanceamento final de XP e recompensas de monstros/quests com base nos dados do script
+- [ ] Adicionar mais monstros e cenários de quests para simulação
+- [ ] Automatizar integração do script com alterações futuras em gameConstants.js
+- [ ] Documentar exemplos de uso do script para designers e devs
+
+## Status atual
+- O sistema de progressão e XP está totalmente auditável e simulável via script, facilitando ajustes e previsões realistas para o MMORPG. 

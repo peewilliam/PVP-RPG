@@ -77,7 +77,7 @@ export class BaseMonster extends Entity {
         this.moveTowardsTarget(target, deltaTime);
         if (this.distanceTo(target) <= this.attackRange) this.setAIState('attacking');
         break;
-      case 'attacking':
+      case 'attacking': {
         const attackTarget = this.findPlayerById(players, this.targetId);
         if (!attackTarget || attackTarget.stats.hp <= 0 || attackTarget.dead) {
           this.targetId = null;
@@ -87,12 +87,16 @@ export class BaseMonster extends Entity {
         this.velocity.x = 0;
         this.velocity.z = 0;
         this.lookAt(attackTarget.position);
-        if (now - this.lastAttackTime > this.attackCooldown) {
+        const dx = attackTarget.position.x - this.position.x;
+        const dz = attackTarget.position.z - this.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist <= this.attackRange && now - this.lastAttackTime > this.attackCooldown) {
           this.attackTarget(attackTarget);
           this.lastAttackTime = now;
         }
         break;
-      case 'returning':
+      }
+      case 'returning': {
         const dx = this.spawnPoint.x - this.position.x;
         const dz = this.spawnPoint.z - this.position.z;
         const distToSpawn = Math.sqrt(dx * dx + dz * dz);
@@ -112,6 +116,7 @@ export class BaseMonster extends Entity {
         this.rotation = Math.atan2(dz, dx);
         this.findTarget(players);
         break;
+      }
     }
   }
 

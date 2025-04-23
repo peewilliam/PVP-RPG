@@ -686,3 +686,12 @@ Além do sistema de otimização de rede, o projeto implementa várias estratég
 - Object pooling para efeitos visuais
 - Throttling para reduzir eventos de input
 - Lazy loading de assets
+
+## Padrão de Simulação e Balanceamento
+- Scripts de simulação (ex: `test-xp.js`) devem consumir as mesmas fontes de verdade das constantes do jogo (`gameConstants.js`), evitando duplicação de lógica e garantindo previsibilidade.
+- O script de simulação de XP é usado para prever, balancear e validar o progresso de níveis, grind, quests e impacto de cada monstro real do jogo.
+- Mudanças em parâmetros de XP, recompensas ou monstros devem ser refletidas tanto no runtime quanto nos scripts de simulação para garantir consistência.
+- O padrão é: **tudo que influencia o balanceamento do jogo deve ser centralizado em arquivos de constantes e consumido por qualquer ferramenta de análise/simulação**.
+
+## Observações
+- Esse padrão facilita o ajuste fino do balanceamento, a comunicação entre devs/designers e a manutenção do projeto a longo prazo.

@@ -283,4 +283,28 @@ O foco atual do desenvolvimento está na otimização de rede do jogo para supor
 - **Tráfego Médio por Jogador**: Reduzido de ~120KB/s para ~6KB/s
 - **Latência Média**: Melhorada em 35% após otimizações
 - **Entidades Suportadas**: Aumentado de ~100 para mais de 300
-- **Taxa de Atualização**: Mantida em 20 ticks/segundo 
+- **Taxa de Atualização**: Mantida em 20 ticks/segundo
+
+# Contexto Ativo
+
+## Foco atual
+- Integração do script de simulação de XP (`test-xp.js`) com as constantes reais do jogo (`gameConstants.js`), incluindo todos os monstros definidos.
+- O script agora permite simular:
+  - Progresso de níveis com base em XP real
+  - Quantidade de monstros reais necessários para upar
+  - Impacto de quests e grind
+  - Tempo estimado para subir de nível
+  - Comparação entre diferentes monstros e cenários
+- Ferramenta essencial para ajuste fino do balanceamento de XP, progressão e design de quests.
+
+## Decisões recentes
+- O cálculo de XP, simulações de ganho, previsões de tempo e quantidade de monstros necessários para upar estão alinhados com o balanceamento real do servidor.
+- O script pode ser facilmente ajustado para refletir mudanças futuras nas constantes do jogo.
+
+## Próximos passos
+- Usar o script para validar e ajustar o balanceamento de XP e recompensas de monstros/quests.
+- Documentar exemplos de uso para designers e devs.
+- Automatizar integração do script com alterações futuras em `gameConstants.js`.
+
+## Observações
+- O script é uma ferramenta de apoio para tomada de decisão de design e balanceamento, não faz parte do runtime do jogo. 
