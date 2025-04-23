@@ -1,6 +1,6 @@
 import { Entity } from '../Entity.js';
-import { MONSTERS, PLAYER } from '../../../../shared/constants/gameConstants.js';
-import { getXpForLevel } from '../../../../shared/utils/levelUtils.js';
+import { MONSTERS, PLAYER, EVENTS } from '../../../../shared/constants/gameConstants.js';
+import { getLevelBenefits, getXpForLevel, calculateXpGain, calculateDamage } from '../../../../shared/progressionSystem.js';
 
 export class BaseMonster extends Entity {
   constructor(id, type, position = { x: 0, y: 0, z: 0 }, level = 1) {
@@ -12,12 +12,12 @@ export class BaseMonster extends Entity {
     this.collisionRadius = 0.6;
     this.level = level;
     this.xpReward = monsterType.XP_REWARD * level;
-    const levelMultiplier = 1 + ((level - 1) * 0.2);
+    const benefits = getLevelBenefits(level);
     this.stats = {
-      maxHp: Math.floor(monsterType.HP * levelMultiplier),
-      hp: Math.floor(monsterType.HP * levelMultiplier),
-      damage: Math.floor(monsterType.DAMAGE * levelMultiplier),
-      defense: Math.floor(monsterType.DEFENSE * levelMultiplier)
+      maxHp: Math.floor(monsterType.HP * (benefits.maxHp / 100)),
+      hp: Math.floor(monsterType.HP * (benefits.maxHp / 100)),
+      damage: Math.floor(monsterType.DAMAGE * (benefits.attack / 10)),
+      defense: Math.floor(monsterType.DEFENSE * (benefits.defense / 5))
     };
     this.moveSpeed = monsterType.SPEED;
     this.attackRange = monsterType.ATTACK_RANGE;
@@ -67,7 +67,7 @@ export class BaseMonster extends Entity {
         this.findTarget(players);
         if (now - this.lastStateChange > 8000) this.setAIState('idle');
         break;
-      case 'chasing':
+      case 'chasing': {
         const target = this.findPlayerById(players, this.targetId);
         if (!target || target.stats.hp <= 0 || target.dead) {
           this.targetId = null;
@@ -77,6 +77,7 @@ export class BaseMonster extends Entity {
         this.moveTowardsTarget(target, deltaTime);
         if (this.distanceTo(target) <= this.attackRange) this.setAIState('attacking');
         break;
+      }
       case 'attacking': {
         const attackTarget = this.findPlayerById(players, this.targetId);
         if (!attackTarget || attackTarget.stats.hp <= 0 || attackTarget.dead) {
@@ -93,6 +94,9 @@ export class BaseMonster extends Entity {
         if (dist <= this.attackRange && now - this.lastAttackTime > this.attackCooldown) {
           this.attackTarget(attackTarget);
           this.lastAttackTime = now;
+        } else if (dist > this.attackRange) {
+          // Se o alvo saiu do alcance de ataque, volta a perseguir
+          this.setAIState('chasing');
         }
         break;
       }
@@ -169,13 +173,26 @@ export class BaseMonster extends Entity {
   }
 
   attackTarget(target) {
+    if (!target || target.stats.hp <= 0 || target.dead) return;
     if (target && typeof target.takeDamage === 'function') {
-      target.takeDamage(this.stats.damage, this);
+      // Centraliza o cálculo de dano PvE
+      const damage = calculateDamage({
+        attackerAttack: this.stats.damage,
+        defenderDefense: target.stats.defense,
+        isPvE: true
+      });
+      target.takeDamage(damage, this);
+      this.emitDamageEvent(target, damage);
+      this.lastAttackTime = Date.now();
     }
   }
 
   takeDamage(amount, source) {
-    const damageTaken = Math.max(1, amount - (this.stats.defense * 0.5));
+    const damageTaken = calculateDamage({
+      attackerAttack: amount,
+      defenderDefense: this.stats.defense,
+      isPvE: true
+    });
     this.stats.hp -= damageTaken;
     if (source && source.type === 'player') {
       this.targetId = source.id;
@@ -186,9 +203,9 @@ export class BaseMonster extends Entity {
     if (this.stats.hp <= 0) {
       this.stats.hp = 0;
       this.die(source);
-      return true;
+      return damageTaken;
     }
-    return false;
+    return damageTaken;
   }
 
   die(killer) {
@@ -224,7 +241,8 @@ export class BaseMonster extends Entity {
       
       console.log(`XP ajustado para jogador ${killer.id} (nível ${killer.level}): ${adjustedXpReward} (original: ${this.xpReward})`);
       
-      killer.addExperience(adjustedXpReward);
+      // Aplica o multiplicador global de XP
+      killer.addExperience(calculateXpGain(adjustedXpReward));
     }
     if (global.gameWorld) {
       global.gameWorld.monsterDied(this.id);
@@ -245,5 +263,23 @@ export class BaseMonster extends Entity {
       },
       aiState: this.aiState
     };
+  }
+
+  emitDamageEvent(target, damage) {
+    if (!global.server) return;
+    global.server.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
+      sourceId: this.id,
+      sourceType: 'monster',
+      targetId: target.id,
+      targetType: target.type,
+      damage: damage,
+      skillId: null
+    });
+    global.server.emit(EVENTS.COMBAT.FLOATING_TEXT, {
+      targetId: target.id,
+      targetType: target.type,
+      text: `-${damage}`,
+      color: '#ff3333'
+    });
   }
 } 

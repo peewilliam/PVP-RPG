@@ -297,14 +297,13 @@ O sistema de combate do jogo foi implementado seguindo uma arquitetura modular:
 - Try/catch em handlers críticos.
 - Logs descritivos para depuração.
 
-## Padrões de HUD e Sincronização XP
-- HUD central utiliza SVG para borda de XP, com stroke-dasharray para progresso e fundo cinza translúcido sempre visível
-- Sempre sincronizar level, xp, nextLevelXp e name entre servidor e cliente em todos os eventos relevantes
-- Cliente deve atualizar player.userData e HUD imediatamente ao receber eventos do servidor
-- Eventos do servidor (JOINED, EXISTING, MOVED, RESPAWN, LEVEL_UP) devem sempre enviar esses campos
-- Padrão: HUD nunca deve mostrar valores undefined; fallback visual sempre presente
-- Decisão: clareza visual e feedback imediato são prioridade no HUD
-- Padrão: fundo da borda de XP sempre visível, mesmo sem progresso
+## Padrão de Centralização de Progressão, Status e Dano
+- Toda a lógica de XP, level, benefícios por level, multiplicador global de XP, cálculo de dano PvP/PvE, defesa, HP e mana está centralizada no módulo shared/progressionSystem.js.
+- O progressionSystem.js exporta funções utilitárias para cálculo de XP, level, benefícios, dano, defesa, HP, mana e aplicação de bônus por level.
+- O multiplicador global de XP (XP_MULTIPLIER) permite eventos como XP em dobro de forma simples e segura.
+- Todos os eventos de dano (PLAYER.DAMAGE, COMBAT.DAMAGE_DEALT, etc.) transmitem o valor real sofrido pelo alvo, já com defesa, ataque e multiplicadores aplicados.
+- O método takeDamage de jogadores e monstros retorna sempre o valor real do dano sofrido, e esse valor é usado nos eventos enviados ao cliente.
+- O cliente exibe exatamente o valor recebido do servidor, garantindo feedback visual fiel e sem inconsistências.
 
 ## Padrão de nomes localizados na UI
 - Sempre integrar nomes localizados de entidades (monstros, jogadores, etc) na UI usando o campo NAME da configuração.

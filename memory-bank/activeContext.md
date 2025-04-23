@@ -51,6 +51,14 @@
   - Implementado middleware customizado que serve `index.html` da raiz em `/` e `client/index.html` em `/play`, sem duplicação de arquivos.
   - Middleware também faz alias de `/src/*` para `/client/src/*` para garantir que assets funcionem corretamente em ambos os pontos de entrada.
 
+## Mudanças recentes (Centralização e Robustez)
+- Centralização total dos sistemas de XP, level, benefícios por level, multiplicador global de XP, cálculo de dano PvP/PvE, defesa, HP e mana no progressionSystem.js (shared).
+- Todos os eventos de dano agora transmitem o valor real sofrido, garantindo feedback visual fiel ao jogador.
+- IA dos monstros ajustada: zumbi volta a perseguir após atacar se o player fugir.
+- Sistema de morte do player robusto: morre corretamente ao chegar a 0 de HP.
+- Remoção do antigo levelUtils.js e refatoração de monstros para usar o sistema centralizado.
+- Balanceamento de XP e dano agora é feito exclusivamente via progressionSystem.js, facilitando eventos (ex: XP em dobro) e ajustes finos.
+
 ## Próximos passos
 - Refino de tooltips, responsividade mobile, e integração de novas habilidades.
 - Testes de usabilidade e coleta de feedback dos jogadores.

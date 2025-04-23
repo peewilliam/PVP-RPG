@@ -1,6 +1,12 @@
 import { Entity } from './Entity.js';
 import { PLAYER, EVENTS, MONSTERS } from '../../../shared/constants/gameConstants.js';
-import { getXpForLevel } from '../../../shared/utils/levelUtils.js';
+import {
+  getLevelBenefits,
+  calculateXpGain,
+  getNextLevelXp,
+  applyLevelUp,
+  calculateDamage
+} from '../../../shared/progressionSystem.js';
 
 /**
  * Classe que representa um jogador no jogo.
@@ -20,19 +26,20 @@ export class Player extends Entity {
     this.collisionRadius = 0.5;
     
     // Atributos do jogador
+    const benefits = getLevelBenefits(1);
     this.stats = {
-      maxHp: PLAYER.BASE_STATS.HP,
-      hp: PLAYER.BASE_STATS.HP,
-      maxMana: PLAYER.BASE_STATS.MANA,
-      mana: PLAYER.BASE_STATS.MANA,
-      attack: PLAYER.BASE_STATS.ATTACK,
-      defense: PLAYER.BASE_STATS.DEFENSE
+      maxHp: benefits.maxHp,
+      hp: benefits.maxHp,
+      maxMana: benefits.maxMana,
+      mana: benefits.maxMana,
+      attack: benefits.attack,
+      defense: benefits.defense
     };
     
     // Sistema de nível
     this.level = 1;
     this.xp = 0;
-    this.nextLevelXp = getXpForLevel(2); // XP necessário para o próximo nível
+    this.nextLevelXp = getNextLevelXp(0); // XP necessário para o próximo nível (level 1 -> 2)
     
     // Estado de movimento
     this.movementState = {
@@ -204,8 +211,13 @@ export class Player extends Entity {
    * @returns {boolean} - true se o jogador morreu, false caso contrário
    */
   takeDamage(amount, source) {
-    // Cálculo de dano considerando defesa (fórmula básica)
-    const damageTaken = Math.max(1, amount - (this.stats.defense * 0.5));
+    // Cálculo de dano centralizado
+    const damageTaken = calculateDamage({
+      attackerAttack: amount,
+      defenderDefense: this.stats.defense,
+      isPvP: source && source.isPlayer,
+      isPvE: source && !source.isPlayer
+    });
     this.stats.hp -= damageTaken;
     // Envia evento de dano ao cliente
     if (this.channel) {
@@ -219,10 +231,10 @@ export class Player extends Entity {
     // Verifica se o jogador morreu
     if (this.stats.hp <= 0) {
       this.stats.hp = 0;
-      this.die(source); // Chama o novo método die
-      return true; // Jogador morreu
+      this.die(source);
+      return damageTaken;
     }
-    return false; // Jogador ainda vivo
+    return damageTaken;
   }
   
   /**
@@ -240,7 +252,13 @@ export class Player extends Entity {
     // Aplica penalidade
     this.level = Math.max(1, this.level - lostLevel);
     this.xp = Math.max(0, this.xp - lostXP);
-    this.nextLevelXp = getXpForLevel(this.level + 1);
+    this.nextLevelXp = getNextLevelXp(this.level - 1);
+    // Recalcula status para o novo level
+    const benefits = getLevelBenefits(this.level);
+    this.stats.maxHp = benefits.maxHp;
+    this.stats.maxMana = benefits.maxMana;
+    this.stats.attack = benefits.attack;
+    this.stats.defense = benefits.defense;
     // Zera HP e bloqueia regeneração
     this.stats.hp = 0;
     this.stats.mana = 0;
@@ -345,14 +363,13 @@ export class Player extends Entity {
    * @returns {boolean} - true se houve level up, false caso contrário
    */
   addExperience(amount) {
-    this.xp += amount;
-    
+    const xpGanho = calculateXpGain(amount);
+    this.xp += xpGanho;
     // Verifica se há XP suficiente para subir de nível
     if (this.xp >= this.nextLevelXp && this.level < PLAYER.LEVEL_SYSTEM.MAX_LEVEL) {
       this.levelUp();
       return true;
     }
-    
     return false;
   }
   
@@ -360,21 +377,12 @@ export class Player extends Entity {
    * Aumenta o nível do jogador e atualiza seus atributos
    */
   levelUp() {
+    const oldLevel = this.level;
     this.level++;
-    
     // Atualiza XP necessário para o próximo nível
-    this.nextLevelXp = getXpForLevel(this.level + 1);
-    
-    // Aumenta atributos base (exemplo: 10% por nível)
-    const multiplier = 1.1; // 10% de aumento
-    
-    this.stats.maxHp *= multiplier;
-    this.stats.hp = this.stats.maxHp; // Recupera HP totalmente ao subir de nível
-    this.stats.maxMana *= multiplier;
-    this.stats.mana = this.stats.maxMana; // Recupera Mana totalmente ao subir de nível
-    this.stats.attack *= multiplier;
-    this.stats.defense *= multiplier;
-    
+    this.nextLevelXp = getNextLevelXp(this.level - 1);
+    // Aplica benefícios do novo level
+    this.stats = applyLevelUp(oldLevel, this.level, this.stats);
     // Notifica o cliente sobre o level up
     if (this.channel) {
       this.channel.emit(EVENTS.PLAYER.LEVEL_UP, {
@@ -393,21 +401,19 @@ export class Player extends Entity {
   resetAfterDeath() {
     // Reseta nível para 1
     this.level = 1;
-    
     // Zera a experiência
     this.xp = 0;
-    this.nextLevelXp = getXpForLevel(2);
-    
+    this.nextLevelXp = getNextLevelXp(0);
     // Restaura estatísticas base
+    const benefits = getLevelBenefits(1);
     this.stats = {
-      maxHp: PLAYER.BASE_STATS.HP,
-      hp: PLAYER.BASE_STATS.HP,
-      maxMana: PLAYER.BASE_STATS.MANA,
-      mana: PLAYER.BASE_STATS.MANA,
-      attack: PLAYER.BASE_STATS.ATTACK,
-      defense: PLAYER.BASE_STATS.DEFENSE
+      maxHp: benefits.maxHp,
+      hp: benefits.maxHp,
+      maxMana: benefits.maxMana,
+      mana: benefits.maxMana,
+      attack: benefits.attack,
+      defense: benefits.defense
     };
-    
     // Reseta cooldowns de habilidades
     this.abilityCooldowns = {
       1: 0,
@@ -415,10 +421,8 @@ export class Player extends Entity {
       3: 0,
       4: 0
     };
-    
     // Reseta modificadores de velocidade
     this.speedModifier = 1.0;
-    
     console.log(`Jogador ${this.id} resetado após morte`);
   }
   

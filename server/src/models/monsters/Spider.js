@@ -22,6 +22,7 @@ import { BaseMonster } from './BaseMonster.js';
 import { webShotSkill } from '../skills/WebShotSkill.js';
 import { spiderLeapSkill } from '../skills/SpiderLeapSkill.js';
 import { EVENTS } from '../../../../shared/constants/gameConstants.js';
+import { calculateDamage } from '../../../../shared/progressionSystem.js';
 
 export class Spider extends BaseMonster {
   constructor(id, position = { x: 0, y: 0, z: 0 }, level = 1) {
@@ -92,8 +93,12 @@ export class Spider extends BaseMonster {
         global.gameWorld.applyAreaDamage({
           source: this,
           position: { x: this.position.x, y: 0, z: this.position.z },
-          radius: 2.5,
-          damage: Math.floor(this.stats.damage * 1.2),
+          radius: 5,
+          damageFn: (target) => calculateDamage({
+            attackerAttack: Math.floor(this.stats.damage * 1.2),
+            defenderDefense: target.stats.defense,
+            isPvE: true
+          }),
           type: 'leap',
           color: '#ff3333',
           floatingText: 'Impacto!'
@@ -136,105 +141,123 @@ export class Spider extends BaseMonster {
     const now = Date.now();
     const target = this.findPlayerById(players, this.targetId);
 
-    if (target) {
-      const dist = this.distanceTo(target);
+    if (!target || target.stats.hp <= 0 || target.dead) {
+      this.targetId = null;
+      this.setAIState('idle');
+      this.findTarget(players);
+      return;
+    }
 
-      if (dist > this.attackRange * 1.2 && dist <= this.maxLeapDistance && now - this.lastLeap > this.leapCooldown) {
-        this.lastLeap = now;
-        this.isLeaping = true;
-        this.leapStartTime = Date.now();
-        this.leapStartPos = { x: this.position.x, y: this.position.y, z: this.position.z };
+    const dist = this.distanceTo(target);
 
-        const angle = Math.random() * Math.PI * 2;
-        const jumpRadius = this.attackRange * 0.8;
-        this.leapEndPos = {
-          x: target.position.x + Math.cos(angle) * jumpRadius,
-          y: 0,
-          z: target.position.z + Math.sin(angle) * jumpRadius
-        };
+    if (dist > this.aggroRange) {
+      this.targetId = null;
+      this.setAIState('idle');
+      return;
+    }
 
-        this.leapTargetId = target.id;
-        if (global.server) {
-          try {
-            global.server.emit('monster:spiderLeap', {
-              sourceId: this.id,
-              targetPos: {
-                x: this.leapEndPos.x,
-                y: 0,
-                z: this.leapEndPos.z
-              }
-            });
-            console.log(`Spider ${this.id} usou spiderLeap para (${this.leapEndPos.x}, ${this.leapEndPos.z})`);
-          } catch (error) {
-            console.error('Erro ao emitir evento spiderLeap:', error);
-          }
+    if (this.aiState === 'idle') {
+      this.findTarget(players);
+    }
+    if (this.aiState === 'patrolling') {
+      this.findTarget(players);
+    }
+
+    if (dist > this.attackRange * 1.2 && dist <= this.maxLeapDistance && now - this.lastLeap > this.leapCooldown) {
+      this.lastLeap = now;
+      this.isLeaping = true;
+      this.leapStartTime = Date.now();
+      this.leapStartPos = { x: this.position.x, y: this.position.y, z: this.position.z };
+
+      const angle = Math.random() * Math.PI * 2;
+      const jumpRadius = this.attackRange * 0.8;
+      this.leapEndPos = {
+        x: target.position.x + Math.cos(angle) * jumpRadius,
+        y: 0,
+        z: target.position.z + Math.sin(angle) * jumpRadius
+      };
+
+      this.leapTargetId = target.id;
+      if (global.server) {
+        try {
+          global.server.emit('monster:spiderLeap', {
+            sourceId: this.id,
+            targetPos: {
+              x: this.leapEndPos.x,
+              y: 0,
+              z: this.leapEndPos.z
+            }
+          });
+          console.log(`Spider ${this.id} usou spiderLeap para (${this.leapEndPos.x}, ${this.leapEndPos.z})`);
+        } catch (error) {
+          console.error('Erro ao emitir evento spiderLeap:', error);
         }
-        return;
+      }
+      return;
+    }
+
+    if (dist <= this.attackRange) {
+      if (this.attackPositionAngle === null) {
+        this.attackPositionAngle = Math.random() * Math.PI * 2;
+        this.attackStationaryTime = now;
       }
 
-      if (dist <= this.attackRange) {
-        if (this.attackPositionAngle === null) {
+      const idealDistance = this.attackRange * 0.7;
+      const idealX = target.position.x + Math.cos(this.attackPositionAngle) * idealDistance;
+      const idealZ = target.position.z + Math.sin(this.attackPositionAngle) * idealDistance;
+
+      const dxIdeal = idealX - this.position.x;
+      const dzIdeal = idealZ - this.position.z;
+      const distToIdeal = Math.sqrt(dxIdeal * dxIdeal + dzIdeal * dzIdeal);
+
+      if (distToIdeal > 0.5) {
+        const moveSpeed = this.moveSpeed * 0.6;
+        this.velocity.x = (dxIdeal / distToIdeal) * moveSpeed;
+        this.velocity.z = (dzIdeal / distToIdeal) * moveSpeed;
+      } else {
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+        this.attackTarget(target);
+
+        if (now - this.lastWebShot > this.webShotCooldown) {
+          webShotSkill(this, target, null);
+          this.lastWebShot = now;
+
+          if (global.server) {
+            try {
+              global.server.emit('monster:webShot', {
+                sourceId: this.id,
+                targetId: target.id,
+                targetType: target.type
+              });
+              console.log(`Spider ${this.id} usou webShot em ${target.id}`);
+            } catch (error) {
+              console.error('Erro ao emitir evento webShot:', error);
+            }
+          }
+        }
+
+        if (now - this.attackStationaryTime > 5000 + Math.random() * 3000) {
           this.attackPositionAngle = Math.random() * Math.PI * 2;
           this.attackStationaryTime = now;
         }
-
-        const idealDistance = this.attackRange * 0.7;
-        const idealX = target.position.x + Math.cos(this.attackPositionAngle) * idealDistance;
-        const idealZ = target.position.z + Math.sin(this.attackPositionAngle) * idealDistance;
-
-        const dxIdeal = idealX - this.position.x;
-        const dzIdeal = idealZ - this.position.z;
-        const distToIdeal = Math.sqrt(dxIdeal * dxIdeal + dzIdeal * dzIdeal);
-
-        if (distToIdeal > 0.5) {
-          const moveSpeed = this.moveSpeed * 0.6;
-          this.velocity.x = (dxIdeal / distToIdeal) * moveSpeed;
-          this.velocity.z = (dzIdeal / distToIdeal) * moveSpeed;
-        } else {
-          this.velocity.x = 0;
-          this.velocity.z = 0;
-          this.attackTarget(target);
-
-          if (now - this.lastWebShot > this.webShotCooldown) {
-            webShotSkill(this, target, null);
-            this.lastWebShot = now;
-
-            if (global.server) {
-              try {
-                global.server.emit('monster:webShot', {
-                  sourceId: this.id,
-                  targetId: target.id,
-                  targetType: target.type
-                });
-                console.log(`Spider ${this.id} usou webShot em ${target.id}`);
-              } catch (error) {
-                console.error('Erro ao emitir evento webShot:', error);
-              }
-            }
-          }
-
-          if (now - this.attackStationaryTime > 5000 + Math.random() * 3000) {
-            this.attackPositionAngle = Math.random() * Math.PI * 2;
-            this.attackStationaryTime = now;
-          }
-        }
-
-        this.lookAt(target.position);
-        return;
       }
 
-      if (dist <= this.aggroRange) {
-        this.attackPositionAngle = null;
+      this.lookAt(target.position);
+      return;
+    }
 
-        const dx = target.position.x - this.position.x;
-        const dz = target.position.z - this.position.z;
-        const length = Math.sqrt(dx * dx + dz * dz);
+    if (dist <= this.aggroRange) {
+      this.attackPositionAngle = null;
 
-        this.velocity.x = (dx / length) * this.moveSpeed;
-        this.velocity.z = (dz / length) * this.moveSpeed;
-        this.lookAt(target.position);
-        return;
-      }
+      const dx = target.position.x - this.position.x;
+      const dz = target.position.z - this.position.z;
+      const length = Math.sqrt(dx * dx + dz * dz);
+
+      this.velocity.x = (dx / length) * this.moveSpeed;
+      this.velocity.z = (dz / length) * this.moveSpeed;
+      this.lookAt(target.position);
+      return;
     }
 
     this.attackPositionAngle = null;
@@ -245,9 +268,15 @@ export class Spider extends BaseMonster {
     const now = Date.now();
     if (now - this.lastAttackTime < this.attackCooldown) return;
 
+    if (!target || target.stats.hp <= 0 || target.dead) return;
     if (target && typeof target.takeDamage === 'function') {
-      target.takeDamage(this.stats.damage, this);
-      this.emitDamageEvent(target, this.stats.damage);
+      const damage = calculateDamage({
+        attackerAttack: this.stats.damage,
+        defenderDefense: target.stats.defense,
+        isPvE: true
+      });
+      target.takeDamage(damage, this);
+      this.emitDamageEvent(target, damage);
       this.lastAttackTime = now;
     }
   }

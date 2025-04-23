@@ -226,16 +226,16 @@ export class CombatSystem {
         console.log(`Aplicando dano de ${damage} ao ${entityType} ${entity.id} (HP atual: ${entity.stats.hp})`);
         
         // Aplica o dano à entidade
-        const died = entity.takeDamage(damage, source);
+        const realDamage = entity.takeDamage(damage, source);
         
-        console.log(`Após dano: ${entityType} ${entity.id} HP: ${entity.stats.hp}, Morreu: ${died}`);
+        console.log(`Após dano: ${entityType} ${entity.id} HP: ${entity.stats.hp}, Morreu: ${realDamage <= 0}`);
         
         // Registra o resultado do ataque
         result.hits.push({
           id: entity.id,
           type: entityType,
-          damage: damage,
-          died: died,
+          damage: realDamage,
+          died: realDamage <= 0,
           position: { ...entity.position }
         });
         
@@ -303,16 +303,16 @@ export class CombatSystem {
         console.log(`Aplicando dano de área de ${damage} ao ${entityType} ${entity.id} (HP atual: ${entity.stats.hp})`);
         
         // Aplica o dano à entidade
-        const died = entity.takeDamage(damage, source);
+        const realDamage = entity.takeDamage(damage, source);
         
-        console.log(`Após dano de área: ${entityType} ${entity.id} HP: ${entity.stats.hp}, Morreu: ${died}`);
+        console.log(`Após dano de área: ${entityType} ${entity.id} HP: ${entity.stats.hp}, Morreu: ${realDamage <= 0}`);
         
         // Registra o resultado do ataque
         result.hits.push({
           id: entity.id,
           type: entityType,
-          damage: damage,
-          died: died,
+          damage: realDamage,
+          died: realDamage <= 0,
           position: { ...entity.position }
         });
       }
@@ -355,8 +355,8 @@ export class CombatSystem {
           console.log(`[COLISAO] Projétil ${id} colidiu com monstro ${monster.id}`);
           // Aplica dano
           const damage = projectile.ability.DAMAGE;
-          const died = monster.takeDamage(damage, projectile.owner);
-          console.log(`[DANO] Aplicado ${damage} ao monstro ${monster.id} (morreu=${died})`);
+          const realDamage = monster.takeDamage(damage, projectile.owner);
+          console.log(`[DANO] Aplicado ${damage} ao monstro ${monster.id} (morreu=${realDamage <= 0})`);
           // Feedback visual: emitir evento de dano para TODOS os jogadores conectados
           for (const player of this.entityManager.players.values()) {
             if (player.channel) {
@@ -364,8 +364,8 @@ export class CombatSystem {
                 targetId: monster.id,
                 targetType: 'monster',
                 targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
-                damage,
-                died,
+                damage: realDamage,
+                died: realDamage <= 0,
                 position: { ...monster.position }
               });
             }
@@ -388,8 +388,8 @@ export class CombatSystem {
           console.log(`[COLISAO] Projétil ${id} colidiu com jogador ${player.id}`);
           // Aplica dano PvP
           const damage = Math.round(projectile.ability.DAMAGE * (this.damageMultipliers.player.player || 1.0));
-          const died = player.takeDamage(damage, projectile.owner);
-          console.log(`[DANO] Aplicado ${damage} ao jogador ${player.id} (morreu=${died})`);
+          const realDamage = player.takeDamage(damage, projectile.owner);
+          console.log(`[DANO] Aplicado ${damage} ao jogador ${player.id} (morreu=${realDamage <= 0})`);
           // Feedback visual: emitir evento de dano para o lançador
           if (projectile.owner && projectile.owner.channel) {
             projectile.owner.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
@@ -399,8 +399,8 @@ export class CombatSystem {
               targetId: player.id,
               targetType: 'player',
               targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-              damage,
-              died,
+              damage: realDamage,
+              died: realDamage <= 0,
               position: { ...player.position }
             });
             console.log(`[EVENTO] DAMAGE_DEALT emitido para lançador ${projectile.owner.id}`);
@@ -411,8 +411,8 @@ export class CombatSystem {
               targetId: player.id,
               targetType: 'player',
               targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-              damage,
-              died,
+              damage: realDamage,
+              died: realDamage <= 0,
               position: { ...player.position }
             });
             console.log(`[EVENTO] DAMAGE_DEALT emitido para alvo ${player.id}`);
@@ -446,7 +446,7 @@ export class CombatSystem {
           );
           if (dist <= zone.radius && !zone.alreadyHit.has(monster.id)) {
             const damage = zone.damage;
-            const died = monster.takeDamage(damage, zone.owner);
+            const realDamage = monster.takeDamage(damage, zone.owner);
             zone.alreadyHit.add(monster.id);
             hits++;
             // Aplica lentidão se for Frost Spikes
@@ -477,8 +477,8 @@ export class CombatSystem {
                   targetId: monster.id,
                   targetType: 'monster',
                   targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
-                  damage,
-                  died,
+                  damage: realDamage,
+                  died: realDamage <= 0,
                   position: { ...monster.position }
                 });
               }
@@ -494,7 +494,7 @@ export class CombatSystem {
           );
           if (dist <= zone.radius && !zone.alreadyHit.has(player.id)) {
             const damage = Math.round(zone.damage * (this.damageMultipliers.player.player || 1.0));
-            const died = player.takeDamage(damage, zone.owner);
+            const realDamage = player.takeDamage(damage, zone.owner);
             zone.alreadyHit.add(player.id);
             hits++;
             // Depuração: logar valores antes de aplicar slow
@@ -527,8 +527,8 @@ export class CombatSystem {
                   targetId: player.id,
                   targetType: 'player',
                   targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-                  damage,
-                  died,
+                  damage: realDamage,
+                  died: realDamage <= 0,
                   position: { ...player.position }
                 });
               }

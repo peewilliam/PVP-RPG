@@ -372,4 +372,17 @@ O sistema atual representa uma base sólida para futuras otimizações, com foco
 - [ ] Documentar exemplos de uso do script para designers e devs
 
 ## Status atual
-- O sistema de progressão e XP está totalmente auditável e simulável via script, facilitando ajustes e previsões realistas para o MMORPG. 
+- O sistema de progressão e XP está totalmente auditável e simulável via script, facilitando ajustes e previsões realistas para o MMORPG.
+
+## Concluído recentemente
+- Centralização de XP, level, benefícios por level, multiplicador global, cálculo de dano PvP/PvE, defesa, HP e mana no progressionSystem.js.
+- Todos os eventos de dano agora transmitem o valor real sofrido (após defesa, ataque, multiplicadores), garantindo feedback visual fiel ao jogador.
+- IA dos monstros (zumbi) ajustada: volta a perseguir após atacar se o player fugir.
+- Sistema de morte do player robusto: morre corretamente ao chegar a 0 de HP.
+- Remoção do levelUtils.js e refatoração de monstros para usar o sistema centralizado.
+- Balanceamento de XP e dano agora é feito exclusivamente via progressionSystem.js.
+
+## Observações sobre balanceamento
+- Para ajustar XP, dano, defesa, HP, mana e benefícios por level, altere progressionSystem.js.
+- Para eventos de XP em dobro, basta alterar XP_MULTIPLIER.
+- O valor exibido de dano no cliente é sempre o real sofrido pelo alvo. 

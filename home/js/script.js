@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
       }
       
-      alert('Sistema de cadastro em desenvolvimento!');
+      window.location.href = '/play';
     });
   }
 }); 

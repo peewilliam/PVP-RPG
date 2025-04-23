@@ -199,4 +199,9 @@ Implementamos um sistema avançado de otimização de rede que resolve problemas
 - Middleware customizado intercepta `/play` e serve `client/index.html` (SPA do jogo), enquanto `/` serve o `index.html` da raiz normalmente.
 - Alias de `/src/*` para `/client/src/*` garante que assets JS/CSS funcionem sem alterar caminhos no HTML.
 - Essa abordagem evita duplicação de arquivos, mantém o build limpo e permite roteamento flexível.
-- Motivo: Permitir múltiplos pontos de entrada reais, sem gambiarras, mantendo a arquitetura limpa e fácil de manter. 
+- Motivo: Permitir múltiplos pontos de entrada reais, sem gambiarras, mantendo a arquitetura limpa e fácil de manter.
+
+## Balanceamento Centralizado
+- O arquivo shared/progressionSystem.js é o ponto único de configuração e ajuste de XP, level, benefícios por level, multiplicador global de XP, dano PvP/PvE, defesa, HP e mana.
+- Para eventos de XP em dobro, basta alterar XP_MULTIPLIER no progressionSystem.js.
+- Todo o balanceamento de progressão e combate deve ser feito nesse arquivo para garantir consistência e facilidade de manutenção. 
