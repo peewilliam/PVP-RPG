@@ -256,4 +256,13 @@
 # Padrão de exibição de nomes na UI
 - Sempre exibir nomes de monstros e entidades na UI usando o campo NAME localizado da configuração, nunca o identificador interno/código.
 - Garantir localização e clareza para o jogador.
-- Exemplo: 'Zumbi da Névoa Negra' para BLACK_MIST_ZOMBIE. 
+- Exemplo: 'Zumbi da Névoa Negra' para BLACK_MIST_ZOMBIE.
+
+## Padrão: Multi-Entry Vite com Middleware Customizado
+- Quando o projeto exige múltiplos pontos de entrada (ex: landing page institucional e SPA do jogo), usar Vite com root na raiz do projeto.
+- Implementar plugin/middleware customizado no Vite para:
+  - Servir `index.html` da raiz em `/` (landing page, institucional, etc)
+  - Servir `client/index.html` em `/play` (SPA do jogo)
+  - Middleware faz alias de `/src/*` para `/client/src/*` para garantir que assets JS/CSS funcionem sem alterar caminhos no HTML
+- Não duplicar arquivos nem criar gambiarras; manter build limpo e roteamento flexível.
+- Documentar sempre que esse padrão for adotado, incluindo exemplos de configuração e motivação. 

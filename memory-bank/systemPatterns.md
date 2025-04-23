@@ -695,3 +695,15 @@ Além do sistema de otimização de rede, o projeto implementa várias estratég
 
 ## Observações
 - Esse padrão facilita o ajuste fino do balanceamento, a comunicação entre devs/designers e a manutenção do projeto a longo prazo.
+
+### Multi-Entry Vite com Middleware
+- Quando o frontend precisa servir diferentes SPAs ou páginas em rotas distintas (ex: landing page em `/` e jogo em `/play`), usar Vite com root na raiz do projeto.
+- Implementar middleware customizado que:
+  - Serve `index.html` da raiz em `/`
+  - Serve `client/index.html` em `/play`
+  - Faz alias de `/src/*` para `/client/src/*` para garantir que assets funcionem sem alterar caminhos no HTML
+- Não duplicar arquivos nem criar projetos separados; manter build limpo e roteamento flexível.
+- Exemplo de configuração:
+  - Plugin Vite com `configureServer` interceptando `/play` e servindo o HTML correto
+  - Middleware para alias de assets
+- Motivo: Permite múltiplos pontos de entrada reais, sem gambiarras, mantendo a arquitetura limpa e fácil de manter.

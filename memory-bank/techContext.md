@@ -192,4 +192,11 @@ Implementamos um sistema avançado de otimização de rede que resolve problemas
 - Cliente atualiza player.userData e HUD imediatamente ao receber eventos
 - Padrão: fallback visual sempre presente no HUD para evitar valores undefined ou sensação de vazio
 - Decisão: clareza visual e feedback imediato são prioridades técnicas para UX
-- UI sempre usa o campo NAME da configuração do monstro para exibição, nunca o identificador/código. Padrão de localização e clareza implementado. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'. 
+- UI sempre usa o campo NAME da configuração do monstro para exibição, nunca o identificador/código. Padrão de localização e clareza implementado. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.
+
+## Configuração Avançada: Multi-Entry Vite com Middleware
+- Para servir diferentes páginas/SPA em rotas distintas (ex: landing page em `/` e jogo em `/play`), o projeto utiliza Vite com root na raiz.
+- Middleware customizado intercepta `/play` e serve `client/index.html` (SPA do jogo), enquanto `/` serve o `index.html` da raiz normalmente.
+- Alias de `/src/*` para `/client/src/*` garante que assets JS/CSS funcionem sem alterar caminhos no HTML.
+- Essa abordagem evita duplicação de arquivos, mantém o build limpo e permite roteamento flexível.
+- Motivo: Permitir múltiplos pontos de entrada reais, sem gambiarras, mantendo a arquitetura limpa e fácil de manter. 

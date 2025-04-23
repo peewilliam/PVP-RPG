@@ -47,6 +47,9 @@
   - **Compressão de Dados**: Sistema global que compacta mensagens grandes (>500 bytes) usando zlib no servidor e pako no cliente.
   - **Monitoramento**: Logs detalhados com tamanho original/compactado dos pacotes e estatísticas de economia de banda.
   - Redução total de ~95% no tráfego de rede, eliminando problemas de latência e erro de `maxMessageSize exceeded`.
+- **Configuração avançada do Vite para múltiplos pontos de entrada:**
+  - Implementado middleware customizado que serve `index.html` da raiz em `/` e `client/index.html` em `/play`, sem duplicação de arquivos.
+  - Middleware também faz alias de `/src/*` para `/client/src/*` para garantir que assets funcionem corretamente em ambos os pontos de entrada.
 
 ## Próximos passos
 - Refino de tooltips, responsividade mobile, e integração de novas habilidades.
@@ -101,6 +104,10 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - ✅ Decisão: UI agora exibe nomes localizados de monstros (campo NAME), nunca o identificador interno. Mudança melhora clareza, localização e experiência do usuário. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.
 - ✅ **Sistema de nomes flutuantes para monstros:** visual MMORPG, responsivo, centralizado, nome pt-br, integração total ao ciclo de animação.
 - ✅ **Sistema avançado de otimização de rede:** delta updates, compressão, e envio seletivo implementados com sucesso, resultando em 95% de redução no tráfego e eliminação dos problemas de latência.
+- **Frontend agora suporta múltiplos pontos de entrada via Vite:**
+  - `/` serve o index.html raiz (landing page, institucional, etc)
+  - `/play` serve o client/index.html (SPA do jogo)
+  - Middleware customizado garante assets corretos e roteamento limpo, sem gambiarras ou duplicação de arquivos.
 
 ## Próximos Passos
 - Refinar efeitos visuais das habilidades
@@ -124,6 +131,10 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
 - **Sistema de nomes flutuantes integrado ao ciclo de animação e presenters.**
 - **Otimização de rede como prioridade para garantir experiência fluida mesmo em conexões mais lentas.**
 - **Compressão adaptativa baseada no tamanho do payload para equilibrar uso de CPU e banda.**
+- **Frontend agora suporta múltiplos pontos de entrada via Vite:**
+  - `/` serve o index.html raiz (landing page, institucional, etc)
+  - `/play` serve o client/index.html (SPA do jogo)
+  - Middleware customizado garante assets corretos e roteamento limpo, sem gambiarras ou duplicação de arquivos.
 
 # Contexto Ativo do PVP-RPG
 

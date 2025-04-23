@@ -52,6 +52,10 @@
 - ✅ **Script de simulação de XP (test-xp.js) integrado com gameConstants.js**: permite prever, balancear e simular o progresso de níveis, grind, quests e impacto de cada monstro real do jogo.
 - ✅ Simulações de quests, grind, tempo estimado para upar e comparação de monstros reais disponíveis.
 - ✅ Ferramenta essencial para ajuste fino do balanceamento de XP e progressão.
+- ✅ **Configuração avançada do Vite para múltiplos pontos de entrada:**
+  - Middleware customizado serve `index.html` da raiz em `/` e `client/index.html` em `/play`.
+  - Alias de `/src/*` para `/client/src/*` garante assets corretos sem alterar caminhos no HTML.
+  - Solução sem duplicação de arquivos, mantendo build limpo e roteamento flexível.
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens
@@ -70,6 +74,11 @@
 O mundo do jogo está organizado em biomas distintos, com distribuição balanceada de árvores, rochas e arbustos, evitando sobreposição. O sistema de combate está totalmente funcional, com quatro habilidades implementadas e testadas. O cliente exibe FPS e ping em tempo real na interface, facilitando o monitoramento de performance. A HUD do alvo agora é responsiva, localizada e sincronizada, e o painel visual permite calibrar o visual do jogo em tempo real. 
 
 O sistema de otimização de rede recentemente implementado resolveu problemas críticos de latência e uso excessivo de banda, proporcionando uma experiência de jogo fluida mesmo com centenas de entidades e em conexões mais lentas. As métricas iniciais mostram redução de ~95% no tráfego de rede, diminuição de 35% na latência média e aumento de capacidade de entidades simultâneas de aproximadamente 100 para mais de 300.
+
+Agora o frontend suporta múltiplos pontos de entrada via Vite:
+  - `/` serve o index.html raiz (landing page, institucional, etc)
+  - `/play` serve o client/index.html (SPA do jogo)
+  - Middleware customizado e alias de assets garantem funcionamento correto sem gambiarras.
 
 ## Próximos Marcos
 - Sistema de inventário e equipamentos
