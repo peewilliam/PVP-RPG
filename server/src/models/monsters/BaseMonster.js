@@ -209,6 +209,7 @@ export class BaseMonster extends Entity {
   }
 
   die(killer) {
+    console.log(`[SERVER] [DIE] Monstro ${this.id} morreu. HP final: ${this.stats.hp}. Killer: ${killer ? killer.id : 'N/A'}`);
     this.active = false;
     this.velocity.x = 0;
     this.velocity.z = 0;
@@ -244,11 +245,40 @@ export class BaseMonster extends Entity {
       // Aplica o multiplicador global de XP
       killer.addExperience(calculateXpGain(adjustedXpReward));
     }
-    if (global.gameWorld) {
-      global.gameWorld.monsterDied(this.id);
-      console.log(`Monstro ${this.id} morreu e foi agendado para respawn`);
+    if (global.server) {
+      let emitted = false;
+      // Preferencialmente, emitir para todos os canais conectados
+      if (global.server.channels && typeof global.server.channels.values === 'function') {
+        for (const channel of global.server.channels.values()) {
+          channel.emit(EVENTS.MONSTER.DEATH, { id: this.id });
+          console.log(`[SERVER] [DIE] Evento EVENTS.MONSTER.DEATH emitido via global.server.channels (monstro ${this.id})`);
+          emitted = true;
+        }
+      }
+      // Fallback para gameWorld/entityManager
+      else if (global.gameWorld && global.gameWorld.entityManager && global.gameWorld.entityManager.players) {
+        for (const player of global.gameWorld.entityManager.players.values()) {
+          if (player.channel) {
+            player.channel.emit(EVENTS.MONSTER.DEATH, { id: this.id });
+            console.log(`[SERVER] [DIE] Evento EVENTS.MONSTER.DEATH emitido para player ${player.id} (monstro ${this.id})`);
+            emitted = true;
+          }
+        }
+      }
+      if (!emitted) {
+        console.error('[SERVER] [DIE] Nenhum canal ou gameWorld disponível para emitir evento de morte do monstro!');
+      }
+      // Delay de 50ms para garantir que a HUD do alvo seja atualizada antes da remoção
+      setTimeout(() => {
+        console.log(`[SERVER] [DIE] Chamando monsterDied para ${this.id}`);
+        if (global.gameWorld) {
+          global.gameWorld.monsterDied(this.id);
+        } else {
+          console.error(`[SERVER] [DIE] Erro ao agendar respawn do monstro ${this.id}: gameWorld não encontrado`);
+        }
+      }, 50);
     } else {
-      console.error(`Erro ao agendar respawn do monstro ${this.id}: gameWorld não encontrado`);
+      console.error(`[SERVER] [DIE] Erro: global.server não está definido!`);
     }
   }
 

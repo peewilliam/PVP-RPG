@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
   patchSidebar.innerHTML = `
     <div class="patchnote-title">Patch Notes</div>
     <ul class="patchnote-list">
-      ${patchNotes.map((p, i) => `<li data-patch="${p.id}" tabindex="0">${p.title}</li>`).join('')}
+      ${patchNotes.slice().reverse().map((p, i) => `<li data-patch="${p.id}" tabindex="0">${p.title}</li>`).join('')}
     </ul>
     <button class="patchnote-all-btn">Ver todos os patch notes</button>
   `;
@@ -147,10 +147,11 @@ document.addEventListener('DOMContentLoaded', function() {
   document.body.appendChild(patchModalOverlay);
 
   function openPatchModal(selectedId = null) {
+    const reversedNotes = patchNotes.slice().reverse();
     patchModal.innerHTML = `
       <button class="patchnote-modal-close">&times;</button>
       <div class="patchnote-modal-content">
-        ${patchNotes.map(p => `
+        ${reversedNotes.map(p => `
           <div id="${p.id}" class="patchnote-block${selectedId === p.id ? ' selected' : ''}">
             <h3>${p.title}</h3>
             <p>${p.content}</p>

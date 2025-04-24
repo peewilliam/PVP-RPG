@@ -29,6 +29,8 @@ const io = geckos({
   }
 });
 
+global.server = io; // Torna o servidor acessível globalmente
+
 // Inicializa o mundo do jogo
 const gameWorld = new GameWorld();
 

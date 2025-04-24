@@ -1804,12 +1804,37 @@ function initServerEvents() {
 
   // Evento de morte de monstro
   channel.on(EVENTS.MONSTER.DEATH, data => {
+    console.log('[CLIENT] [EVENTS.MONSTER.DEATH] Recebido para monstro:', data && data.id);
     if (!data || !data.id) return;
     const mesh = monsterPresenter.getMonster(data.id);
-    if (mesh) applyGrayDeathEffect(mesh);
+    if (mesh) {
+      console.log('[CLIENT] [applyGrayDeathEffect] Aplicando efeito cinza ao monstro:', data.id);
+      applyGrayDeathEffect(mesh);
+    } else {
+      console.warn('[CLIENT] [applyGrayDeathEffect] Mesh do monstro não encontrado:', data.id);
+    }
+    // Se o monstro morto for o alvo selecionado, atualizar HUD para vida 0
+    if (selectedTargetId === data.id && selectedTargetType === 'monster') {
+      const targetData = monsterPresenter.getMonsterData(data.id);
+      if (targetData) {
+        targetData.stats = targetData.stats || {};
+        targetData.stats.hp = 0;
+        console.log('[CLIENT] [HUD] Atualizando HUD do alvo para vida 0 do monstro:', data.id);
+        updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
+      }
+    }
     // Remove o corpo do monstro após um curto delay (para animações)
     setTimeout(() => {
+      console.log('[CLIENT] [removeMonster] Removendo monstro:', data.id);
       monsterPresenter.removeMonster(data.id);
+      // Se o monstro removido era o alvo selecionado, limpar HUD
+      if (selectedTargetId === data.id && selectedTargetType === 'monster') {
+        selectedTargetId = null;
+        selectedTargetType = null;
+        updateTargetHUD(null);
+        highlightTarget(null);
+        console.log('[CLIENT] [HUD] HUD do alvo limpa após remoção do monstro:', data.id);
+      }
     }, 2000); // 2 segundos de delay para mostrar animação de morte
   });
   
@@ -2146,15 +2171,31 @@ let isPlayerDead = false;
 // Função utilitária para aplicar efeito cinza/translúcido
 function applyGrayDeathEffect(mesh) {
   if (!mesh) return;
-  if (mesh.material) {
-    mesh.material.color.set(0x888888);
-    mesh.material.opacity = 0.5;
-    mesh.material.transparent = true;
+  // Função recursiva para aplicar efeito em todos os materiais
+  function applyToAllMaterials(obj) {
+    if (obj.material) {
+      if (Array.isArray(obj.material)) {
+        obj.material.forEach(mat => {
+          mat.color.set(0x888888);
+          mat.opacity = 0.5;
+          mat.transparent = true;
+        });
+      } else {
+        obj.material.color.set(0x888888);
+        obj.material.opacity = 0.5;
+        obj.material.transparent = true;
+      }
+    }
+    if (obj.children && obj.children.length > 0) {
+      obj.children.forEach(child => applyToAllMaterials(child));
+    }
   }
+  applyToAllMaterials(mesh);
   mesh.userData._wasGray = true;
   // Deitar o corpo
   mesh.rotation.x = Math.PI / 2;
   mesh.position.y = 0.1;
+  console.log('[CLIENT] [applyGrayDeathEffect] Efeito cinza aplicado ao mesh:', mesh.userData.id);
 }
 
 // Função utilitária para restaurar cor original
@@ -2211,12 +2252,37 @@ channel.on(EVENTS.PLAYER.RESPAWN, data => {
 
 // Handler de morte de monstro
 channel.on(EVENTS.MONSTER.DEATH, data => {
+  console.log('[CLIENT] [EVENTS.MONSTER.DEATH] Recebido para monstro:', data && data.id);
   if (!data || !data.id) return;
   const mesh = monsterPresenter.getMonster(data.id);
-  if (mesh) applyGrayDeathEffect(mesh);
+  if (mesh) {
+    console.log('[CLIENT] [applyGrayDeathEffect] Aplicando efeito cinza ao monstro:', data.id);
+    applyGrayDeathEffect(mesh);
+  } else {
+    console.warn('[CLIENT] [applyGrayDeathEffect] Mesh do monstro não encontrado:', data.id);
+  }
+  // Se o monstro morto for o alvo selecionado, atualizar HUD para vida 0
+  if (selectedTargetId === data.id && selectedTargetType === 'monster') {
+    const targetData = monsterPresenter.getMonsterData(data.id);
+    if (targetData) {
+      targetData.stats = targetData.stats || {};
+      targetData.stats.hp = 0;
+      console.log('[CLIENT] [HUD] Atualizando HUD do alvo para vida 0 do monstro:', data.id);
+      updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
+    }
+  }
   // Remove o corpo do monstro após um curto delay (para animações)
   setTimeout(() => {
+    console.log('[CLIENT] [removeMonster] Removendo monstro:', data.id);
     monsterPresenter.removeMonster(data.id);
+    // Se o monstro removido era o alvo selecionado, limpar HUD
+    if (selectedTargetId === data.id && selectedTargetType === 'monster') {
+      selectedTargetId = null;
+      selectedTargetType = null;
+      updateTargetHUD(null);
+      highlightTarget(null);
+      console.log('[CLIENT] [HUD] HUD do alvo limpa após remoção do monstro:', data.id);
+    }
   }, 2000); // 2 segundos de delay para mostrar animação de morte
 });
 
@@ -2228,4 +2294,30 @@ function blockDeadInputs(e) {
     e.preventDefault();
     return false;
   }
+}
+
+// Ao selecionar um alvo, impedir seleção de monstros mortos/removidos
+function selectTarget(id, type) {
+  console.log('[CLIENT] [selectTarget] Tentando selecionar alvo:', id, type);
+  if (type === 'monster') {
+    const mesh = monsterPresenter.getMonster(id);
+    if (!mesh) {
+      console.warn('[CLIENT] [selectTarget] Monstro não existe mais:', id);
+      selectedTargetId = null;
+      selectedTargetType = null;
+      updateTargetHUD(null);
+      highlightTarget(null);
+      return;
+    }
+    // Se o monstro está morto (efeito cinza), impedir seleção
+    if (mesh.userData._wasGray) {
+      console.warn('[CLIENT] [selectTarget] Monstro está morto/cinza, não pode ser selecionado:', id);
+      selectedTargetId = null;
+      selectedTargetType = null;
+      updateTargetHUD(null);
+      highlightTarget(null);
+      return;
+    }
+  }
+  // ... chamada original de seleção de alvo ...
 }
