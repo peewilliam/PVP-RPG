@@ -1,10 +1,19 @@
 // Arquivo principal do servidor
 import geckos from '@geckos.io/server';
-import { SERVER, EVENTS, WORLD } from '../../shared/constants/gameConstants.js';
+import { SERVER, EVENTS, WORLD, BINARY_EVENTS } from '../../shared/constants/gameConstants.js';
 import { GameWorld } from './models/GameWorld.js';
 import zlib from 'zlib';
 import express from 'express';
 import path from 'path';
+import {
+  serializePlayerMove,
+  serializePlayerMoved,
+  serializeMonsterMove,
+  serializeWorldUpdate,
+  logBinary,
+  logJson,
+  deserializePlayerMoveInput
+} from '../../shared/utils/binarySerializer.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -55,9 +64,19 @@ io.onConnection(channel => {
     
     // Adiciona jogador ao mundo do jogo
     const player = gameWorld.addPlayer(channel);
+    channel.playerId = player.id; // Salva o ID numérico no canal
     
-    // Envia ID para o cliente
-    channel.emit(EVENTS.PLAYER.INIT, { id: player.id });
+    // Envia ID e dados completos para o cliente
+    channel.emit(EVENTS.PLAYER.INIT, {
+      id: player.id,
+      position: player.position,
+      rotation: player.rotation,
+      stats: player.stats,
+      level: player.level,
+      xp: player.xp,
+      nextLevelXp: player.nextLevelXp,
+      name: player.name
+    });
     
     // Envia informações sobre objetos do mundo para o novo jogador (apenas próximos)
     const nearbyMonsters = [];
@@ -130,36 +149,24 @@ io.onConnection(channel => {
       }
     });
     
-    // Processa eventos de movimento
-    channel.on(EVENTS.PLAYER.MOVE, data => {
+    // Processa eventos de movimento (BINÁRIO)
+    channel.on(BINARY_EVENTS.PLAYER_MOVE, buffer => {
       try {
-        // Verifica se os dados são válidos antes de processá-los
-        if (!data || !data.input) {
-          console.error('Comandos de movimento inválidos:', data);
-          return;
-        }
-        
-        // Recupera o jogador do mundo
-        const player = gameWorld.entityManager.getPlayer(channel.id);
-        
+        const input = deserializePlayerMoveInput(buffer);
+        const player = gameWorld.entityManager.getPlayer(channel.playerId);
         if (!player) {
-          console.error(`Jogador não encontrado para ID: ${channel.id}`);
+          console.error(`Jogador não encontrado para ID: ${channel.playerId}`);
           return;
         }
-        
-        // Atualiza o estado de movimento do jogador com base nos inputs
-        player.movementState.forward = data.input.forward || false;
-        player.movementState.backward = data.input.backward || false;
-        player.movementState.left = data.input.left || false;
-        player.movementState.right = data.input.right || false;
-        
-        // O movimento será processado no próximo update do loop do jogo
-        // e a rotação será calculada automaticamente com base na direção
+        player.movementState.forward = input.forward || false;
+        player.movementState.backward = input.backward || false;
+        player.movementState.left = input.left || false;
+        player.movementState.right = input.right || false;
       } catch (error) {
-        console.error('Erro no tratamento de movimento:', error);
+        console.error('Erro no tratamento de movimento (binário):', error);
       }
     });
-    
+
     // Processa uso de habilidades (action)
     channel.on(EVENTS.PLAYER.USE_ABILITY, data => {
       try {
@@ -168,7 +175,7 @@ io.onConnection(channel => {
           return;
         }
         
-        const player = gameWorld.entityManager.getPlayer(channel.id);
+        const player = gameWorld.entityManager.getPlayer(channel.playerId);
         if (!player) return;
         
         const ability = player.getAbilityById(data.abilityId);
@@ -256,49 +263,28 @@ io.onConnection(channel => {
     // Processa requisições de sincronização
     channel.on(EVENTS.PLAYER.SYNC_REQUEST, () => {
       try {
-        const player = gameWorld.entityManager.getPlayer(channel.id);
+        const player = gameWorld.entityManager.getPlayer(channel.playerId);
         if (!player) return;
-        
         // Envia mana e cooldowns atualizados para o cliente
         const cooldowns = {};
         const now = Date.now();
-        
-        // Para cada habilidade, envia o timestamp de fim do cooldown
         for (const abilityId in player.abilityCooldowns) {
           const abilityStartTime = player.abilityCooldowns[abilityId];
-          if (abilityStartTime === 0) continue; // Ignora se não estiver em cooldown
-          
+          if (abilityStartTime === 0) continue;
           const ability = player.getAbilityById(parseInt(abilityId));
           if (!ability) continue;
-          
-          // Calcula quando o cooldown termina
           const cooldownEndTime = abilityStartTime + ability.COOLDOWN;
-          
-          // Só envia se ainda estiver em cooldown
           if (cooldownEndTime > now) {
             cooldowns[abilityId] = cooldownEndTime;
           }
         }
-        
         compressAndSend(channel, EVENTS.PLAYER.SYNC_RESPONSE, {
           mana: player.stats.mana,
           maxMana: player.stats.maxMana,
           hp: player.stats.hp,
           maxHp: player.stats.maxHp,
           cooldowns: cooldowns,
-          timestamp: now // Enviando timestamp do servidor para ajustar diferenças de relógio
-        });
-        
-        // Adicionalmente, enviamos um evento MOVED para garantir que os stats estejam sincronizados
-        compressAndSend(channel, EVENTS.PLAYER.MOVED, {
-          id: player.id,
-          position: { ...player.position },
-          rotation: player.rotation,
-          stats: { ...player.stats },
-          level: player.level,
-          xp: player.xp,
-          nextLevelXp: player.nextLevelXp,
-          name: player.name
+          timestamp: now
         });
       } catch (error) {
         console.error('Erro ao processar sincronização:', error);
@@ -418,7 +404,7 @@ io.onConnection(channel => {
 
     // Handler para respawn do player
     channel.on(EVENTS.PLAYER.RESPAWN, () => {
-      const player = gameWorld.entityManager.getPlayer(channel.id);
+      const player = gameWorld.entityManager.getPlayer(channel.playerId);
       if (!player || !player.dead) return;
       // Define posição de respawn (spawn zone)
       const spawnZone = WORLD.ZONES.SPAWN;
@@ -463,20 +449,36 @@ function broadcastUpdates() {
         };
       }
     }
-
     for (const player of gameWorld.entityManager.players.values()) {
       if (!player.active || !player.channel) continue;
-      
-      // Envia a posição atualizada do próprio jogador
-      compressAndSend(player.channel, EVENTS.PLAYER.MOVED, serializedPlayers[player.id]);
-      
+      // Envia versão binária (player:moved)
+      const binMoved = serializePlayerMoved({
+        playerId: player.id,
+        posX: player.position.x,
+        posY: player.position.z,
+        rot: player.rotation,
+        hp: player.stats.hp,
+        mana: player.stats.mana
+      });
+      logBinary(BINARY_EVENTS.PLAYER_MOVED);
+      player.channel.emit(BINARY_EVENTS.PLAYER_MOVED, new Uint8Array(binMoved));
       // Envia posições de outros jogadores
       for (const otherPlayerId in serializedPlayers) {
         if (otherPlayerId !== player.id) {
-          compressAndSend(player.channel, EVENTS.PLAYER.MOVED, serializedPlayers[otherPlayerId]);
+          // Binário para outros jogadores
+          const other = serializedPlayers[otherPlayerId];
+          const binOtherMoved = serializePlayerMoved({
+            playerId: other.id,
+            posX: other.position.x,
+            posY: other.position.z,
+            rot: other.rotation,
+            hp: other.stats.hp,
+            mana: other.stats.mana
+          });
+          logBinary(BINARY_EVENTS.PLAYER_MOVED);
+          player.channel.emit(BINARY_EVENTS.PLAYER_MOVED, new Uint8Array(binOtherMoved));
         }
       }
-
       // --- DELTA UPDATE ---
       if (!lastSentState[player.id]) {
         lastSentState[player.id] = { monsters: {}, worldObjects: {} };
@@ -484,7 +486,6 @@ function broadcastUpdates() {
       const prev = lastSentState[player.id];
       const deltaMonsters = [];
       const deltaWorldObjects = [];
-      // Monstros próximos
       for (const monster of gameWorld.entityManager.monsters.values()) {
         if (monster.active && player.distanceTo(monster) < 30) {
           const serialized = monster.serialize();
@@ -495,7 +496,6 @@ function broadcastUpdates() {
           }
         }
       }
-      // Objetos do mundo próximos
       for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
         if (worldObject.active && player.distanceTo(worldObject) < 40) {
           const serialized = worldObject.serialize();
@@ -506,17 +506,31 @@ function broadcastUpdates() {
           }
         }
       }
-      // Envia apenas se houver delta
       if (deltaMonsters.length > 0 || deltaWorldObjects.length > 0) {
         const updatePayload = {
           monsters: deltaMonsters,
           worldObjects: deltaWorldObjects
         };
         const updatePayloadSize = Buffer.byteLength(JSON.stringify(updatePayload));
-        // console.log(`[DELTA] Enviando WORLD.UPDATE para ${player.id}: ${updatePayloadSize} bytes | Objetos: ${deltaWorldObjects.length} | Monstros: ${deltaMonsters.length}`);
-        
-        // Usar a função global de compactação
+        // Envio JSON
         compressAndSend(player.channel, EVENTS.WORLD.UPDATE, updatePayload);
+        logJson(EVENTS.WORLD.UPDATE);
+        // Envio binário (apenas monstros por exemplo)
+        const binEntities = [];
+        for (const m of deltaMonsters) {
+          binEntities.push({
+            entityId: m.id,
+            posX: m.position.x,
+            posY: m.position.z,
+            rot: m.rotation,
+            hp: m.stats ? m.stats.hp : 0
+          });
+        }
+        if (binEntities.length > 0) {
+          const binWorldUpdate = serializeWorldUpdate(binEntities);
+          logBinary('bin:world:update');
+          player.channel.emit(BINARY_EVENTS.WORLD_UPDATE, new Uint8Array(binWorldUpdate));
+        }
       }
     }
   } catch (error) {

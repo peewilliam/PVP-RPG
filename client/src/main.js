@@ -1,7 +1,7 @@
 // Arquivo principal do cliente
 import * as THREE from 'three';
 import geckos from '@geckos.io/client';
-import { SERVER, EVENTS, PLAYER, WORLD, ABILITIES, MONSTERS } from '../../shared/constants/gameConstants.js';
+import { SERVER, EVENTS, PLAYER, WORLD, ABILITIES, MONSTERS, BINARY_EVENTS } from '../../shared/constants/gameConstants.js';
 import { SKILLS } from '../../shared/skills/skillsConfig.js';
 import { MonsterPresenter } from './presenters/MonsterPresenter.js';
 import { WorldObjectPresenter } from './presenters/WorldObjectPresenter.js';
@@ -26,6 +26,14 @@ import GUI from 'lil-gui';
 import { FloatingNameManager } from './presenters/FloatingNameManager.js';
 // Importa pako para descompressão
 import pako from 'pako';
+import {
+  deserializePlayerMove,
+  deserializePlayerMoved,
+  deserializeWorldUpdate,
+  logBinary,
+  deserializePlayerStatus,
+  serializePlayerMoveInput
+} from '../../shared/utils/binarySerializer.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -212,40 +220,6 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
 // Atualiza HUD ao receber INIT ou MOVED
 channel.on(EVENTS.PLAYER.INIT, data => {
   if (player && player.userData) updateLocalHUDFromServer(player.userData);
-});
-channel.on(EVENTS.PLAYER.MOVED, data => {
-  try {
-    if (!data || !data.id || !data.position) {
-      console.error('Dados de jogador inválidos:', data);
-      return;
-    }
-    const otherPlayerId = data.id;
-    if (otherPlayerId === playerId) {
-      if (player) {
-        const x = Number(data.position.x) || 0;
-        const z = Number(data.position.z) || 0;
-        player.targetPosition = new THREE.Vector3(x, 0.5, z);
-        player.rotation.y = Number(data.rotation) || 0;
-        if (data.stats && player.userData) {
-          player.userData.stats = { ...player.userData.stats, ...data.stats };
-          // Atualiza campos de progresso e nome
-          player.userData.level = data.level;
-          player.userData.xp = data.xp;
-          player.userData.nextLevelXp = data.nextLevelXp;
-          player.userData.name = data.name;
-          // Atualiza o HUD com os dados recebidos
-          hudManager.update(data.stats, data.level, data.name, data.xp, data.nextLevelXp); // Corrigido
-          if (data.stats.mana !== undefined) {
-            skillManager.updateMana(data.stats.mana);
-          }
-        }
-      }
-    } else {
-      playerPresenter.updatePlayer(data);
-    }
-  } catch (error) {
-    console.error('Erro ao processar movimento de jogador:', error);
-  }
 });
 
 // Função utilitária para obter posição do mouse no mundo
@@ -646,24 +620,23 @@ function updateKey(key, isDown) {
 // Função para enviar os comandos de movimento para o servidor
 function sendMovementInput() {
   if (!player || !playerId) return;
-  
+
   // Mapeamento das teclas WASD para os comandos de movimento
   const cameraRelativeInput = {
-    forward: keys.w,     
-    backward: keys.s,    
-    left: keys.a,        
-    right: keys.d        
+    forward: keys.w,
+    backward: keys.s,
+    left: keys.a,
+    right: keys.d
   };
-  
+
   try {
-    channel.emit(EVENTS.PLAYER.MOVE, { 
-      input: cameraRelativeInput,
-      isRelativeToCamera: true
-    });
+    // Envia input de movimento em binário
+    const buffer = serializePlayerMoveInput(cameraRelativeInput);
+    channel.emit(BINARY_EVENTS.PLAYER_MOVE, new Uint8Array(buffer));
   } catch (error) {
-    console.error('Erro ao enviar comando de movimento:', error);
+    console.error('Erro ao enviar comando de movimento (binário):', error);
   }
-  
+
   // Atualiza o estado anterior para a próxima comparação
   prevKeys = { ...keys };
 }
@@ -814,9 +787,20 @@ channel.on(EVENTS.PLAYER.INIT, data => {
   try {
     console.log('ID recebido do servidor:', data.id);
     playerId = data.id;
-    
     // Cria o jogador local após receber o ID
     createPlayer();
+    // Após criar o player, atualize todos os dados recebidos
+    if (player && player.userData) {
+      player.userData.stats = data.stats;
+      player.userData.level = data.level;
+      player.userData.xp = data.xp;
+      player.userData.nextLevelXp = data.nextLevelXp;
+      player.userData.name = data.name;
+      // Atualiza a HUD com todos os dados
+      if (hudManager && typeof hudManager.update === 'function') {
+        hudManager.update(data.stats, data.level, data.name, data.xp, data.nextLevelXp);
+      }
+    }
   } catch (error) {
     console.error('Erro ao processar ID do jogador:', error);
   }
@@ -2321,3 +2305,77 @@ function selectTarget(id, type) {
   }
   // ... chamada original de seleção de alvo ...
 }
+
+// Após a conexão do canal, adicionar listeners para eventos binários
+
+channel.on(BINARY_EVENTS.PLAYER_MOVED, buffer => {
+  logBinary(BINARY_EVENTS.PLAYER_MOVED);
+  const data = deserializePlayerMoved(buffer);
+  if (playerPresenter) {
+    // console.log('[BINÁRIO] playerId evento:', data.playerId, '| playerId local:', playerId, '| pos:', data.posX, data.posY);
+    if (data.playerId === playerId) {
+      // console.log('>> Atualizando POSIÇÃO do PLAYER LOCAL:', data.posX, data.posY);
+      if (player) {
+        player.position.set(data.posX, 0.5, data.posY);
+        player.targetPosition = new THREE.Vector3(data.posX, 0.5, data.posY);
+        player.rotation.y = data.rot;
+        if (player.userData && player.userData.stats) {
+          player.userData.stats.hp = data.hp;
+          player.userData.stats.mana = data.mana;
+        }
+        // console.log('Nova posição do player local:', player.position);
+      } else {
+        console.log('Objeto player local não encontrado:', player);
+      }
+    } else {
+      // console.log('>> Atualizando OUTRO PLAYER:', data.playerId);
+      playerPresenter.updateExistingPlayer(String(data.playerId), {
+        position: { x: data.posX, z: data.posY },
+        rotation: data.rot,
+        stats: { hp: data.hp, mana: data.mana }
+      });
+    }
+  }
+});
+
+channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
+  logBinary(BINARY_EVENTS.WORLD_UPDATE);
+  const data = deserializeWorldUpdate(buffer);
+  // Integração binária: atualizar monstros
+  if (monsterPresenter && data.entities) {
+    for (const ent of data.entities) {
+      const id = String(ent.entityId);
+      monsterPresenter.updateExistingMonster(id, {
+        position: { x: ent.posX, y: 0.5, z: ent.posY },
+        rotation: ent.rot,
+        stats: { hp: ent.hp }
+      });
+    }
+  }
+});
+
+channel.on(BINARY_EVENTS.PLAYER_STATUS, buffer => {
+  const data = deserializePlayerStatus(buffer);
+  // Removido log de debug do status binário
+  if (data.playerId === playerId && player && player.userData) {
+    player.userData.stats.hp = data.hp;
+    player.userData.stats.maxHp = data.maxHp;
+    player.userData.stats.mana = data.mana;
+    player.userData.stats.maxMana = data.maxMana;
+    player.userData.level = data.level;
+    player.userData.xp = data.xp;
+    player.userData.nextLevelXp = data.nextLevelXp;
+    if (hudManager && typeof hudManager.update === 'function') {
+      hudManager.update(
+        player.userData.stats,
+        player.userData.level,
+        player.userData.name,
+        player.userData.xp,
+        player.userData.nextLevelXp
+      );
+    }
+    if (skillManager && typeof skillManager.updateMana === 'function') {
+      skillManager.updateMana(data.mana);
+    }
+  }
+});

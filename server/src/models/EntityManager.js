@@ -4,6 +4,9 @@ import { MonsterTypes } from './monsters/index.js';
 import { Projectile } from './Projectile.js';
 import { DamageZone } from './DamageZone.js';
 
+// Adiciona contador global para IDs numéricos de player
+let nextPlayerId = 1;
+
 /**
  * Gerenciador de entidades que controla todas as entidades do jogo
  */
@@ -24,7 +27,8 @@ export class EntityManager {
    * @returns {Player} - Instância do jogador criado
    */
   createPlayer(channel, position = { x: 0, y: 0, z: 0 }) {
-    const id = channel.id.toString();
+    // Gere um novo ID numérico incremental
+    const id = nextPlayerId++;
     
     // Verifica se o jogador já existe
     if (this.players.has(id)) {

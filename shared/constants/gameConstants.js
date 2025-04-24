@@ -235,4 +235,12 @@ export const WORLD = {
     SPIDER: 'SPIDER',
     // Adicione novos tipos de monstros aqui
   }
+};
+
+export const BINARY_EVENTS = {
+  PLAYER_MOVE: 'bin:player:move', // Evento de movimento do jogador (funcionando 100% e unico)
+  PLAYER_MOVED: 'bin:player:moved', // Evento de movimento do jogador confirmado (funcionando 100% e unico)
+  MONSTER_MOVE: 'bin:monster:move', // Evento de movimento do monstro
+  WORLD_UPDATE: 'bin:world:update', // Evento de atualização do mundo
+  PLAYER_STATUS: 'bin:player:status' // Evento de status do jogador (funcionando 100% e unico)
 }; 

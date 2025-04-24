@@ -1,5 +1,5 @@
 import { Entity } from './Entity.js';
-import { PLAYER, EVENTS, MONSTERS } from '../../../shared/constants/gameConstants.js';
+import { PLAYER, EVENTS, MONSTERS, WORLD } from '../../../shared/constants/gameConstants.js';
 import {
   getLevelBenefits,
   calculateXpGain,
@@ -7,6 +7,8 @@ import {
   applyLevelUp,
   calculateDamage
 } from '../../../shared/progressionSystem.js';
+import { serializePlayerStatus } from '../../../shared/utils/binarySerializer.js';
+import { BINARY_EVENTS } from '../../../shared/constants/gameConstants.js';
 
 /**
  * Classe que representa um jogador no jogo.
@@ -73,6 +75,24 @@ export class Player extends Entity {
     
     // Chama o método da classe pai para atualizar a posição
     super.update(deltaTime);
+    
+    // Limita a posição do player dentro do mapa considerando o centro em (0,0)
+    const halfWidth = WORLD.SIZE.WIDTH / 2;
+    const halfHeight = WORLD.SIZE.HEIGHT / 2;
+    const minX = -halfWidth + WORLD.BOUNDARIES.BORDER_WIDTH;
+    const maxX = halfWidth - WORLD.BOUNDARIES.BORDER_WIDTH;
+    const minZ = -halfHeight + WORLD.BOUNDARIES.BORDER_WIDTH;
+    const maxZ = halfHeight - WORLD.BOUNDARIES.BORDER_WIDTH;
+    this.position.x = Math.max(minX, Math.min(maxX, this.position.x));
+    this.position.z = Math.max(minZ, Math.min(maxZ, this.position.z));
+    
+    // (Opcional) Log para depuração
+    if (
+      this.position.x === minX || this.position.x === maxX ||
+      this.position.z === minZ || this.position.z === maxZ
+    ) {
+      console.log(`[LIMITE] Player ${this.id} atingiu a borda do mapa: (${this.position.x}, ${this.position.z})`);
+    }
     
     // Regeneração natural de HP e Mana (exemplo: 1% a cada segundo)
     this.regenerate(deltaTime);
@@ -194,12 +214,24 @@ export class Player extends Entity {
         (oldMana < (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD) && 
          this.stats.mana >= (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD))) {
       if (this.channel) {
-        this.channel.emit(EVENTS.PLAYER.MOVED, {
-          id: this.id,
-          position: { ...this.position },
-          rotation: this.rotation,
-          stats: { ...this.stats }
+        // this.channel.emit(EVENTS.PLAYER.MOVED, {
+        //   id: this.id,
+        //   position: { ...this.position },
+        //   rotation: this.rotation,
+        //   stats: { ...this.stats }
+        // });
+        // Envia status completo em binário
+        const binStatus = serializePlayerStatus({
+          playerId: this.id,
+          hp: Math.round(this.stats.hp),
+          maxHp: Math.round(this.stats.maxHp),
+          mana: Math.round(this.stats.mana),
+          maxMana: Math.round(this.stats.maxMana),
+          level: this.level,
+          xp: Math.round(this.xp),
+          nextLevelXp: Math.round(this.nextLevelXp)
         });
+        this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
       }
     }
   }
@@ -310,6 +342,18 @@ export class Player extends Entity {
         level: this.level,
         xp: this.xp
       });
+      // Envia status completo em binário
+      const binStatus = serializePlayerStatus({
+        playerId: this.id,
+        hp: Math.round(this.stats.hp),
+        maxHp: Math.round(this.stats.maxHp),
+        mana: Math.round(this.stats.mana),
+        maxMana: Math.round(this.stats.maxMana),
+        level: this.level,
+        xp: Math.round(this.xp),
+        nextLevelXp: Math.round(this.nextLevelXp)
+      });
+      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
     }
   }
   
@@ -338,7 +382,22 @@ export class Player extends Entity {
     // Consome mana e coloca habilidade em cooldown
     this.stats.mana -= ability.MANA_COST;
     this.abilityCooldowns[abilityId] = now;
-    
+
+    // Envia status completo em binário após consumir mana
+    if (this.channel) {
+      const binStatus = serializePlayerStatus({
+        playerId: this.id,
+        hp: Math.round(this.stats.hp),
+        maxHp: Math.round(this.stats.maxHp),
+        mana: Math.round(this.stats.mana),
+        maxMana: Math.round(this.stats.maxMana),
+        level: this.level,
+        xp: Math.round(this.xp),
+        nextLevelXp: Math.round(this.nextLevelXp)
+      });
+      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+    }
+
     return true;
   }
   
@@ -392,6 +451,18 @@ export class Player extends Entity {
         nextLevelXp: this.nextLevelXp,
         stats: { ...this.stats }
       });
+      // Envia status completo em binário
+      const binStatus = serializePlayerStatus({
+        playerId: this.id,
+        hp: Math.round(this.stats.hp),
+        maxHp: Math.round(this.stats.maxHp),
+        mana: Math.round(this.stats.mana),
+        maxMana: Math.round(this.stats.maxMana),
+        level: this.level,
+        xp: Math.round(this.xp),
+        nextLevelXp: Math.round(this.nextLevelXp)
+      });
+      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
     }
   }
   
@@ -424,6 +495,20 @@ export class Player extends Entity {
     // Reseta modificadores de velocidade
     this.speedModifier = 1.0;
     console.log(`Jogador ${this.id} resetado após morte`);
+    // Após resetar, envie status completo em binário
+    if (this.channel) {
+      const binStatus = serializePlayerStatus({
+        playerId: this.id,
+        hp: Math.round(this.stats.hp),
+        maxHp: Math.round(this.stats.maxHp),
+        mana: Math.round(this.stats.mana),
+        maxMana: Math.round(this.stats.maxMana),
+        level: this.level,
+        xp: Math.round(this.xp),
+        nextLevelXp: Math.round(this.nextLevelXp)
+      });
+      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+    }
   }
   
   /**
