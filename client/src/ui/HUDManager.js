@@ -48,6 +48,12 @@ export class HUDManager {
     this.animateCooldowns();
     // Inicializa o chat lateral
     this.chatManager = new ChatManager(document.body);
+    // Painel de métricas de performance
+    this.createPerformancePanel();
+    // Botão de configurações
+    this.createSettingsButton();
+    // Carregar configurações do usuário
+    this.loadUserSettings();
   }
 
   createHUD() {
@@ -639,8 +645,24 @@ export class HUDManager {
   addPlayerMessage(name, text, tab) { this.chatManager.addPlayerMessage(name, text, tab); }
 
   setChannel(channel) {
-    if (this.chatManager) {
-      this.chatManager.setChannel(channel);
+    this.channel = channel;
+    if (this.pingInterval) clearInterval(this.pingInterval);
+    if (this.pingListener && this.channel && this.channel.off) {
+      this.channel.off('pong', this.pingListener);
+    }
+    this.pingListener = () => {
+      this.ping = Math.round(performance.now() - this.pingStartTime);
+    };
+    if (this.channel && this.channel.on) {
+      this.channel.on('pong', this.pingListener);
+    }
+    this.pingInterval = setInterval(() => this.sendPing(), 2000);
+  }
+
+  sendPing() {
+    if (this.channel && this.channel.emit) {
+      this.pingStartTime = performance.now();
+      this.channel.emit('ping');
     }
   }
 
@@ -813,5 +835,190 @@ export class HUDManager {
       this.deathModal = null;
     }
     document.body.style.overflow = '';
+  }
+
+  createPerformancePanel() {
+    this.perfPanel = document.createElement('div');
+    this.perfPanel.id = 'performance-panel';
+    this.perfPanel.style.position = 'fixed';
+    this.perfPanel.style.top = '8px';
+    this.perfPanel.style.left = '8px';
+    this.perfPanel.style.background = 'rgba(20,20,20,0.85)';
+    this.perfPanel.style.color = '#fff';
+    this.perfPanel.style.fontSize = '13px';
+    this.perfPanel.style.padding = '8px 14px';
+    this.perfPanel.style.borderRadius = '8px';
+    this.perfPanel.style.zIndex = '4000';
+    this.perfPanel.style.pointerEvents = 'none';
+    this.perfPanel.innerHTML = 'FPS: --<br>FPS Média: --<br>Ping: --<br>Memória: --<br>Render: --ms<br>Monstros/UI: -- ms';
+    document.body.appendChild(this.perfPanel);
+    // FPS
+    this.fps = 0;
+    this.frameCount = 0;
+    this.lastFpsTime = performance.now();
+    // Ping
+    this.ping = '--';
+    this.pingStartTime = 0;
+    this.pingInterval = null;
+    this.pingListener = null;
+    this.channel = null;
+    // FPS histórico para média móvel
+    if (!this.fpsHistory) this.fpsHistory = [];
+    // Atualização do painel
+    requestAnimationFrame(this.updatePerformancePanel.bind(this));
+  }
+
+  updatePerformancePanel(now) {
+    // FPS
+    this.frameCount++;
+    if (now - this.lastFpsTime >= 1000) {
+      this.fps = this.frameCount;
+      this.frameCount = 0;
+      this.lastFpsTime = now;
+    }
+    // Memória
+    let mem = '--';
+    if (window.performance && performance.memory) {
+      mem = (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB';
+    }
+    // Render e UI (placeholders, podem ser refinados)
+    const renderMs = window.__lastRenderTimeMs || '--';
+    const uiMs = window.__lastUiUpdateTimeMs || '--';
+    // Históricos para média móvel
+    if (!this.renderHistory) this.renderHistory = [];
+    if (!this.uiHistory) this.uiHistory = [];
+    if (renderMs !== '--') this.renderHistory.push(parseFloat(renderMs));
+    if (uiMs !== '--') this.uiHistory.push(parseFloat(uiMs));
+    if (this.renderHistory.length > 30) this.renderHistory.shift();
+    if (this.uiHistory.length > 30) this.uiHistory.shift();
+    const renderAvg = this.renderHistory.length
+      ? (this.renderHistory.reduce((a, b) => a + b, 0) / this.renderHistory.length).toFixed(2)
+      : '--';
+    const uiAvg = this.uiHistory.length
+      ? (this.uiHistory.reduce((a, b) => a + b, 0) / this.uiHistory.length).toFixed(2)
+      : '--';
+    // Render status
+    function getPerfStatus(ms) {
+      if (ms === '--') return {text: '', color: '#fff'};
+      ms = parseFloat(ms);
+      if (ms <= 16) return {text: 'Excelente', color: '#4caf50'};
+      if (ms <= 25) return {text: 'Bom', color: '#ffe066'};
+      if (ms <= 33) return {text: 'Aceitável', color: '#ff9800'};
+      return {text: 'Ruim', color: '#f44336'};
+    }
+    const renderStatus = getPerfStatus(renderAvg);
+    const uiStatus = getPerfStatus(uiAvg);
+    // Ping status
+    let pingText = '--';
+    let pingStatus = '';
+    let pingColor = '#fff';
+    if (typeof this.ping === 'number') {
+      pingText = `${this.ping} ms`;
+      if (this.ping < 60) {
+        pingStatus = 'Excelente';
+        pingColor = '#4caf50';
+      } else if (this.ping < 121) {
+        pingStatus = 'Bom';
+        pingColor = '#ffe066';
+      } else if (this.ping < 201) {
+        pingStatus = 'Ruim';
+        pingColor = '#ff9800';
+      } else {
+        pingStatus = 'Péssimo';
+        pingColor = '#f44336';
+      }
+      pingText += ` <span style="color:${pingColor}">${pingStatus}</span>`;
+    }
+    // FPS histórico para média móvel
+    const realFps = typeof window.fps === 'number' ? window.fps : this.fps;
+    if (!this.fpsHistory) this.fpsHistory = [];
+    this.fpsHistory.push(realFps);
+    if (this.fpsHistory.length > 30) this.fpsHistory.shift();
+    const fpsAvg = this.fpsHistory.length
+      ? Math.round(this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length)
+      : '--';
+    this.perfPanel.innerHTML = `FPS: ${realFps}<br>FPS Média: ${fpsAvg}<br>Ping: ${pingText}<br>Memória: ${mem}<br>Render: ${renderAvg} ms <span style=\"color:${renderStatus.color}\">${renderStatus.text}</span><br>Monstros/UI: ${uiAvg} ms <span style=\"color:${uiStatus.color}\">${uiStatus.text}</span>`;
+    requestAnimationFrame(this.updatePerformancePanel.bind(this));
+  }
+
+  createSettingsButton() {
+    this.settingsBtn = document.createElement('button');
+    this.settingsBtn.id = 'settings-btn';
+    this.settingsBtn.innerText = '⚙️';
+    this.settingsBtn.title = 'Configurações';
+    this.settingsBtn.style.position = 'fixed';
+    this.settingsBtn.style.top = '8px';
+    this.settingsBtn.style.right = '8px';
+    this.settingsBtn.style.zIndex = '4100';
+    this.settingsBtn.style.background = '#222';
+    this.settingsBtn.style.color = '#ffe066';
+    this.settingsBtn.style.border = 'none';
+    this.settingsBtn.style.borderRadius = '50%';
+    this.settingsBtn.style.width = '40px';
+    this.settingsBtn.style.height = '40px';
+    this.settingsBtn.style.fontSize = '22px';
+    this.settingsBtn.style.cursor = 'pointer';
+    this.settingsBtn.style.boxShadow = '0 2px 8px #0008';
+    this.settingsBtn.addEventListener('click', () => this.toggleSettingsMenu());
+    document.body.appendChild(this.settingsBtn);
+    this.createSettingsMenu();
+  }
+
+  createSettingsMenu() {
+    this.settingsMenu = document.createElement('div');
+    this.settingsMenu.id = 'settings-menu';
+    this.settingsMenu.style.position = 'fixed';
+    this.settingsMenu.style.top = '60px';
+    this.settingsMenu.style.right = '16px';
+    this.settingsMenu.style.background = 'rgba(30,30,30,0.98)';
+    this.settingsMenu.style.color = '#fff';
+    this.settingsMenu.style.padding = '24px 28px';
+    this.settingsMenu.style.borderRadius = '12px';
+    this.settingsMenu.style.zIndex = '4200';
+    this.settingsMenu.style.display = 'none';
+    this.settingsMenu.style.minWidth = '320px';
+    this.settingsMenu.style.boxShadow = '0 4px 24px #000b';
+    this.settingsMenu.innerHTML = `
+      <h2 style="margin-top:0;font-size:20px;color:#ffe066;">Configurações</h2>
+      <label><input type="checkbox" id="setting-effects"> Efeitos visuais avançados</label><br>
+      <label><input type="checkbox" id="setting-lod"> Qualidade alta de modelos (LOD)</label><br>
+      <label><input type="checkbox" id="setting-bars"> Barras/nome flutuante em tempo real</label><br>
+      <label><input type="checkbox" id="setting-compression"> Compressão de dados</label><br>
+      <label><input type="checkbox" id="setting-fpslimit"> Limitar FPS a 30</label><br>
+      <button id="settings-save" style="margin-top:18px;padding:8px 18px;background:#ffe066;color:#222;border:none;border-radius:6px;font-weight:bold;cursor:pointer;">Salvar</button>
+      <button id="settings-close" style="margin-top:18px;margin-left:12px;padding:8px 18px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;">Fechar</button>
+    `;
+    document.body.appendChild(this.settingsMenu);
+    this.settingsMenu.querySelector('#settings-save').onclick = () => this.saveUserSettings();
+    this.settingsMenu.querySelector('#settings-close').onclick = () => this.toggleSettingsMenu(false);
+  }
+
+  toggleSettingsMenu(force) {
+    const show = force !== undefined ? force : this.settingsMenu.style.display === 'none';
+    this.settingsMenu.style.display = show ? 'block' : 'none';
+  }
+
+  loadUserSettings() {
+    const settings = JSON.parse(localStorage.getItem('pvpRpgUserSettings') || '{}');
+    this.settingsMenu.querySelector('#setting-effects').checked = settings.visualEffects !== false;
+    this.settingsMenu.querySelector('#setting-lod').checked = settings.lod !== false;
+    this.settingsMenu.querySelector('#setting-bars').checked = settings.bars !== false;
+    this.settingsMenu.querySelector('#setting-compression').checked = settings.compression !== false;
+    this.settingsMenu.querySelector('#setting-fpslimit').checked = settings.fpslimit === true;
+    window.__pvpRpgUserSettings = settings;
+  }
+
+  saveUserSettings() {
+    const settings = {
+      visualEffects: this.settingsMenu.querySelector('#setting-effects').checked,
+      lod: this.settingsMenu.querySelector('#setting-lod').checked,
+      bars: this.settingsMenu.querySelector('#setting-bars').checked,
+      compression: this.settingsMenu.querySelector('#setting-compression').checked,
+      fpslimit: this.settingsMenu.querySelector('#setting-fpslimit').checked
+    };
+    localStorage.setItem('pvpRpgUserSettings', JSON.stringify(settings));
+    window.__pvpRpgUserSettings = settings;
+    this.toggleSettingsMenu(false);
+    window.dispatchEvent(new CustomEvent('pvpRpgUserSettingsChanged', { detail: settings }));
   }
 } 

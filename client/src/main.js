@@ -65,6 +65,7 @@ let playerPresenter;
 let skillManager; // Gerenciador de habilidades
 let floatingNameManager;
 let floatingBarManager;
+let lastFrameTime;
 
 // Variáveis para o sistema de rotação com o mouse
 let mousePosition = new THREE.Vector2();
@@ -89,32 +90,15 @@ let prevKeys = {
   d: false
 };
 
-// Variáveis para medição de FPS e ping
-let frames = 0;
-let lastFpsUpdate = performance.now();
-let lastFrameTime = performance.now();
-let ping = 0;
-let pingStartTime = 0;
-let lastPingSent = 0;
 
-// Elemento de UI para FPS e Ping
-let statsDiv = document.createElement('div');
-statsDiv.style.position = 'fixed';
-statsDiv.style.top = '10px';
-statsDiv.style.left = '10px';
-statsDiv.style.background = 'rgba(0,0,0,0.7)';
-statsDiv.style.color = '#fff';
-statsDiv.style.fontFamily = 'monospace';
-statsDiv.style.fontSize = '15px';
-statsDiv.style.padding = '6px 12px';
-statsDiv.style.borderRadius = '8px';
-statsDiv.style.zIndex = '1000';
-statsDiv.innerHTML = 'FPS: --<br>Ping: -- ms';
-document.body.appendChild(statsDiv);
+// Flag global para efeitos visuais avançados
+let visualEffectsActive = true;
 
-// Sistema de dano flutuante
+// Inicializa flag a partir do localStorage/configuração
+const userSettings = JSON.parse(localStorage.getItem('pvpRpgUserSettings') || '{}');
+if (userSettings.visualEffects === false) visualEffectsActive = false;
+
 const floatingDamages = [];
-
 // Variável para armazenar o alvo selecionado
 let selectedTargetId = null;
 let selectedTargetType = null; // 'player' ou 'monster'
@@ -122,6 +106,7 @@ let selectedOutline = null;
 
 // Instancia o HUDManager
 const hudManager = new HUDManager();
+hudManager.setChannel(channel);
 
 // Criação do gerenciador de textos flutuantes
 let floatingTextManager;
@@ -345,10 +330,12 @@ function initThree() {
   renderer = new THREE.WebGLRenderer({ 
     antialias: true,
     precision: 'highp',
-    powerPreference: 'high-performance'
+    powerPreference: 'high-performance',
+    alpha: false // garantir fundo opaco
   });
   renderer.setSize(width, height);
   renderer.setPixelRatio(window.devicePixelRatio); // Melhora a nitidez em dispositivos HiDPI
+  renderer.setClearColor(0x223355, 1); // Fundo azul escuro opaco
   container.appendChild(renderer.domElement);
   
   // Não adicionamos luzes básicas aqui, usando o sistema avançado de iluminação
@@ -388,7 +375,7 @@ function initThree() {
   skillManager = new SkillManager(scene);
   
   // Configura o sistema de iluminação avançado
-  worldObjectPresenter.setupLighting(renderer);
+  // worldObjectPresenter.setupLighting(renderer);
   
   // --- CONFIGURAÇÃO PROFISSIONAL ALBION ONLINE ---
   // Tonemapping e exposição para cores naturais e vibrantes
@@ -455,6 +442,9 @@ function initThree() {
       removeGrayDeathEffect(mesh, 0xff0000); // Vermelho padrão para monstros
     }
   };
+  
+  // Atualiza o modo de efeitos visuais APÓS a inicialização completa da cena
+  updateVisualEffectsMode();
 }
 
 /**
@@ -674,82 +664,117 @@ function handleMovementInput() {
   }
 }
 
-// Envia ping ao servidor a cada 2 segundos
-function sendPing() {
-  pingStartTime = performance.now();
-  channel.emit('ping');
-  lastPingSent = Date.now();
-}
+// Controle de FPS
+let fpsLimitActive = false;
+let minFrameTime = 0;
+let lastFpsLimitedFrame = 0;
 
-// Recebe resposta do ping
-channel.on('pong', () => {
-  ping = Math.round(performance.now() - pingStartTime);
+window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
+  const settings = e.detail;
+  // Limite de FPS
+  fpsLimitActive = !!settings.fpslimit;
+  minFrameTime = fpsLimitActive ? 1000 / 30 : 0;
+  // (Esqueleto para aplicar outras flags futuramente)
+  // Exemplo:
+  // efeitosVisuaisAtivos = !!settings.effects;
+  // lodAtivo = !!settings.lod;
+  // barrasTempoReal = !!settings.bars;
+  // compressaoAtiva = !!settings.compression;
 });
 
-// Envia ping periodicamente
-setInterval(sendPing, 2000);
+// Inicializa com as configurações salvas
+(function applyInitialSettings() {
+  const settings = JSON.parse(localStorage.getItem('pvpRpgUserSettings') || '{}');
+  fpsLimitActive = !!settings.fpslimit;
+  minFrameTime = fpsLimitActive ? 1000 / 30 : 0;
+})();
 
-// Loop principal de renderização
-function animate() {
+// ... existing code ...
+// Variáveis globais para FPS real
+let framesThisSecond = 0;
+let lastFpsUpdateTime = performance.now();
+let fps = 0;
+
+
+
+// Listener para mudanças de configuração
+window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
+  const settings = e.detail || {};
+  if (typeof settings.visualEffects === 'boolean') {
+    visualEffectsActive = settings.visualEffects;
+  }
+});
+
+let animate = function() {
   requestAnimationFrame(animate);
-  
   const now = performance.now();
-  
+  // Limite de FPS (se ativado)
+  if (fpsLimitActive && lastFpsLimitedFrame && now - lastFpsLimitedFrame < minFrameTime) {
+    return;
+  }
+  lastFpsLimitedFrame = now;
+
+  // --- Cálculo de FPS real ---
+  framesThisSecond++;
+  if (now - lastFpsUpdateTime >= 1000) {
+    fps = framesThisSecond;
+    framesThisSecond = 0;
+    lastFpsUpdateTime = now;
+  }
+
   // Calcula o delta time desde o último frame para animações suaves
   const deltaTime = (now - lastFrameTime) / 1000; // Converte para segundos
   lastFrameTime = now;
-  
-  // Atualiza FPS
-  frames++;
-  if (now - lastFpsUpdate > 1000) {
-    // Atualiza a UI com FPS e ping
-    statsDiv.innerHTML = `FPS: ${frames}<br>Ping: ${ping} ms`;
-    frames = 0;
-    lastFpsUpdate = now;
-  }
-  
+
+  // --- Medição do tempo de atualização de monstros/UI ---
+  const uiStart = performance.now();
   // Processa movimentos
   handleMovementInput();
-  
   // Atualiza a posição da câmera para seguir o jogador
   updateCameraPosition();
-  
   // Atualiza posições interpoladas dos outros jogadores
   if (playerPresenter.updatePositions) {
     playerPresenter.updatePositions(deltaTime);
   }
-  
   // Atualiza posições interpoladas dos monstros
   if (monsterPresenter.updatePositions) {
     monsterPresenter.updatePositions(deltaTime);
   }
-  
   // Atualiza as partículas e efeitos visuais
   if (skillManager.update) {
     skillManager.update(deltaTime);
   }
-  
   // Atualiza os textos flutuantes
   if (floatingTextManager) {
     floatingTextManager.update(deltaTime);
   }
-  
   // Atualiza o sistema de otimização do renderizador
   if (worldObjectPresenter && worldObjectPresenter.updateRenderer) {
     worldObjectPresenter.updateRenderer(deltaTime, camera.position);
   }
-  
   // Se temos um jogador local, atualiza a luz para seguir o jogador
   if (player) {
     worldObjectPresenter.updateLightPosition(player.position);
   }
-  
-  if (composer) {
+  if (floatingNameManager) {
+    floatingNameManager.updateAll(window.innerWidth, window.innerHeight);
+  }
+  if (floatingBarManager) {
+    floatingBarManager.updateAll(window.innerWidth, window.innerHeight);
+  }
+  // --- Fim da medição de UI ---
+  window.__lastUiUpdateTimeMs = (performance.now() - uiStart).toFixed(2);
+
+  // Renderização condicional
+  if (visualEffectsActive && typeof composer !== 'undefined') {
     composer.render();
-  } else {
+  } else if (typeof renderer !== 'undefined' && typeof scene !== 'undefined' && typeof camera !== 'undefined') {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    // renderer.clear(true, true, true); // Removido para evitar problemas de buffer
     renderer.render(scene, camera);
   }
-  
+
   // Atualiza o outline do alvo selecionado para seguir o alvo
   if (selectedOutline && selectedTargetId) {
     let mesh = null;
@@ -763,21 +788,14 @@ function animate() {
       selectedOutline.rotation.copy(mesh.rotation);
     }
   }
-  
   if (player && player.targetPosition) {
     player.position.lerp(player.targetPosition, 0.25);
   }
 
-  // Atualiza nomes flutuantes
-  if (floatingNameManager) {
-    floatingNameManager.updateAll(window.innerWidth, window.innerHeight);
-  }
-
-  // No loop de animação, após atualizar nomes flutuantes
-  if (floatingBarManager) {
-    floatingBarManager.updateAll(window.innerWidth, window.innerHeight);
-  }
+  // No HUDManager, use window.fps para exibir o FPS real
+  window.fps = fps;
 }
+// ... existing code ...
 
 // Conexão ao servidor
 channel.onConnect(error => {
@@ -2401,3 +2419,251 @@ channel.on(BINARY_EVENTS.PLAYER_STATUS, buffer => {
     }
   }
 });
+
+// ... existing code ...
+// Log visual para depuração dos efeitos visuais
+let visualEffectsLog = document.createElement('div');
+visualEffectsLog.style.position = 'fixed';
+visualEffectsLog.style.top = '8px';
+visualEffectsLog.style.left = '8px';
+visualEffectsLog.style.zIndex = 99999;
+visualEffectsLog.style.background = 'rgba(0,0,0,0.5)';
+visualEffectsLog.style.color = '#fff';
+visualEffectsLog.style.fontSize = '14px';
+visualEffectsLog.style.padding = '4px 10px';
+visualEffectsLog.style.borderRadius = '6px';
+visualEffectsLog.style.pointerEvents = 'none';
+visualEffectsLog.innerText = visualEffectsActive ? 'Efeitos Visuais: ON' : 'Efeitos Visuais: OFF';
+document.body.appendChild(visualEffectsLog);
+
+function updateVisualEffectsLog() {
+  visualEffectsLog.innerText = visualEffectsActive ? 'Efeitos Visuais: ON' : 'Efeitos Visuais: OFF';
+}
+
+// Atualizar log ao mudar o flag
+window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
+  const settings = e.detail || {};
+  if (typeof settings.visualEffects === 'boolean') {
+    visualEffectsActive = settings.visualEffects;
+    updateVisualEffectsLog();
+  }
+});
+// Também atualizar ao inicializar
+updateVisualEffectsLog();
+// ... existing code ...
+
+// ... existing code ...
+// Luzes básicas para fallback quando efeitos visuais estão OFF
+let fallbackAmbientLight = null;
+let fallbackDirectionalLight = null;
+
+function ensureFallbackLights() {
+  if (!scene) return; // Só adiciona luzes se a cena já existe
+  if (!fallbackAmbientLight) {
+    fallbackAmbientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(fallbackAmbientLight);
+  }
+  if (!fallbackDirectionalLight) {
+    fallbackDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    fallbackDirectionalLight.position.set(20, 40, 20);
+    scene.add(fallbackDirectionalLight);
+  }
+}
+
+function removeFallbackLights() {
+  if (!scene) return;
+  if (fallbackAmbientLight) {
+    scene.remove(fallbackAmbientLight);
+    fallbackAmbientLight = null;
+  }
+  if (fallbackDirectionalLight) {
+    scene.remove(fallbackDirectionalLight);
+    fallbackDirectionalLight = null;
+  }
+}
+
+// Atualizar luzes ao alternar efeitos visuais
+function updateVisualEffectsMode() {
+  console.log("[DEBUG] Atualizando modo de efeitos visuais. Ativo:", visualEffectsActive);
+  
+  if (visualEffectsActive) {
+    // COMPOSER: ativa luzes principais, remove fallback
+    console.log("[DEBUG] Ativando modo COMPOSER");
+    
+    // Remove fallback lights primeiro
+    removeFallbackLights();
+    
+    // Certifica-se de que worldObjectPresenter existe
+    // if (typeof worldObjectPresenter === 'undefined' || !worldObjectPresenter) {
+    //   console.error("[DEBUG] worldObjectPresenter não encontrado! Inicializando Three.js...");
+    //   // Se o presenter não existir, talvez precise reinicializar
+    //   if (typeof initThree === 'function') {
+    //     // initThree();
+    //     // Return para não continuar, pois initThree vai chamar esta função ao final
+    //     return;
+    //   }
+    // }
+    
+    // Certifica-se de que as luzes estão configuradas
+    if (typeof worldObjectPresenter !== 'undefined' && typeof scene !== 'undefined') {
+      console.log("[DEBUG] Verificando luzes principais...");
+      
+      // Se as luzes não existirem, tenta recriar o sistema de iluminação
+      if (!worldObjectPresenter.sunLight || !worldObjectPresenter.ambientLight || !worldObjectPresenter.hemisphereLight) {
+        console.log("[DEBUG] Luzes principais não encontradas, recriando sistema de iluminação!");
+        
+        // Verificar se podemos recriar as luzes
+        if (typeof worldObjectPresenter.setupLighting === 'function' && typeof renderer !== 'undefined') {
+          console.log("[DEBUG] Chamando setupLighting...");
+          worldObjectPresenter.setupLighting(renderer);
+        }
+      }
+      
+      // Agora tenta adicionar as luzes à cena
+      if (worldObjectPresenter.sunLight) {
+        console.log("[DEBUG] Adicionando sunLight à cena");
+        if (!scene.children.includes(worldObjectPresenter.sunLight)) {
+          scene.add(worldObjectPresenter.sunLight);
+        }
+        worldObjectPresenter.sunLight.intensity = 2.2;
+      } else {
+        console.warn("[DEBUG] sunLight não existe!");
+      }
+      
+      if (worldObjectPresenter.ambientLight) {
+        console.log("[DEBUG] Adicionando ambientLight à cena");
+        if (!scene.children.includes(worldObjectPresenter.ambientLight)) {
+          scene.add(worldObjectPresenter.ambientLight);
+        }
+        worldObjectPresenter.ambientLight.intensity = 0.8;
+      } else {
+        console.warn("[DEBUG] ambientLight não existe!");
+      }
+      
+      if (worldObjectPresenter.hemisphereLight) {
+        console.log("[DEBUG] Adicionando hemisphereLight à cena");
+        if (!scene.children.includes(worldObjectPresenter.hemisphereLight)) {
+          scene.add(worldObjectPresenter.hemisphereLight);
+        }
+        worldObjectPresenter.hemisphereLight.intensity = 1.3;
+      } else {
+        console.warn("[DEBUG] hemisphereLight não existe!");
+      }
+    }
+    
+    // Configura o renderer
+    if (typeof renderer !== 'undefined' && typeof worldObjectPresenter !== 'undefined') {
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = worldObjectPresenter.toneMappingExposure || 1.0;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+  } else {
+    // RENDERER: remove luzes principais, ativa fallback
+    console.log("[DEBUG] Ativando modo RENDERER");
+    
+    // Remove TODAS as luzes do sistema avançado da cena
+    if (typeof scene !== 'undefined') {
+      // Encontra e remove todas as luzes principais da cena
+      const lightsToRemove = scene.children.filter(obj => {
+        // Remove apenas as luzes principais, não as fallback
+        return obj.isLight && 
+               obj !== fallbackAmbientLight && 
+               obj !== fallbackDirectionalLight &&
+               !obj.userData.isFallbackLight;
+      });
+      
+      console.log("[DEBUG] Removendo luzes principais:", lightsToRemove.length);
+      lightsToRemove.forEach(light => scene.remove(light));
+      
+      // Ainda tenta remover explicitamente as luzes do worldObjectPresenter
+      if (worldObjectPresenter) {
+        if (worldObjectPresenter.sunLight && scene.children.includes(worldObjectPresenter.sunLight)) 
+          scene.remove(worldObjectPresenter.sunLight);
+        if (worldObjectPresenter.ambientLight && scene.children.includes(worldObjectPresenter.ambientLight)) 
+          scene.remove(worldObjectPresenter.ambientLight);
+        if (worldObjectPresenter.hemisphereLight && scene.children.includes(worldObjectPresenter.hemisphereLight)) 
+          scene.remove(worldObjectPresenter.hemisphereLight);
+      }
+    }
+    
+    // Garante que as fallback lights estão adicionadas e marcadas
+    ensureFallbackLights();
+    if (fallbackAmbientLight) {
+      fallbackAmbientLight.userData.isFallbackLight = true;
+      fallbackAmbientLight.intensity = 0.45;
+    }
+    if (fallbackDirectionalLight) {
+      fallbackDirectionalLight.userData.isFallbackLight = true;
+      fallbackDirectionalLight.intensity = 1.0;
+    }
+    
+    // Ajusta o renderer
+    if (typeof renderer !== 'undefined') {
+      renderer.toneMapping = THREE.NoToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+  }
+  
+  // Atualiza o log visual
+  updateVisualEffectsLog && updateVisualEffectsLog();
+  
+  // Logs do número de luzes para diagnóstico
+  if (typeof scene !== 'undefined') {
+    const allLights = scene.children.filter(obj => obj.isLight);
+    console.log("[DEBUG] Depois de alternar: Total de luzes na cena:", allLights.length);
+    allLights.forEach((light, i) => {
+      console.log(`[DEBUG] Luz #${i+1}: ${light.type}, intensidade: ${light.intensity}, fallback: ${!!light.userData.isFallbackLight}`);
+    });
+  }
+}
+// ... existing code ...
+
+// Chamar ao inicializar e ao mudar o flag
+updateVisualEffectsMode();
+window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
+  const settings = e.detail || {};
+  if (typeof settings.visualEffects === 'boolean') {
+    visualEffectsActive = settings.visualEffects;
+    updateVisualEffectsMode();
+  }
+});
+// ... existing code ...
+
+// ... existing code ...
+// Painel de diagnóstico visual
+let diagPanel = document.createElement('div');
+diagPanel.style.position = 'fixed';
+diagPanel.style.top = '126px';
+diagPanel.style.left = '8px';
+diagPanel.style.zIndex = 99999;
+diagPanel.style.background = 'rgba(0,0,0,0.7)';
+diagPanel.style.color = '#ffe066';
+diagPanel.style.fontSize = '13px';
+diagPanel.style.padding = '4px 12px';
+diagPanel.style.borderRadius = '6px';
+diagPanel.style.pointerEvents = 'none';
+diagPanel.innerText = 'Diagnóstico: --';
+document.body.appendChild(diagPanel);
+
+function updateDiagPanel() {
+  let mode = (visualEffectsActive && typeof composer !== 'undefined') ? 'COMPOSER' : 'RENDERER';
+  let nLights = scene && scene.children ? scene.children.filter(obj => obj.isLight).length : 0;
+  let nObjs = scene && scene.children ? scene.children.length : 0;
+  let hasCamera = !!camera;
+  let hasPlane = !!plane;
+  diagPanel.innerText = `Modo: ${mode}\nLuzes: ${nLights}\nObjs: ${nObjs}\nCâmera: ${hasCamera ? 'Sim' : 'Não'}\nChão: ${hasPlane ? 'Sim' : 'Não'}`;
+  // Log detalhado no console a cada troca de modo
+  if (window.__lastDiagMode !== mode) {
+    console.log('[DIAG] Modo:', mode, '| Luzes:', nLights, '| Objs:', nObjs, '| Câmera:', hasCamera, '| Chão:', hasPlane);
+    window.__lastDiagMode = mode;
+  }
+}
+
+// Atualizar painel de diagnóstico a cada frame
+const oldAnimateDiag = animate;
+animate = function() {
+  updateDiagPanel();
+  oldAnimateDiag();
+};
+// ... existing code ...
