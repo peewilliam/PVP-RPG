@@ -72,4 +72,10 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 - Sincronização robusta: level, xp, nextLevelXp e name sempre atualizados entre servidor e cliente
 - Decisão: feedback visual e clareza são prioridades para engajamento e satisfação do jogador
 - Padrão: fallback visual no HUD para evitar sensação de "vazio" ou "invisível"
-- UI exibe nomes localizados de monstros (campo NAME), nunca o identificador interno. Garante clareza, localização e experiência de usuário consistente. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'. 
+- UI exibe nomes localizados de monstros (campo NAME), nunca o identificador interno. Garante clareza, localização e experiência de usuário consistente. Exemplo: BLACK_MIST_ZOMBIE exibe 'Zumbi da Névoa Negra'.
+
+# Melhorias Recentes
+
+- O sistema de entidades foi totalmente reestruturado: agora cada tipo (jogador, monstro, objeto do mundo) é gerenciado separadamente, evitando bugs de sumiço ou comportamento estranho e tornando o mundo mais estável.
+- A comunicação entre cliente e servidor foi otimizada com eventos binários: as informações mais importantes do jogo (movimento, status, morte, atualização de mundo) agora são transmitidas em formato binário, reduzindo o tempo de resposta e o uso de internet, deixando a experiência mais fluida mesmo com muitos jogadores.
+- Essas mudanças aumentam a escalabilidade do sistema, permitindo mais jogadores e monstros simultâneos, e preparam o terreno para futuras expansões e novidades. 

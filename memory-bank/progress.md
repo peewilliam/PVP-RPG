@@ -385,4 +385,10 @@ O sistema atual representa uma base sólida para futuras otimizações, com foco
 ## Observações sobre balanceamento
 - Para ajustar XP, dano, defesa, HP, mana e benefícios por level, altere progressionSystem.js.
 - Para eventos de XP em dobro, basta alterar XP_MULTIPLIER.
-- O valor exibido de dano no cliente é sempre o real sofrido pelo alvo. 
+- O valor exibido de dano no cliente é sempre o real sofrido pelo alvo.
+
+## Infraestrutura e Rede: Novos Marcos
+- Refatoração do sistema de entidades: agora cada tipo (player, monster, worldObject, damageZone) é gerenciado em mapas separados, eliminando conflitos de ID e bugs de remoção.
+- Implementação de eventos binários para comunicação cliente-servidor: eventos críticos (movimento, status, morte, update de mundo) agora usam serialização binária customizada (binarySerializer.js), reduzindo drasticamente o tamanho dos pacotes, a latência e o uso de banda.
+- Documentação incremental dos eventos binários: cada evento possui opcode, formato e exemplos claros, facilitando manutenção e expansão.
+- Essas mudanças aumentam a performance, permitem mais entidades simultâneas e melhoram a experiência do jogador, tornando o sistema mais escalável e preparado para o futuro. 

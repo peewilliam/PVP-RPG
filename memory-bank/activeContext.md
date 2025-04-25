@@ -59,6 +59,12 @@
 - Remoção do antigo levelUtils.js e refatoração de monstros para usar o sistema centralizado.
 - Balanceamento de XP e dano agora é feito exclusivamente via progressionSystem.js, facilitando eventos (ex: XP em dobro) e ajustes finos.
 
+## Mudanças recentes (Infraestrutura e Rede)
+- Refatoração do sistema de entidades: agora cada tipo (player, monster, worldObject, damageZone) é gerenciado em mapas separados, eliminando conflitos de ID e bugs de remoção.
+- Implementação de eventos binários para comunicação cliente-servidor: eventos críticos (movimento, status, morte, update de mundo) agora usam serialização binária customizada (binarySerializer.js), reduzindo drasticamente o tamanho dos pacotes, a latência e o uso de banda.
+- Documentação incremental dos eventos binários: cada evento possui opcode, formato e exemplos claros, facilitando manutenção e expansão.
+- Essas mudanças aumentam a performance, permitem mais entidades simultâneas e melhoram a experiência do jogador, tornando o sistema mais escalável e preparado para o futuro.
+
 ## Próximos passos
 - Refino de tooltips, responsividade mobile, e integração de novas habilidades.
 - Testes de usabilidade e coleta de feedback dos jogadores.

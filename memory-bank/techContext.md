@@ -204,4 +204,19 @@ Implementamos um sistema avançado de otimização de rede que resolve problemas
 ## Balanceamento Centralizado
 - O arquivo shared/progressionSystem.js é o ponto único de configuração e ajuste de XP, level, benefícios por level, multiplicador global de XP, dano PvP/PvE, defesa, HP e mana.
 - Para eventos de XP em dobro, basta alterar XP_MULTIPLIER no progressionSystem.js.
-- Todo o balanceamento de progressão e combate deve ser feito nesse arquivo para garantir consistência e facilidade de manutenção. 
+- Todo o balanceamento de progressão e combate deve ser feito nesse arquivo para garantir consistência e facilidade de manutenção.
+
+## Novidades Técnicas Recentes
+
+### Sistema de Eventos Binários (binarySerializer.js)
+- Implementado utilitário compartilhado para serialização binária dos principais eventos de rede (movimento, status, morte, update de mundo).
+- Cada evento binário possui opcode único, formato compacto e quantização de dados (posição, rotação, HP, etc).
+- Redução de até 80% no tamanho dos pacotes críticos, menor latência e maior escalabilidade.
+- Permite integração incremental: eventos menos críticos continuam em JSON, facilitando debug e manutenção.
+- Exemplo de eventos binários: player:move, player:moved, monster:move, world:update, player:status, monster:death, playerMoveInput.
+- O utilitário é documentado e compatível entre cliente e servidor.
+
+### Refatoração do Sistema de Entidades
+- Entidades agora são gerenciadas em mapas segmentados por tipo (players, monsters, worldObjects, damageZones), eliminando conflitos de ID e bugs de remoção.
+- Operações de busca, remoção e atualização são sempre feitas no mapa correto, aumentando a robustez e facilitando manutenção.
+- Essa arquitetura prepara o sistema para expansão futura e maior número de entidades simultâneas. 

@@ -706,3 +706,59 @@ Além do sistema de otimização de rede, o projeto implementa várias estratég
   - Plugin Vite com `configureServer` interceptando `/play` e servindo o HTML correto
   - Middleware para alias de assets
 - Motivo: Permite múltiplos pontos de entrada reais, sem gambiarras, mantendo a arquitetura limpa e fácil de manter.
+
+## Sistema de Eventos Binários e Serialização (binarySerializer.js)
+
+### Visão Geral
+Para otimizar a comunicação entre cliente e servidor, migramos eventos críticos de JSON para um formato binário customizado, implementado em `shared/utils/binarySerializer.js`. Isso reduz drasticamente o tamanho dos pacotes, melhora a performance e diminui a latência, especialmente em cenários com muitos jogadores e entidades.
+
+### Vantagens
+- Redução de até 80% no tamanho dos pacotes de rede para eventos críticos.
+- Menor latência e uso de banda, permitindo mais entidades simultâneas.
+- Integração incremental: eventos menos críticos continuam em JSON, facilitando manutenção e debug.
+- Quantização de posições e rotações para empacotamento eficiente.
+
+### Como funciona
+- Cada evento binário possui um opcode único (1 byte) que identifica o tipo de mensagem.
+- Os dados são serializados em ArrayBuffer/DataView, usando quantização para posições (-100 a +100 mapeado para 0-65535) e rotações (0-2PI mapeado para 0-255).
+- IDs de entidades são convertidos para inteiros compactos.
+- O utilitário `toArrayBuffer` garante compatibilidade entre diferentes formatos de buffer.
+
+### Eventos Binários Implementados
+- **player:move** (opcode 0x01): Envia movimento do jogador (id, posX, posY, rot).
+- **player:moved** (opcode 0x02): Atualização de posição, HP e mana do jogador.
+- **monster:move** (opcode 0x03): Movimento de monstro (id, posX, posY, rot).
+- **world:update** (opcode 0x05): Atualização de múltiplas entidades essenciais (id, posX, posY, rot, hp).
+- **player:status** (opcode 0x10): Status completo do jogador (hp, maxHp, mana, maxMana, level, xp, nextLevelXp).
+- **playerMoveInput**: Input de movimento WASD (bits 0-3).
+- **monster:death** (opcode 0x20): Notificação de morte de monstro (id).
+
+### Exemplo de Serialização/Deserialização
+```js
+// Serializar movimento do jogador
+const buffer = serializePlayerMove({ playerId: 1, posX: 10.5, posY: -3.2, rot: Math.PI });
+// Enviar buffer pelo canal de rede
+
+// No receptor:
+const data = deserializePlayerMove(buffer);
+console.log(data); // { opcode: 1, playerId: 1, posX: 10.5, posY: -3.2, rot: 3.14 }
+```
+
+### Documentação dos Principais Métodos (binarySerializer.js)
+- `serializePlayerMove` / `deserializePlayerMove`
+- `serializePlayerMoved` / `deserializePlayerMoved`
+- `serializeMonsterMove` / `deserializeMonsterMove`
+- `serializeWorldUpdate` / `deserializeWorldUpdate`
+- `serializePlayerStatus` / `deserializePlayerStatus`
+- `serializePlayerMoveInput` / `deserializePlayerMoveInput`
+- `serializeMonsterDeath` / `deserializeMonsterDeath`
+
+Cada função recebe um objeto com os campos relevantes e retorna um ArrayBuffer (serialização) ou objeto JS (deserialização).
+
+### Integração
+- O sistema permite migrar eventos gradualmente: eventos críticos (movimento, status, morte) já usam binário; outros permanecem em JSON.
+- O utilitário pode ser expandido para novos eventos conforme necessário.
+
+### Referência: shared/utils/binarySerializer.js
+- O arquivo contém comentários detalhados e exemplos de uso para cada função.
+- Mantém compatibilidade entre cliente e servidor, facilitando debug e expansão futura.

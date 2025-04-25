@@ -60,4 +60,11 @@ O projeto implementa um MMORPG topdown isométrico com combate em tempo real, ha
 - O sistema de combate foi robustecido com logs detalhados, validação de parâmetros e tratamento de edge cases.
 - O cliente exibe efeitos visuais de status (ex: congelado) de forma sincronizada com o servidor.
 
-Esses padrões garantem escalabilidade, fácil manutenção e experiência consistente para o jogador. 
+Esses padrões garantem escalabilidade, fácil manutenção e experiência consistente para o jogador.
+
+# Atualizações Recentes
+
+- Refatoração do sistema de entidades: agora jogadores, monstros, objetos do mundo e zonas de dano são gerenciados em mapas separados, eliminando conflitos de ID e tornando o gerenciamento mais seguro e robusto.
+- Implementação de eventos binários para comunicação cliente-servidor: eventos críticos (movimento, status, morte, update de mundo) agora usam serialização binária customizada (ver binarySerializer.js), reduzindo drasticamente o tamanho dos pacotes, a latência e o uso de banda.
+- Documentação incremental dos eventos binários: cada evento possui opcode, formato e exemplos claros, facilitando manutenção e expansão.
+- Essas mudanças aumentam a performance, permitem mais entidades simultâneas e melhoram a experiência do jogador, tornando o sistema mais escalável e preparado para o futuro. 
