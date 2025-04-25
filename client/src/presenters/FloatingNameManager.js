@@ -6,37 +6,23 @@ export class FloatingNameManager {
   }
 
   addName(id, mesh, name) {
-    const el = document.createElement('div');
-    el.className = 'monster-name';
-    el.textContent = name;
-    el.style.position = 'absolute';
-    el.style.color = '#ffffff';
-    el.style.fontWeight = 'bold';
-    // Sombra mais grossa para melhor contraste em qualquer fundo
-    el.style.textShadow = '0 0 6px #000, 0 0 3px #000, 1px 1px 2px #000';
-    el.style.pointerEvents = 'none';
-    el.style.fontSize = '12px'; // Aumentado para 18px
-    el.style.fontFamily = 'Arial, sans-serif';
-    el.style.textAlign = 'center';
-    el.style.whiteSpace = 'nowrap';
-    el.style.userSelect = 'none';
-    el.style.padding = '2px 8px'; // Adiciona um pequeno padding
-    el.style.borderRadius = '3px'; // Bordas levemente arredondadas
-    el.style.backgroundColor = 'rgba(0, 0, 0, 0.3)'; // Fundo semi-transparente para melhor legibilidade
-    this.container.appendChild(el);
-    this.names.set(id, { el, mesh });
+    // Não cria mais o nome flutuante, apenas registra para compatibilidade
+    this.names.set(id, { el: null, mesh });
   }
 
   removeName(id) {
     const obj = this.names.get(id);
     if (obj) {
-      this.container.removeChild(obj.el);
+      if (obj.el && obj.el.parentNode) {
+        this.container.removeChild(obj.el);
+      }
       this.names.delete(id);
     }
   }
 
   updateAll(width, height) {
     for (const { el, mesh } of this.names.values()) {
+      if (!el) continue;
       if (!mesh || !mesh.position) continue;
       const pos = mesh.position.clone();
       pos.y += 4.2; // Ajustado para posição ideal acima da cabeça

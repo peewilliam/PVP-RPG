@@ -130,7 +130,7 @@ export class SpawnSystem {
     console.log(`Monstro ${monsterId} (${monster.monsterType}) agendado para respawn em ${respawnTime/1000} segundos`);
     
     // Remove o monstro
-    this.entityManager.removeEntity(monsterId);
+    this.entityManager.removeMonster(monsterId);
     
     // Agenda o respawn
     const timerId = setTimeout(() => {

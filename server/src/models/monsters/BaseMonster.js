@@ -1,6 +1,8 @@
 import { Entity } from '../Entity.js';
 import { MONSTERS, PLAYER, EVENTS } from '../../../../shared/constants/gameConstants.js';
 import { getLevelBenefits, getXpForLevel, calculateXpGain, calculateDamage } from '../../../../shared/progressionSystem.js';
+import { serializeMonsterDeath } from '../../../../shared/utils/binarySerializer.js';
+import { BINARY_EVENTS } from '../../../../shared/constants/gameConstants.js';
 
 export class BaseMonster extends Entity {
   constructor(id, type, position = { x: 0, y: 0, z: 0 }, level = 1) {
@@ -250,8 +252,9 @@ export class BaseMonster extends Entity {
       // Preferencialmente, emitir para todos os canais conectados
       if (global.server.channels && typeof global.server.channels.values === 'function') {
         for (const channel of global.server.channels.values()) {
-          channel.emit(EVENTS.MONSTER.DEATH, { id: this.id });
-          console.log(`[SERVER] [DIE] Evento EVENTS.MONSTER.DEATH emitido via global.server.channels (monstro ${this.id})`);
+          // Evento binário de morte de monstro
+          const binDeath = serializeMonsterDeath({ monsterId: this.id });
+          channel.emit(BINARY_EVENTS.MONSTER_DEATH, new Uint8Array(binDeath));
           emitted = true;
         }
       }
@@ -259,8 +262,8 @@ export class BaseMonster extends Entity {
       else if (global.gameWorld && global.gameWorld.entityManager && global.gameWorld.entityManager.players) {
         for (const player of global.gameWorld.entityManager.players.values()) {
           if (player.channel) {
-            player.channel.emit(EVENTS.MONSTER.DEATH, { id: this.id });
-            console.log(`[SERVER] [DIE] Evento EVENTS.MONSTER.DEATH emitido para player ${player.id} (monstro ${this.id})`);
+            const binDeath = serializeMonsterDeath({ monsterId: this.id });
+            player.channel.emit(BINARY_EVENTS.MONSTER_DEATH, new Uint8Array(binDeath));
             emitted = true;
           }
         }
@@ -270,7 +273,6 @@ export class BaseMonster extends Entity {
       }
       // Delay de 50ms para garantir que a HUD do alvo seja atualizada antes da remoção
       setTimeout(() => {
-        console.log(`[SERVER] [DIE] Chamando monsterDied para ${this.id}`);
         if (global.gameWorld) {
           global.gameWorld.monsterDied(this.id);
         } else {

@@ -6,13 +6,14 @@ import { DamageZone } from './DamageZone.js';
 
 // Adiciona contador global para IDs numéricos de player
 let nextPlayerId = 1;
+let nextMonsterId = 1;
 
 /**
  * Gerenciador de entidades que controla todas as entidades do jogo
  */
 export class EntityManager {
   constructor() {
-    this.entities = new Map(); // Map de ID -> Entidade
+    // this.entities = new Map(); // Removido: não usar mapa genérico
     this.players = new Map();  // Map de ID -> Player (para acesso rápido)
     this.monsters = new Map(); // Map de ID -> Monster (para acesso rápido)
     this.worldObjects = new Map(); // Map de ID -> WorldObject (futuro)
@@ -27,21 +28,12 @@ export class EntityManager {
    * @returns {Player} - Instância do jogador criado
    */
   createPlayer(channel, position = { x: 0, y: 0, z: 0 }) {
-    // Gere um novo ID numérico incremental
     const id = nextPlayerId++;
-    
-    // Verifica se o jogador já existe
     if (this.players.has(id)) {
       return this.players.get(id);
     }
-    
-    // Cria o jogador
     const player = new Player(id, channel, position);
-    
-    // Adiciona às coleções
-    this.entities.set(id, player);
     this.players.set(id, player);
-    
     return player;
   }
   
@@ -53,17 +45,11 @@ export class EntityManager {
    * @returns {Monster} - Instância do monstro criado
    */
   createMonster(type, position = { x: 0, y: 0, z: 0 }, level = 1) {
-    const id = `monster-${uuidv4()}`;
-    
-    // Cria o monstro usando a factory dinâmica
+    const id = nextMonsterId++;
     const MonsterClass = MonsterTypes[type];
     if (!MonsterClass) throw new Error(`Tipo de monstro desconhecido: ${type}`);
     const monster = new MonsterClass(id, position, level);
-    
-    // Adiciona às coleções
-    this.entities.set(id, monster);
     this.monsters.set(id, monster);
-    
     return monster;
   }
   
@@ -84,7 +70,6 @@ export class EntityManager {
       params.owner,
       params.ability
     );
-    this.entities.set(id, projectile);
     this.projectiles.set(id, projectile);
     return projectile;
   }
@@ -338,19 +323,34 @@ export class EntityManager {
    * @returns {Entity|null} - Entidade colidindo ou null
    */
   checkCollision(entity, radius = 1) {
-    for (const other of this.entities.values()) {
-      // Não verifica colisão com a própria entidade ou entidades inativas
-      if (other.id === entity.id || !other.active) continue;
-      
-      // Verifica distância entre entidades
-      const distance = entity.distanceTo(other);
-      
-      // Se a distância for menor que o raio, há colisão
-      if (distance < radius) {
-        return other;
-      }
+    // Exemplo: colisão entre players e monstros
+    for (const player of this.players.values()) {
+      if (player.id === entity.id || !player.active) continue;
+      const distance = entity.distanceTo(player);
+      if (distance < radius) return player;
     }
-    
+    for (const monster of this.monsters.values()) {
+      if (monster.id === entity.id || !monster.active) continue;
+      const distance = entity.distanceTo(monster);
+      if (distance < radius) return monster;
+    }
+    // Adicione outros tipos conforme necessário
     return null;
+  }
+
+  removePlayer(id) {
+    return this.players.delete(id);
+  }
+  removeMonster(id) {
+    return this.monsters.delete(id);
+  }
+  removeProjectile(id) {
+    return this.projectiles.delete(id);
+  }
+  removeDamageZone(id) {
+    return this.damageZones.delete(id);
+  }
+  removeWorldObject(id) {
+    return this.worldObjects.delete(id);
   }
 } 

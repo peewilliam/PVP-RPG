@@ -249,7 +249,6 @@ export class WorldManager {
     );
     
     // Adiciona ao gerenciador de entidades
-    this.entityManager.entities.set(id, worldObject);
     this.entityManager.worldObjects.set(id, worldObject);
     
     return worldObject;

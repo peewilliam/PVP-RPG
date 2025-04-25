@@ -32,8 +32,10 @@ import {
   deserializeWorldUpdate,
   logBinary,
   deserializePlayerStatus,
-  serializePlayerMoveInput
+  serializePlayerMoveInput,
+  deserializeMonsterDeath
 } from '../../shared/utils/binarySerializer.js';
+import { FloatingBarManager } from './presenters/FloatingBarManager.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -62,6 +64,7 @@ let worldObjectPresenter;
 let playerPresenter;
 let skillManager; // Gerenciador de habilidades
 let floatingNameManager;
+let floatingBarManager;
 
 // Variáveis para o sistema de rotação com o mouse
 let mousePosition = new THREE.Vector2();
@@ -379,9 +382,9 @@ function initThree() {
   createWorldBoundaries();
   
   // Inicializa os presenters
-  monsterPresenter = new MonsterPresenter(scene);
+  monsterPresenter = new MonsterPresenter(scene, floatingNameManager, floatingBarManager);
   worldObjectPresenter = new WorldObjectPresenter(scene);
-  playerPresenter = new PlayerPresenter(scene);
+  playerPresenter = new PlayerPresenter(scene, floatingBarManager);
   skillManager = new SkillManager(scene);
   
   // Configura o sistema de iluminação avançado
@@ -430,12 +433,18 @@ function initThree() {
   // Cria gerenciador de textos flutuantes
   floatingTextManager = new FloatingTextManager(scene, camera);
 
+  // Instancia o FloatingBarManager ANTES dos presenters!
+  floatingBarManager = new FloatingBarManager(document.body, camera);
+
   // Instancia o FloatingNameManager
   const overlay = document.getElementById('overlay');
   floatingNameManager = new FloatingNameManager(overlay, camera);
 
-  // Instancia MonsterPresenter com o gerenciador de nomes
-  monsterPresenter = new MonsterPresenter(scene, floatingNameManager);
+  // Instancia MonsterPresenter e PlayerPresenter com o gerenciador de barras
+  monsterPresenter = new MonsterPresenter(scene, floatingNameManager, floatingBarManager);
+  worldObjectPresenter = new WorldObjectPresenter(scene);
+  playerPresenter = new PlayerPresenter(scene, floatingBarManager);
+  skillManager = new SkillManager(scene);
   // PATCH: restaurar cor do monstro ao respawnar
   const oldUpdateMonster = monsterPresenter.updateMonster.bind(monsterPresenter);
   monsterPresenter.updateMonster = function(monsterData) {
@@ -762,6 +771,11 @@ function animate() {
   // Atualiza nomes flutuantes
   if (floatingNameManager) {
     floatingNameManager.updateAll(window.innerWidth, window.innerHeight);
+  }
+
+  // No loop de animação, após atualizar nomes flutuantes
+  if (floatingBarManager) {
+    floatingBarManager.updateAll(window.innerWidth, window.innerHeight);
   }
 }
 
@@ -1786,40 +1800,33 @@ function initServerEvents() {
     }
   });
 
-  // Evento de morte de monstro
-  channel.on(EVENTS.MONSTER.DEATH, data => {
-    console.log('[CLIENT] [EVENTS.MONSTER.DEATH] Recebido para monstro:', data && data.id);
-    if (!data || !data.id) return;
-    const mesh = monsterPresenter.getMonster(data.id);
+  // Evento de morte de monstro (BINÁRIO)
+  channel.on(BINARY_EVENTS.MONSTER_DEATH, buffer => {
+    const data = deserializeMonsterDeath(buffer);
+    const id = String(data.monsterId);
+    const mesh = monsterPresenter.getMonster(id);
     if (mesh) {
-      console.log('[CLIENT] [applyGrayDeathEffect] Aplicando efeito cinza ao monstro:', data.id);
       applyGrayDeathEffect(mesh);
-    } else {
-      console.warn('[CLIENT] [applyGrayDeathEffect] Mesh do monstro não encontrado:', data.id);
     }
     // Se o monstro morto for o alvo selecionado, atualizar HUD para vida 0
-    if (selectedTargetId === data.id && selectedTargetType === 'monster') {
-      const targetData = monsterPresenter.getMonsterData(data.id);
+    if (selectedTargetId === id && selectedTargetType === 'monster') {
+      const targetData = monsterPresenter.getMonsterData(id);
       if (targetData) {
         targetData.stats = targetData.stats || {};
         targetData.stats.hp = 0;
-        console.log('[CLIENT] [HUD] Atualizando HUD do alvo para vida 0 do monstro:', data.id);
         updateTargetHUD(formatTargetForHUD(targetData, 'monster'));
       }
     }
     // Remove o corpo do monstro após um curto delay (para animações)
     setTimeout(() => {
-      console.log('[CLIENT] [removeMonster] Removendo monstro:', data.id);
-      monsterPresenter.removeMonster(data.id);
-      // Se o monstro removido era o alvo selecionado, limpar HUD
-      if (selectedTargetId === data.id && selectedTargetType === 'monster') {
+      monsterPresenter.removeMonster(id);
+      if (selectedTargetId === id && selectedTargetType === 'monster') {
         selectedTargetId = null;
         selectedTargetType = null;
         updateTargetHUD(null);
         highlightTarget(null);
-        console.log('[CLIENT] [HUD] HUD do alvo limpa após remoção do monstro:', data.id);
       }
-    }, 2000); // 2 segundos de delay para mostrar animação de morte
+    }, 2000);
   });
   
   // Eventos de habilidades da aranha e outros monstros
@@ -2239,11 +2246,26 @@ channel.on(EVENTS.MONSTER.DEATH, data => {
   console.log('[CLIENT] [EVENTS.MONSTER.DEATH] Recebido para monstro:', data && data.id);
   if (!data || !data.id) return;
   const mesh = monsterPresenter.getMonster(data.id);
-  if (mesh) {
+  let maxHp = 1;
+  if (mesh && mesh.userData && mesh.userData.stats && mesh.userData.stats.maxHp) {
+    maxHp = mesh.userData.stats.maxHp;
     console.log('[CLIENT] [applyGrayDeathEffect] Aplicando efeito cinza ao monstro:', data.id);
     applyGrayDeathEffect(mesh);
   } else {
+    // Tenta buscar maxHp do presenter, se possível
+    const monsterData = monsterPresenter.getMonsterData ? monsterPresenter.getMonsterData(data.id) : null;
+    if (monsterData && monsterData.stats && monsterData.stats.maxHp) {
+      maxHp = monsterData.stats.maxHp;
+    }
     console.warn('[CLIENT] [applyGrayDeathEffect] Mesh do monstro não encontrado:', data.id);
+  }
+  // Zera a barra de vida flutuante imediatamente, mesmo sem mesh
+  if (monsterPresenter.floatingBarManager) {
+    console.log('[MONSTER.DEATH] Zerando barra', data.id, 'maxHp:', maxHp);
+    monsterPresenter.floatingBarManager.updateBar(data.id, {
+      hp: 0,
+      maxHp
+    });
   }
   // Se o monstro morto for o alvo selecionado, atualizar HUD para vida 0
   if (selectedTargetId === data.id && selectedTargetType === 'monster') {

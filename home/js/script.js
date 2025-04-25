@@ -120,9 +120,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Patch notes (exemplo, edite conforme necessário)
   const patchNotes = [
-    { id: 'patch-1-0', title: 'Patch 1.0 - Lançamento', content: 'Primeira versão do jogo lançada com sistema de combate, progressão e mundo inicial.' },
-    { id: 'patch-1-1', title: 'Patch 1.1 - Novos Recursos', content: 'Adicionados novos monstros, sistema de XP em dobro para eventos e melhorias na HUD.' },
-    { id: 'patch-1-2', title: 'Patch 1.2 - Balanceamento', content: 'Balanceamento de dano PvP/PvE, ajuste de defesa e melhorias na IA dos monstros.' },
+    { id: 'patch-1-0', title: 'Patch 0.1 - Alpha', content: 'Primeira versão do jogo alpha com sistema de combate, progressão e mundo inicial.' },
+    { id: 'patch-1-1', title: 'Patch 0.2 - Novos Recursos', content: 'Adicionados novos monstros, sistema de XP em dobro para eventos e melhorias na HUD.' },
+    { id: 'patch-1-2', title: 'Patch 0.3 - Balanceamento', content: 'Balanceamento de dano PvP/PvE, ajuste de defesa e melhorias na IA dos monstros.' },
+    { id: 'patch-1-3', title: 'Patch 0.4 - Estabilidade e Experiência', content: 'Salve! Nessa atualização, foquei em corrigir problemas de estabilidade: monstros e objetos do cenário não devem mais sumir ou bugar do nada. O gerenciamento interno do jogo ficou mais robusto, o que deve deixar a experiência mais estável e pronta para as próximas features. Também fiz ajustes na troca de informações entre cliente e servidor, melhorando o empacotamento binário dos dados para deixar tudo mais fluido e rápido. Se encontrar algum bug ou comportamento estranho, manda pra mim! Valeu por jogar e por todo feedback nessa fase Alpha.' },
   ];
 
   // Cria a sidebar flutuante

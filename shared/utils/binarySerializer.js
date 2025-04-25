@@ -232,6 +232,23 @@ function deserializePlayerMoveInput(buffer) {
   };
 }
 
+// Serialização binária para monster:death
+function serializeMonsterDeath({ monsterId }) {
+  const buffer = new ArrayBuffer(3); // 1 opcode + 2 id
+  const view = new DataView(buffer);
+  view.setUint8(0, 0x20); // opcode para monster:death
+  view.setUint16(1, toEntityId(monsterId));
+  return buffer;
+}
+function deserializeMonsterDeath(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  return {
+    opcode: view.getUint8(0),
+    monsterId: view.getUint16(1)
+  };
+}
+
 // Log utilitário
 function logBinary(eventName) {
 //   console.log(`[BINÁRIO] Evento: ${eventName}`);
@@ -254,5 +271,7 @@ export {
   serializePlayerStatus,
   deserializePlayerStatus,
   serializePlayerMoveInput,
-  deserializePlayerMoveInput
+  deserializePlayerMoveInput,
+  serializeMonsterDeath,
+  deserializeMonsterDeath
 }; 

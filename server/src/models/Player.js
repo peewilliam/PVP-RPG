@@ -259,6 +259,18 @@ export class Player extends Entity {
         sourceId: source ? source.id : null,
         remainingHp: this.stats.hp
       });
+      // Emite status binário atualizado para o HUD
+      const binStatus = serializePlayerStatus({
+        playerId: this.id,
+        hp: Math.round(this.stats.hp),
+        maxHp: Math.round(this.stats.maxHp),
+        mana: Math.round(this.stats.mana),
+        maxMana: Math.round(this.stats.maxMana),
+        level: this.level,
+        xp: Math.round(this.xp),
+        nextLevelXp: Math.round(this.nextLevelXp)
+      });
+      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
     }
     // Verifica se o jogador morreu
     if (this.stats.hp <= 0) {

@@ -104,7 +104,7 @@ export class GameWorld {
     
     if (player) {
       console.log(`Jogador ${playerId} removido do mundo`);
-      this.entityManager.removeEntity(playerId);
+      this.entityManager.removePlayer(playerId);
     }
   }
   

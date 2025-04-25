@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FloatingBarManager } from './FloatingBarManager.js';
 
 /**
  * Presenter responsável por renderizar e gerenciar jogadores no cliente.
@@ -8,11 +9,13 @@ import * as THREE from 'three';
 export class PlayerPresenter {
   /**
    * @param {THREE.Scene} scene - Cena Three.js onde os jogadores serão renderizados
+   * @param {FloatingBarManager} floatingBarManager - Gerenciador de barras flutuantes
    */
-  constructor(scene) {
+  constructor(scene, floatingBarManager) {
     this.scene = scene;
     this.players = new Map(); // Map para armazenar todos os jogadores por ID
     this.localPlayerId = null; // ID do jogador local
+    this.floatingBarManager = floatingBarManager;
   }
 
   /**
@@ -112,6 +115,23 @@ export class PlayerPresenter {
     // Armazena referência ao objeto
     this.players.set(id, player);
     
+    // Adiciona barra de vida/energia e nome flutuante (exceto para o player local)
+    if (this.floatingBarManager && id !== this.localPlayerId) {
+      this.floatingBarManager.addBar(
+        id,
+        player,
+        'player',
+        data.name || `Player${String(id).slice(-4)}`
+      );
+      // Atualiza barra com valores iniciais
+      this.floatingBarManager.updateBar(id, {
+        hp: data.stats?.hp ?? 1,
+        maxHp: data.stats?.maxHp ?? 1,
+        mana: data.stats?.mana ?? 1,
+        maxMana: data.stats?.maxMana ?? 1
+      });
+    }
+    
     console.log(`Jogador criado: ${id}`);
   }
 
@@ -152,6 +172,16 @@ export class PlayerPresenter {
     if (data.active !== undefined) {
       player.visible = data.active;
     }
+
+    // Atualiza barra de vida/energia se não for o player local
+    if (this.floatingBarManager && id !== this.localPlayerId && data.stats) {
+      this.floatingBarManager.updateBar(id, {
+        hp: data.stats.hp ?? 1,
+        maxHp: data.stats.maxHp ?? 1,
+        mana: data.stats.mana ?? 1,
+        maxMana: data.stats.maxMana ?? 1
+      });
+    }
   }
 
   /**
@@ -168,6 +198,11 @@ export class PlayerPresenter {
     
     // Remove do mapa
     this.players.delete(id);
+    
+    // Remove barra de vida/energia
+    if (this.floatingBarManager) {
+      this.floatingBarManager.removeBar(id);
+    }
     
     console.log(`Jogador removido: ${id}`);
   }

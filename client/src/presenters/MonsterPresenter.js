@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Monsters } from './entities/index.js';
 import { MONSTERS } from '../../../shared/constants/gameConstants.js';
 import { FloatingNameManager } from './FloatingNameManager.js';
+import { FloatingBarManager } from './FloatingBarManager.js';
 
 /**
  * Presenter responsável por renderizar e gerenciar monstros no cliente.
@@ -11,12 +12,15 @@ import { FloatingNameManager } from './FloatingNameManager.js';
 export class MonsterPresenter {
   /**
    * @param {THREE.Scene} scene - Cena Three.js onde os monstros serão renderizados
+   * @param {FloatingNameManager} floatingNameManager - Gerenciador de nomes flutuantes
+   * @param {FloatingBarManager} floatingBarManager - Gerenciador de barras flutuantes
    */
-  constructor(scene, floatingNameManager) {
+  constructor(scene, floatingNameManager, floatingBarManager) {
     this.scene = scene;
     this.monsters = new Map(); // Map para armazenar todos os monstros ativos por ID
     this.lastResetTime = Date.now(); // Timestamp da última limpeza completa
     this.floatingNameManager = floatingNameManager;
+    this.floatingBarManager = floatingBarManager;
   }
 
   /**
@@ -46,6 +50,11 @@ export class MonsterPresenter {
    * @param {Object} data - Dados do monstro
    */
   createMonster(id, data) {
+    id = String(id);
+    // Remove monstro antigo se já existir
+    if (this.monsters.has(id)) {
+      this.removeMonster(id);
+    }
     let monster;
     if (data.monsterType === 'BLACK_MIST_ZOMBIE') {
       monster = Monsters.createBlackMistZombieVisual();
@@ -89,12 +98,25 @@ export class MonsterPresenter {
 
     // Armazena referência ao objeto
     this.monsters.set(id, monster);
-    
-    // Adiciona nome pt-br acima da cabeça
+    // Adiciona nome flutuante sempre que criar um monstro
     if (this.floatingNameManager) {
       const monsterType = data.monsterType || 'BLACK_MIST_ZOMBIE';
       const name = MONSTERS[monsterType]?.NAME || monsterType;
-      this.floatingNameManager.addName(id, monster, name);
+      this.floatingNameManager.addName(id, this.monsters.get(id), name);
+    }
+    // Adiciona barra de vida
+    if (this.floatingBarManager) {
+      const monsterStats = data.stats || {};
+      this.floatingBarManager.addBar(
+        id,
+        this.monsters.get(id),
+        'monster',
+        MONSTERS[data.monsterType]?.NAME || data.monsterType || id
+      );
+      this.floatingBarManager.updateBar(id, {
+        hp: monsterStats.hp ?? 1,
+        maxHp: monsterStats.maxHp ?? 1
+      });
     }
     
     // console.log(`Monstro criado: ${id}, tipo: ${monster.userData.monsterType}`);
@@ -106,6 +128,7 @@ export class MonsterPresenter {
    * @param {Object} data - Novos dados do monstro
    */
   updateExistingMonster(id, data) {
+    id = String(id);
     const monster = this.monsters.get(id);
     if (!monster) return;
     
@@ -123,9 +146,17 @@ export class MonsterPresenter {
       monster.rotation.y = Number(data.rotation) || monster.rotation.y;
     }
     
-    // Atualiza stats se fornecidos
+    // Atualiza stats de forma incremental
     if (data.stats) {
-      monster.userData.stats = data.stats;
+      monster.userData.stats = {
+        ...monster.userData.stats,
+        ...data.stats
+      };
+    }
+
+    // Atualiza level se fornecido
+    if (data.level !== undefined) {
+      monster.userData.level = data.level;
     }
 
     // Atualiza o estado ativo/inativo
@@ -135,6 +166,15 @@ export class MonsterPresenter {
     
     // Marca o timestamp da última atualização
     monster.userData.lastUpdated = Date.now();
+
+    // Atualiza barra de vida
+    if (this.floatingBarManager && data.stats) {
+      console.log('[MonsterPresenter] updateBar', id, data.stats);
+      this.floatingBarManager.updateBar(id, {
+        hp: data.stats.hp ?? monster.userData.stats.maxHp ?? 1,
+        maxHp: data.stats.maxHp ?? monster.userData.stats.maxHp ?? 1
+      });
+    }
   }
 
   /**
@@ -142,20 +182,22 @@ export class MonsterPresenter {
    * @param {string} id - ID do monstro a ser removido
    */
   removeMonster(id) {
+    id = String(id);
     if (!this.monsters.has(id)) return;
-    
     const monster = this.monsters.get(id);
-    
-    // Remove da cena
     this.scene.remove(monster);
-    
-    // Remove do mapa
+    // Zera a barra de vida antes de remover
+    if (this.floatingBarManager) {
+      this.floatingBarManager.updateBar(id, {
+        hp: 0,
+        maxHp: monster.userData.stats.maxHp ?? 1
+      });
+      this.floatingBarManager.removeBar(id);
+    }
     this.monsters.delete(id);
-    
     if (this.floatingNameManager) {
       this.floatingNameManager.removeName(id);
     }
-    
     console.log(`Monstro removido: ${id}`);
   }
 
@@ -165,7 +207,7 @@ export class MonsterPresenter {
    * @returns {THREE.Object3D|null} - Referência ao objeto 3D ou null se não existir
    */
   getMonster(id) {
-    return this.monsters.get(id) || null;
+    return this.monsters.get(String(id)) || null;
   }
 
   /**
@@ -216,5 +258,14 @@ export class MonsterPresenter {
       ...mesh.userData,
       status: mesh.userData.status || {},
     };
+  }
+
+  updateBar(id, { hp, maxHp }) {
+    const mesh = this.getMonster(id);
+    // Se o monstro está morto, sempre zere a barra
+    if (mesh && mesh.userData && mesh.userData._wasGray) {
+      hp = 0;
+    }
+    // ... resto do código ...
   }
 } 
