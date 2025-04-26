@@ -32,6 +32,7 @@ export class PlayerPresenter {
    * @returns {boolean} - true se o jogador existe, false caso contrário
    */
   hasPlayer(id) {
+    id = String(id); // Padroniza ID como string
     return this.players.has(id);
   }
 
@@ -77,6 +78,10 @@ export class PlayerPresenter {
    * @param {Object} data - Dados do jogador
    */
   createPlayer(id, data) {
+    id = String(id); // Padroniza ID como string
+    if (this.players.has(id)) {
+      this.removePlayer(id);
+    }
     // Geometria e material para o jogador (cubo azul)
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshStandardMaterial({ color: 0x0000ff }); // Azul
@@ -133,6 +138,7 @@ export class PlayerPresenter {
     }
     
     console.log(`Jogador criado: ${id}`);
+    console.log('Players atuais:', Array.from(this.players.keys()));
   }
 
   /**
@@ -141,9 +147,17 @@ export class PlayerPresenter {
    * @param {Object} data - Novos dados do jogador
    */
   updateExistingPlayer(id, data) {
-    const player = this.players.get(id);
-    if (!player) return;
-    
+    id = String(id); // Padroniza ID como string
+    let player = this.players.get(id);
+    if (!player) {
+      this.createPlayer(id, data);
+      player = this.players.get(id);
+      if (!player) {
+        console.error(`[PlayerPresenter] Falha ao criar mesh para player ${id}`);
+        return;
+      }
+    }
+
     // Atualiza posição se fornecida
     if (data.position) {
       player.position.set(
@@ -152,15 +166,23 @@ export class PlayerPresenter {
         Number(data.position.z) || player.position.z
       );
     }
-    
+
     // Atualiza rotação se fornecida
     if (data.rotation !== undefined) {
       player.rotation.y = Number(data.rotation) || player.rotation.y;
     }
-    
-    // Atualiza stats se fornecidos
+
+    // Atualiza stats se fornecidos (garantindo todos os campos)
     if (data.stats) {
-      player.userData.stats = data.stats;
+      player.userData.stats = {
+        ...player.userData.stats,
+        ...data.stats
+      };
+      // Garante que maxHp/maxMana existam
+      if (data.stats.maxHp !== undefined) player.userData.stats.maxHp = data.stats.maxHp;
+      if (data.stats.maxMana !== undefined) player.userData.stats.maxMana = data.stats.maxMana;
+      if (data.stats.hp !== undefined) player.userData.stats.hp = data.stats.hp;
+      if (data.stats.mana !== undefined) player.userData.stats.mana = data.stats.mana;
     }
 
     // Atualiza nível se fornecido
@@ -174,14 +196,17 @@ export class PlayerPresenter {
     }
 
     // Atualiza barra de vida/energia se não for o player local
-    if (this.floatingBarManager && id !== this.localPlayerId && data.stats) {
+    if (this.floatingBarManager && id !== this.localPlayerId && player.userData.stats) {
       this.floatingBarManager.updateBar(id, {
-        hp: data.stats.hp ?? 1,
-        maxHp: data.stats.maxHp ?? 1,
-        mana: data.stats.mana ?? 1,
-        maxMana: data.stats.maxMana ?? 1
+        hp: player.userData.stats.hp ?? 1,
+        maxHp: player.userData.stats.maxHp ?? 1,
+        mana: player.userData.stats.mana ?? 1,
+        maxMana: player.userData.stats.maxMana ?? 1
       });
     }
+    // Log para depuração
+    // console.log(`[PlayerPresenter] updateExistingPlayer: ${id}`, player.position, player.rotation.y, player.userData.stats);
+    console.log('Players atuais após update:', Array.from(this.players.keys()));
   }
 
   /**
@@ -189,22 +214,16 @@ export class PlayerPresenter {
    * @param {string} id - ID do jogador a ser removido
    */
   removePlayer(id) {
+    id = String(id); // Padroniza ID como string
     if (!this.players.has(id)) return;
-    
     const player = this.players.get(id);
-    
-    // Remove da cena
     this.scene.remove(player);
-    
-    // Remove do mapa
     this.players.delete(id);
-    
-    // Remove barra de vida/energia
     if (this.floatingBarManager) {
       this.floatingBarManager.removeBar(id);
     }
-    
     console.log(`Jogador removido: ${id}`);
+    console.log('Players atuais após remoção:', Array.from(this.players.keys()));
   }
 
   /**
@@ -213,6 +232,7 @@ export class PlayerPresenter {
    * @returns {THREE.Object3D|null} - Referência ao objeto 3D ou null se não existir
    */
   getPlayer(id) {
+    id = String(id); // Padroniza ID como string
     return this.players.get(id) || null;
   }
 

@@ -689,7 +689,7 @@ window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
   minFrameTime = fpsLimitActive ? 1000 / 30 : 0;
 })();
 
-// ... existing code ...
+
 // Variáveis globais para FPS real
 let framesThisSecond = 0;
 let lastFpsUpdateTime = performance.now();
@@ -795,7 +795,7 @@ let animate = function() {
   // No HUDManager, use window.fps para exibir o FPS real
   window.fps = fps;
 }
-// ... existing code ...
+
 
 // Conexão ao servidor
 channel.onConnect(error => {
@@ -2420,7 +2420,7 @@ channel.on(BINARY_EVENTS.PLAYER_STATUS, buffer => {
   }
 });
 
-// ... existing code ...
+
 // Log visual para depuração dos efeitos visuais
 let visualEffectsLog = document.createElement('div');
 visualEffectsLog.style.position = 'fixed';
@@ -2450,9 +2450,9 @@ window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
 });
 // Também atualizar ao inicializar
 updateVisualEffectsLog();
-// ... existing code ...
 
-// ... existing code ...
+
+
 // Luzes básicas para fallback quando efeitos visuais estão OFF
 let fallbackAmbientLight = null;
 let fallbackDirectionalLight = null;
@@ -2617,7 +2617,7 @@ function updateVisualEffectsMode() {
     });
   }
 }
-// ... existing code ...
+
 
 // Chamar ao inicializar e ao mudar o flag
 updateVisualEffectsMode();
@@ -2628,9 +2628,9 @@ window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
     updateVisualEffectsMode();
   }
 });
-// ... existing code ...
 
-// ... existing code ...
+
+
 // Painel de diagnóstico visual
 let diagPanel = document.createElement('div');
 diagPanel.style.position = 'fixed';
@@ -2666,4 +2666,3 @@ animate = function() {
   updateDiagPanel();
   oldAnimateDiag();
 };
-// ... existing code ...
