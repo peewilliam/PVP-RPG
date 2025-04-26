@@ -132,7 +132,7 @@ export class FloatingBarManager {
 
       el.style.left = `${x}px`;
       el.style.top = `${y}px`;
-      el.style.display = mesh.visible ? 'block' : 'none';
+      // el.style.display = mesh.visible ? 'block' : 'none';
     }
   }
 
