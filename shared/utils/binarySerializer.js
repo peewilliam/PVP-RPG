@@ -257,6 +257,107 @@ function logJson(eventName) {
 //   console.log(`[JSON] Evento: ${eventName}`);
 }
 
+// Serialização binária para world:update FULL (monstros, objetos do mundo, jogadores)
+import { MONSTER_TYPE_INDEX, MONSTER_TYPE_BY_INDEX, WORLD_OBJECT_TYPE_INDEX, WORLD_OBJECT_TYPE_BY_INDEX } from '../constants/gameConstants.js';
+function serializeWorldUpdateFull({ monsters, worldObjects, players }) {
+  // Header: 1 opcode + 2 N + 2 M + 2 P
+  const N = monsters.length;
+  const M = worldObjects.length;
+  const P = players.length;
+  // Monstro: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 2 hp + 2 maxHp = 12 bytes
+  // Objeto: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 1 status = 9 bytes
+  // Jogador: 12 bytes (igual)
+  const buffer = new ArrayBuffer(1 + 2 + 2 + 2 + (N * 12) + (M * 9) + (P * 12));
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x06); offset += 1; // opcode
+  view.setUint16(offset, N); offset += 2;
+  view.setUint16(offset, M); offset += 2;
+  view.setUint16(offset, P); offset += 2;
+  // Monstros
+  for (let i = 0; i < N; i++) {
+    const m = monsters[i];
+    view.setUint16(offset, toEntityId(m.id)); offset += 2;
+    // 1 byte: tipo
+    const typeIdx = MONSTER_TYPE_INDEX[m.monsterType] ?? 0;
+    view.setUint8(offset, typeIdx); offset += 1;
+    view.setUint16(offset, quantizePos(m.position.x)); offset += 2;
+    view.setUint16(offset, quantizePos(m.position.z)); offset += 2;
+    view.setUint8(offset, quantizeRot(m.rotation)); offset += 1;
+    view.setUint16(offset, m.stats?.hp ?? 0); offset += 2;
+    view.setUint16(offset, m.stats?.maxHp ?? 1); offset += 2;
+  }
+  // Objetos do mundo
+  for (let i = 0; i < M; i++) {
+    const o = worldObjects[i];
+    view.setUint16(offset, toEntityId(o.id)); offset += 2;
+    // 1 byte: tipo
+    const typeIdx = WORLD_OBJECT_TYPE_INDEX[o.type] ?? 0;
+    view.setUint8(offset, typeIdx); offset += 1;
+    view.setUint16(offset, quantizePos(o.position.x)); offset += 2;
+    view.setUint16(offset, quantizePos(o.position.z)); offset += 2;
+    view.setUint8(offset, quantizeRot(o.rotation ?? 0)); offset += 1;
+    view.setUint8(offset, o.status ?? 0); offset += 1; // Reservado para flags
+  }
+  // Jogadores (igual)
+  for (let i = 0; i < P; i++) {
+    const pl = players[i];
+    view.setUint16(offset, toEntityId(pl.id)); offset += 2;
+    view.setUint16(offset, quantizePos(pl.position.x)); offset += 2;
+    view.setUint16(offset, quantizePos(pl.position.z)); offset += 2;
+    view.setUint8(offset, quantizeRot(pl.rotation)); offset += 1;
+    view.setUint16(offset, pl.stats?.hp ?? 0); offset += 2;
+    view.setUint16(offset, pl.stats?.mana ?? 0); offset += 2;
+    view.setUint8(offset, pl.level ?? 1); offset += 1;
+  }
+  return buffer;
+}
+
+function deserializeWorldUpdateFull(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const N = view.getUint16(offset); offset += 2;
+  const M = view.getUint16(offset); offset += 2;
+  const P = view.getUint16(offset); offset += 2;
+  const monsters = [];
+  for (let i = 0; i < N; i++) {
+    const id = view.getUint16(offset); offset += 2;
+    const typeIdx = view.getUint8(offset); offset += 1;
+    const monsterType = MONSTER_TYPE_BY_INDEX[typeIdx] ?? 'BLACK_MIST_ZOMBIE';
+    const posX = dequantizePos(view.getUint16(offset)); offset += 2;
+    const posZ = dequantizePos(view.getUint16(offset)); offset += 2;
+    const rot = dequantizeRot(view.getUint8(offset)); offset += 1;
+    const hp = view.getUint16(offset); offset += 2;
+    const maxHp = view.getUint16(offset); offset += 2;
+    monsters.push({ id, monsterType, position: { x: posX, z: posZ }, rotation: rot, stats: { hp, maxHp } });
+  }
+  const worldObjects = [];
+  for (let i = 0; i < M; i++) {
+    const id = view.getUint16(offset); offset += 2;
+    const typeIdx = view.getUint8(offset); offset += 1;
+    const type = WORLD_OBJECT_TYPE_BY_INDEX[typeIdx] ?? 'TREE';
+    const posX = dequantizePos(view.getUint16(offset)); offset += 2;
+    const posZ = dequantizePos(view.getUint16(offset)); offset += 2;
+    const rot = dequantizeRot(view.getUint8(offset)); offset += 1;
+    const status = view.getUint8(offset); offset += 1;
+    worldObjects.push({ id, type, position: { x: posX, z: posZ }, rotation: rot, status });
+  }
+  const players = [];
+  for (let i = 0; i < P; i++) {
+    const id = view.getUint16(offset); offset += 2;
+    const posX = dequantizePos(view.getUint16(offset)); offset += 2;
+    const posZ = dequantizePos(view.getUint16(offset)); offset += 2;
+    const rot = dequantizeRot(view.getUint8(offset)); offset += 1;
+    const hp = view.getUint16(offset); offset += 2;
+    const mana = view.getUint16(offset); offset += 2;
+    const level = view.getUint8(offset); offset += 1;
+    players.push({ id, position: { x: posX, z: posZ }, rotation: rot, stats: { hp, mana }, level });
+  }
+  return { opcode, monsters, worldObjects, players };
+}
+
 export {
   serializePlayerMove,
   deserializePlayerMove,
@@ -273,5 +374,7 @@ export {
   serializePlayerMoveInput,
   deserializePlayerMoveInput,
   serializeMonsterDeath,
-  deserializeMonsterDeath
+  deserializeMonsterDeath,
+  serializeWorldUpdateFull,
+  deserializeWorldUpdateFull
 }; 

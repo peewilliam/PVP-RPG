@@ -243,4 +243,34 @@ export const BINARY_EVENTS = {
   MONSTER_DEATH: 'bin:monster:death',
   WORLD_UPDATE: 'bin:world:update', // Evento de atualização do mundo
   PLAYER_STATUS: 'bin:player:status' // Evento de status do jogador (funcionando 100% e unico)
-}; 
+};
+
+// Tabela de índices para tipos de monstros (para serialização binária)
+export const MONSTER_TYPE_INDEX = {
+  BLACK_MIST_ZOMBIE: 0,
+  SPIDER: 1
+  // Adicione outros tipos de monstro aqui, sempre na mesma ordem do array abaixo
+};
+export const MONSTER_TYPE_BY_INDEX = [
+  'BLACK_MIST_ZOMBIE',
+  'SPIDER'
+  // Adicione outros tipos de monstro aqui, na mesma ordem do objeto acima
+];
+
+// Tabela de índices para tipos de objetos do mundo (para serialização binária)
+export const WORLD_OBJECT_TYPE_INDEX = {
+  TREE: 0,
+  ROCK: 1,
+  BUSH: 2,
+  HOUSE: 3,
+  FENCE: 4
+  // Adicione outros tipos conforme necessário
+};
+export const WORLD_OBJECT_TYPE_BY_INDEX = [
+  'TREE',
+  'ROCK',
+  'BUSH',
+  'HOUSE',
+  'FENCE'
+  // Adicione outros tipos conforme necessário
+]; 

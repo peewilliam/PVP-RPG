@@ -58,7 +58,10 @@ const modelCache = {};
 const loader = new GLTFLoader();
 
 async function loadModel(path) {
+  
   if (modelCache[path]) return modelCache[path].clone();
+
+  // console.log('[DEBUG] Carregando modelo:', path);
   return new Promise((resolve, reject) => {
     loader.load(path, (gltf) => {
       modelCache[path] = gltf.scene;
@@ -533,222 +536,103 @@ export class WorldObjectPresenter {
   }
 
   /**
-   * Cria ou atualiza um objeto do mundo baseado nos dados recebidos do servidor
-   * @param {Object} objectData - Dados do objeto vindos do servidor
-   */
-  updateWorldObject(objectData) {
-    if (!objectData || !objectData.id) {
-      console.error('Dados de objeto do mundo inválidos:', objectData);
-      return;
-    }
-
-    const objectId = objectData.id;
-
-    // Se o objeto já existe, apenas atualiza suas propriedades
-    if (this.worldObjects.has(objectId)) {
-      this.updateExistingWorldObject(objectId, objectData);
-    } else {
-      // Caso contrário, cria uma nova representação visual
-      this.createWorldObject(objectId, objectData);
-    }
-  }
-
-  /**
-   * Cria uma representação visual para um novo objeto do mundo
-   * @param {string} id - ID único do objeto
-   * @param {Object} data - Dados do objeto
+   * Cria uma mesh robusta para o tipo de objeto do mundo (modelo 3D ou primitiva)
    */
   async createWorldObject(id, data) {
-    let worldObject;
-    const biome = data.biome || 'SPAWN'; // Fallback para SPAWN se biome não estiver definido
-    
-    // Mapeamento para novos tipos de objeto com base no objectType e biome
-    let modelPath = null;
-    let modelType = data.objectType;
-    
-    // console.log(data)
-    // Log inicial para debug
-    // console.log(`[WORLD] Criando objeto: ${data.objectType}, Bioma: ${biome}, ID: ${id}`);
-    
-    // Mapeamento especializado por bioma
-    if (biome === 'MOUNTAINS' && data.objectType === 'ROCK' && Math.random() > 0.7) {
-      modelPath = MODEL_MAP[biome].ROCK;
-      modelType = 'MOUNTAIN';
-    } else if (biome === 'RUINS' && data.objectType === 'TREE' && Math.random() > 0.6) {
-      modelPath = MODEL_MAP[biome].BRIDGE;
-      modelType = 'BRIDGE';
-    } else if ((data.objectType === 'ROCK' || data.objectType === 'BUSH') && MODEL_MAP[biome]?.ROCK) {
-      modelPath = MODEL_MAP[biome].ROCK;
-      modelType = 'ROCK';
-    } else if (data.objectType === 'TREE' && MODEL_MAP[biome]?.TREE) {
-      let treePath = MODEL_MAP[biome].TREE;
-      if (Array.isArray(treePath)) {
-        // 70% de chance de ser Tree01 e 30% Bush01 para mais árvores reais
-        treePath = Math.random() > 0.3 ? treePath[0] : treePath[1];
-      }
-      modelPath = treePath;
-      modelType = 'TREE';
-    } else if (data.objectType === 'BUSH' && MODEL_MAP[biome]?.BUSH) {
-      modelPath = MODEL_MAP[biome].BUSH;
-      modelType = 'BUSH';
-    } else if (data.objectType === 'GRASS' && MODEL_MAP[biome]?.GRASS) {
-      modelPath = MODEL_MAP[biome].GRASS;
-      modelType = 'GRASS';
-    } else if (data.objectType === 'FLOWER' && MODEL_MAP[biome]?.FLOWER) {
-      modelPath = MODEL_MAP[biome].FLOWER;
-      modelType = 'FLOWER';
+    id = String(id);
+    if (this.worldObjects.has(id)) this.removeWorldObject(id);
+
+    const type = typeof data.type === 'string' ? data.type : 'TREE';
+    const biome = data.biome || 'SPAWN';
+    let modelPath = MODEL_MAP[biome]?.[type];
+    if (Array.isArray(modelPath)) {
+      modelPath = modelPath[Math.floor(Math.random() * modelPath.length)];
     }
-    
-    // Log de caminho do modelo
-    if (modelPath) {
-      // console.log(`[MODEL] Caminho: ${modelPath}, Tipo Mapeado: ${modelType}`);
-    }
-    
-    // Carrega modelo 3D se tiver um caminho
+    let obj = null;
+
     if (modelPath) {
       try {
-        worldObject = await loadModel(modelPath);
-        
-        // Aplicar melhorias visuais sem alterar a escala
-        const modelInfo = adjustModel(worldObject, modelType, modelPath);
-        
-        // Ativar sombras para todos os objetos relevantes (Albion style)
-        worldObject.traverse(child => {
-          if (child.isMesh) {
-            // Ativa sombra para todos os objetos do mundo (exceto flores pequenas, se quiser performance)
-            if (modelType !== 'FLOWER') {
-              child.castShadow = true;
-            }
-            child.receiveShadow = true;
-            // Melhorar configuração de material para responder melhor à iluminação
-            if (child.material) {
-              child.material.envMapIntensity = 0.8;
-              if (child.material.type === 'MeshPhysicalMaterial') {
-                child.material.clearcoat = Math.min(child.material.clearcoat || 0, 0.3);
-                child.material.clearcoatRoughness = Math.max(child.material.clearcoatRoughness || 0, 0.8);
-                child.material.ior = 1.2;
-                if (!['TREE', 'MOUNTAIN', 'BRIDGE'].includes(modelType)) {
-                  child.material.thickness = 0;
-                  child.material.transmission = 0;
-                }
-              }
-            }
-          }
-        });
-        
-        // Rotação aleatória para vegetação para maior naturalidade
-        if (['TREE', 'GRASS', 'FLOWER'].includes(modelType)) {
-          worldObject.rotation.y = Math.random() * Math.PI * 2;
-        }
-        
-        // Log final com informações completas
-        // console.log(`[SUCESSO] Objeto ${id} (${modelType}) carregado. Bioma: ${biome}, Escala original mantida, Triângulos: ~${modelInfo.triangles}`);
-        
-        // Adiciona ao sistema de agrupamento para instanciamento futuro
-        // (preparando terreno para otimização futura)
-        const category = `${biome}_${modelType}_${modelPath}`;
-        if (!this.objectsByCategoryAndModel.has(category)) {
-          this.objectsByCategoryAndModel.set(category, []);
-        }
-        this.objectsByCategoryAndModel.get(category).push(id);
-      } catch (error) {
-        console.error(`[ERRO] Falha ao carregar modelo ${modelPath}:`, error);
-        // Fallback para primitivas em caso de erro
-        worldObject = createPrimitiveObject(data.objectType);
+        // console.log(`[DEBUG] Tentando carregar modelo para ${type} em ${biome}:`, modelPath);
+        obj = await loadModel(modelPath);
+        adjustModel(obj, type, modelPath); // Ajuste visual dos materiais
+      } catch (e) {
+        // console.warn(`[WorldObjectPresenter] Falha ao carregar modelo ${modelPath}, usando primitiva para ${type}`);
+        obj = createPrimitiveObject(type);
       }
     } else {
-      // Se não tiver modelo, usa primitiva
-      console.log(`[FALLBACK] Usando primitiva para ${data.objectType}`);
-      worldObject = createPrimitiveObject(data.objectType);
+      console.info(`[WorldObjectPresenter] Sem modelo 3D para ${type} (${biome}), usando primitiva.`);
+      obj = createPrimitiveObject(type);
     }
-    
-    // Adiciona à cena
-    this.scene.add(worldObject);
-    
+
     // Posição inicial
     const position = data.position || { x: 0, y: 0, z: 0 };
-    worldObject.position.set(
+    obj.position.set(
       Number(position.x) || 0,
       Number(position.y) || 0,
       Number(position.z) || 0
     );
-    
     // Rotação
     if (data.rotation !== undefined) {
-      worldObject.rotation.y = Number(data.rotation) || 0;
+      obj.rotation.y = Number(data.rotation) || 0;
     }
-    
-    // Não aplicamos mais escala personalizada
-    // Comentado para manter a escala original de importação
-    /*
-    if (data.scale) {
-      worldObject.scale.set(
-        Number(data.scale.x) || 1,
-        Number(data.scale.y) || 1,
-        Number(data.scale.z) || 1
-      );
-    }
-    */
-    
     // Armazena metadados junto com a mesh
-    worldObject.userData = {
+    obj.userData = {
       id: id,
       type: 'worldObject',
-      objectType: data.objectType || 'unknown',
-      isCollidable: data.isCollidable !== undefined ? data.isCollidable : true,
+      objectType: type,
       properties: data.properties || {},
       created: Date.now()
     };
-    
-    // Armazena referência ao objeto
-    this.worldObjects.set(id, worldObject);
-    
-    return worldObject;
+    this.worldObjects.set(id, obj);
+    this.scene.add(obj);
+    return obj;
   }
 
   /**
-   * Atualiza um objeto do mundo existente com novos dados
-   * @param {string} id - ID do objeto
-   * @param {Object} data - Novos dados do objeto
+   * Atualiza ou cria um objeto do mundo robustamente
    */
-  updateExistingWorldObject(id, data) {
-    const worldObject = this.worldObjects.get(id);
-    if (!worldObject) return;
-    
+  updateWorldObject(data) {
+    // console.log(data)
+    if (!data || !data.id) {
+      console.error('Dados de objeto do mundo inválidos:', data);
+      return;
+    }
+    const objectId = String(data.id);
+    let obj = this.worldObjects.get(objectId);
+    // Se não existir, cria
+    if (!obj) {
+      this.createWorldObject(objectId, data);
+      obj = this.worldObjects.get(objectId);
+      if (!obj) return;
+    }
+    // Se o tipo mudou, recria (comparação robusta)
+    const localType = typeof obj.userData.objectType === 'string' ? obj.userData.objectType : '';
+    const remoteType = typeof data.type === 'string' ? data.type : '';
+    if (remoteType && localType !== remoteType) {
+      console.warn(`[DEBUG] Recriando objeto ${objectId}: type local='${localType}', type recebido='${remoteType}'`);
+      this.createWorldObject(objectId, data);
+      obj = this.worldObjects.get(objectId);
+      if (!obj) return;
+    }
     // Atualiza posição se fornecida
     if (data.position) {
-      worldObject.position.set(
-        Number(data.position.x) || worldObject.position.x,
-        Number(data.position.y) || worldObject.position.y,
-        Number(data.position.z) || worldObject.position.z
+      obj.position.set(
+        Number(data.position.x) || obj.position.x,
+        Number(data.position.y) || obj.position.y,
+        Number(data.position.z) || obj.position.z
       );
     }
-    
     // Atualiza rotação se fornecida
     if (data.rotation !== undefined) {
-      worldObject.rotation.y = Number(data.rotation) || worldObject.rotation.y;
+      obj.rotation.y = Number(data.rotation) || obj.rotation.y;
     }
-    
-    // Não aplicamos mais escala personalizada
-    // Comentado para manter a escala original de importação
-    /*
-    if (data.scale) {
-      worldObject.scale.set(
-        Number(data.scale.x) || worldObject.scale.x,
-        Number(data.scale.y) || worldObject.scale.y,
-        Number(data.scale.z) || worldObject.scale.z
-      );
-    }
-    */
-    
     // Atualiza propriedades se fornecidas
     if (data.properties) {
-      worldObject.userData.properties = data.properties;
+      obj.userData.properties = data.properties;
     }
-    
     // Atualiza o estado ativo/inativo
     if (data.active !== undefined) {
-      worldObject.visible = data.active;
+      obj.visible = data.active;
     }
   }
 

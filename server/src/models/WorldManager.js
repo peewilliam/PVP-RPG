@@ -235,11 +235,8 @@ export class WorldManager {
    * @returns {WorldObject} - Objeto criado
    */
   createWorldObject(objectType, position, scale = { x: 1, y: 1, z: 1 }, rotation = 0, isCollidable = true, biome = null) {
-    const id = `world-object-${uuidv4()}`;
-    
-    // Cria o objeto
-    const worldObject = new WorldObject(
-      id,
+    // Use sempre o método do EntityManager para garantir ID inteiro único
+    return this.entityManager.createWorldObject(
       objectType,
       position,
       scale,
@@ -247,11 +244,6 @@ export class WorldManager {
       isCollidable,
       biome
     );
-    
-    // Adiciona ao gerenciador de entidades
-    this.entityManager.worldObjects.set(id, worldObject);
-    
-    return worldObject;
   }
   
   /**

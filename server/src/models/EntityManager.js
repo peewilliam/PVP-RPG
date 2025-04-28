@@ -3,10 +3,12 @@ import { Player } from './Player.js';
 import { MonsterTypes } from './monsters/index.js';
 import { Projectile } from './Projectile.js';
 import { DamageZone } from './DamageZone.js';
+import { WorldObject } from './WorldObject.js';
 
-// Adiciona contador global para IDs numéricos de player
+// Adiciona contador global para IDs numéricos de player, monstro e worldObject
 let nextPlayerId = 1;
 let nextMonsterId = 1;
+let nextWorldObjectId = 1;
 
 /**
  * Gerenciador de entidades que controla todas as entidades do jogo
@@ -50,6 +52,7 @@ export class EntityManager {
     if (!MonsterClass) throw new Error(`Tipo de monstro desconhecido: ${type}`);
     const monster = new MonsterClass(id, position, level);
     this.monsters.set(id, monster);
+    console.log('[CLIENT DEBUG] Criando monstro:', id, type);
     return monster;
   }
   
@@ -94,6 +97,31 @@ export class EntityManager {
     );
     this.damageZones.set(id, zone);
     return zone;
+  }
+  
+  /**
+   * Cria e adiciona um novo objeto do mundo ao gerenciador
+   * @param {string} objectType - Tipo do objeto (ex: 'TREE', 'ROCK')
+   * @param {Object} position - Posição inicial do objeto
+   * @param {Object} scale - Escala do objeto
+   * @param {number} rotation - Rotação do objeto
+   * @param {boolean} isCollidable - Se o objeto é colidível
+   * @param {string} biome - Bioma do objeto
+   * @returns {WorldObject} - Instância do objeto criado
+   */
+  createWorldObject(objectType, position = { x: 0, y: 0, z: 0 }, scale = { x: 1, y: 1, z: 1 }, rotation = 0, isCollidable = true, biome = null) {
+    const id = nextWorldObjectId++;
+    const worldObject = new WorldObject(
+      id,
+      objectType,
+      position,
+      scale,
+      rotation,
+      isCollidable,
+      biome
+    );
+    this.worldObjects.set(id, worldObject);
+    return worldObject;
   }
   
   /**
@@ -155,6 +183,15 @@ export class EntityManager {
       // console.log(`[EntityManager] Zona de dano ${id} não encontrada para remoção`);
       return false;
     }
+  }
+  
+  /**
+   * Remove um objeto do mundo pelo ID inteiro
+   * @param {number} id - ID do objeto do mundo
+   * @returns {boolean} - true se removido
+   */
+  removeWorldObject(id) {
+    return this.worldObjects.delete(id);
   }
   
   /**

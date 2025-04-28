@@ -35,6 +35,7 @@ export class MonsterPresenter {
 
     const monsterId = monsterData.id;
 
+
     // Se o monstro já existe, apenas atualiza sua posição e rotação
     if (this.monsters.has(monsterId)) {
       this.updateExistingMonster(monsterId, monsterData);
@@ -56,9 +57,12 @@ export class MonsterPresenter {
       this.removeMonster(id);
     }
     let monster;
-    if (data.monsterType === 'BLACK_MIST_ZOMBIE') {
+    console.log(data.monsterType)
+    // Usa o tipo recebido (data.monsterType) para criar a geometria correta
+    const monsterType = data.monsterType || 'BLACK_MIST_ZOMBIE';
+    if (monsterType === 'BLACK_MIST_ZOMBIE') {
       monster = Monsters.createBlackMistZombieVisual();
-    } else if (data.monsterType === 'SPIDER') {
+    } else if (monsterType === 'SPIDER') {
       monster = Monsters.createSpiderVisual();
     } else {
       // Fallback para outros tipos (placeholder antigo)
@@ -73,10 +77,8 @@ export class MonsterPresenter {
       front.rotation.x = Math.PI / 2;
       monster.add(front);
     }
-
     // Adiciona à cena
     this.scene.add(monster);
-
     // Posição inicial
     const position = data.position || { x: 0, y: 0, z: 0 };
     monster.position.set(
@@ -84,23 +86,20 @@ export class MonsterPresenter {
       Number(position.y) || 0.5, // Um pouco acima do chão
       Number(position.z) || 0
     );
-
     // Armazena metadados junto com a mesh
     monster.userData = {
       id: id,
       type: 'monster',
-      monsterType: data.monsterType || 'unknown',
+      monsterType: monsterType,
       stats: data.stats || {},
       level: data.level || 1,
       created: Date.now(),
       lastUpdated: Date.now()
     };
-
     // Armazena referência ao objeto
     this.monsters.set(id, monster);
     // Adiciona nome flutuante sempre que criar um monstro
     if (this.floatingNameManager) {
-      const monsterType = data.monsterType || 'BLACK_MIST_ZOMBIE';
       const name = MONSTERS[monsterType]?.NAME || monsterType;
       this.floatingNameManager.addName(id, this.monsters.get(id), name);
     }
@@ -111,14 +110,13 @@ export class MonsterPresenter {
         id,
         this.monsters.get(id),
         'monster',
-        MONSTERS[data.monsterType]?.NAME || data.monsterType || id
+        MONSTERS[monsterType]?.NAME || monsterType || id
       );
       this.floatingBarManager.updateBar(id, {
         hp: monsterStats.hp ?? 1,
         maxHp: monsterStats.maxHp ?? 1
       });
     }
-    
     // console.log(`Monstro criado: ${id}, tipo: ${monster.userData.monsterType}`);
   }
 
@@ -129,9 +127,19 @@ export class MonsterPresenter {
    */
   updateExistingMonster(id, data) {
     id = String(id);
-    const monster = this.monsters.get(id);
-    if (!monster) return;
-    
+    let monster = this.monsters.get(id);
+    if (!monster) {
+      this.createMonster(id, data);
+      monster = this.monsters.get(id);
+      if (!monster) return;
+    }
+
+    // Atualiza o tipo do monstro se vier diferente (ex: novo monstro binário)
+    if (data.monsterType && monster.userData.monsterType !== data.monsterType) {
+      this.createMonster(id, data);
+      monster = this.monsters.get(id);
+      if (!monster) return;
+    }
     // Atualiza posição se fornecida
     if (data.position) {
       monster.position.set(
@@ -140,12 +148,10 @@ export class MonsterPresenter {
         Number(data.position.z) || monster.position.z
       );
     }
-    
     // Atualiza rotação se fornecida
     if (data.rotation !== undefined) {
       monster.rotation.y = Number(data.rotation) || monster.rotation.y;
     }
-    
     // Atualiza stats de forma incremental
     if (data.stats) {
       monster.userData.stats = {
@@ -153,23 +159,18 @@ export class MonsterPresenter {
         ...data.stats
       };
     }
-
     // Atualiza level se fornecido
     if (data.level !== undefined) {
       monster.userData.level = data.level;
     }
-
     // Atualiza o estado ativo/inativo
     if (data.active !== undefined) {
       monster.visible = data.active;
     }
-    
     // Marca o timestamp da última atualização
     monster.userData.lastUpdated = Date.now();
-
     // Atualiza barra de vida
     if (this.floatingBarManager && data.stats) {
-      console.log('[MonsterPresenter] updateBar', id, data.stats);
       this.floatingBarManager.updateBar(id, {
         hp: data.stats.hp ?? monster.userData.stats.maxHp ?? 1,
         maxHp: data.stats.maxHp ?? monster.userData.stats.maxHp ?? 1

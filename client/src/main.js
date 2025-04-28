@@ -36,6 +36,8 @@ import {
   deserializeMonsterDeath
 } from '../../shared/utils/binarySerializer.js';
 import { FloatingBarManager } from './presenters/FloatingBarManager.js';
+import { deserializeWorldUpdateFull } from '../../shared/utils/binarySerializer.js';
+import { MONSTER_TYPE_BY_INDEX } from '../../shared/constants/gameConstants.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -659,6 +661,7 @@ function handleMovementInput() {
     prevKeys.s !== keys.s || 
     prevKeys.d !== keys.d;
   
+
   if (hasChanged) {
     sendMovementInput();
   }
@@ -2379,9 +2382,62 @@ channel.on(BINARY_EVENTS.PLAYER_MOVED, buffer => {
 });
 
 channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
-  logBinary(BINARY_EVENTS.WORLD_UPDATE);
+  // console.log('[CLIENT] [BINARY_EVENTS.WORLD_UPDATE] Recebido');
+  // logBinary(BINARY_EVENTS.WORLD_UPDATE);
+  // Novo: desserializa pacote binário completo
+  const data = deserializeWorldUpdateFull(buffer);
+  // Atualiza monstros
+    // Log detalhado para cada monstro antes do presenter
+  if (monsterPresenter && data.monsters) {
+    for (const monster of data.monsters) {
+      // console.log('[DEBUG] Antes do presenter:', monster.id, monster.monsterType);
+      monsterPresenter.updateExistingMonster(String(monster.id),{ ...monster, id: String(monster.id) });
+      
+    }
+     // Remove monstros que não vieram no update (saíram do alcance)
+    const receivedIds = new Set(data.monsters.map(m => String(m.id)));
+    for (const id of monsterPresenter.monsters.keys()) {
+      if (!receivedIds.has(id)) {
+        monsterPresenter.removeMonster(id);
+      }
+    }
+  }
+
+  // Atualiza objetos do mundo
+  if (worldObjectPresenter && data.worldObjects) {
+    for (const o of data.worldObjects) {
+      worldObjectPresenter.updateWorldObject({
+        id: String(o.id),
+        type: o.type,
+        position: { x: o.position.x, y: 0, z: o.position.z },
+        rotation: o.rotation,
+        status: o.status
+      });
+    }
+    // Remove objetos do mundo que não vieram no update (saíram do alcance)
+    const receivedIds = new Set(data.worldObjects.map(o => String(o.id)));
+    for (const id of worldObjectPresenter.worldObjects.keys()) {
+      if (!receivedIds.has(id)) {
+        worldObjectPresenter.removeWorldObject(id);
+      }
+    }
+  }
+  // Atualiza jogadores próximos
+  if (playerPresenter && data.players) {
+    for (const pl of data.players) {
+      // console.log('[CLIENT] [BINARY_EVENTS.WORLD_UPDATE] Atualizando player:', pl.id, playerId);
+      if (Number(pl.id) === Number(playerId)) continue; // Não atualiza o player local!
+      playerPresenter.updateExistingPlayer(String(pl.id), {
+        position: { x: pl.position.x, z: pl.position.z },
+        rotation: pl.rotation,
+        stats: { hp: pl.stats.hp, mana: pl.stats.mana },
+        level: pl.level
+      });
+    }
+  }
+  // --- COMENTADO: Processamento JSON antigo ---
+  /*
   const data = deserializeWorldUpdate(buffer);
-  // Integração binária: atualizar monstros
   if (monsterPresenter && data.entities) {
     for (const ent of data.entities) {
       const id = String(ent.entityId);
@@ -2392,6 +2448,7 @@ channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
       });
     }
   }
+  */
 });
 
 channel.on(BINARY_EVENTS.PLAYER_STATUS, buffer => {

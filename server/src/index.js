@@ -12,7 +12,8 @@ import {
   serializeWorldUpdate,
   logBinary,
   logJson,
-  deserializePlayerMoveInput
+  deserializePlayerMoveInput,
+  serializeWorldUpdateFull
 } from '../../shared/utils/binarySerializer.js';
 
 const app = express();
@@ -108,6 +109,7 @@ io.onConnection(channel => {
     }
     for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
       if (worldObject.active && player.distanceTo(worldObject) < 40) {
+        // console.log(`[SERVER DEBUG] id=${worldObject.id} type=${worldObject.objectType}`);
         nearbyWorldObjects.push(worldObject.serialize());
       }
     }
@@ -454,6 +456,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Função para enviar atualizações aos clientes
 function broadcastUpdates() {
   try {
+    // Serializa todos os jogadores ativos
     const serializedPlayers = {};
     for (const player of gameWorld.entityManager.players.values()) {
       if (player.active) {
@@ -471,7 +474,44 @@ function broadcastUpdates() {
     }
     for (const player of gameWorld.entityManager.players.values()) {
       if (!player.active || !player.channel) continue;
-      // Envia versão binária (player:moved)
+      // Monstros próximos
+      const monsters = [];
+      for (const monster of gameWorld.entityManager.monsters.values()) {
+        if (monster.active && player.distanceTo(monster) < 40) {
+          // console.log(`[SERVER DEBUG] Monstro: id=${monster.id} monsterType=${monster.monsterType}`);
+          monsters.push(monster);
+        }
+      }
+      // Objetos do mundo próximos
+      const worldObjects = [];
+      for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
+        if (worldObject.active && player.distanceTo(worldObject) < 40) {
+          // console.log(`[SERVER DEBUG] id=${worldObject.id} type=${worldObject.objectType}`);
+          worldObjects.push({
+            id: worldObject.id,
+            type: worldObject.objectType, // string, ex: 'TREE'
+            position: { ...worldObject.position },
+            rotation: worldObject.rotation,
+            status: 0 // ou outro campo se desejar
+          });
+        }
+      }
+      // Jogadores próximos (exceto ele mesmo)
+      const playersNearby = [];
+      for (const other of gameWorld.entityManager.players.values()) {
+        if (other.active && other.id !== player.id && player.distanceTo(other) < 40) {
+          playersNearby.push(other);
+        }
+      }
+      // Serializa e envia pacote binário completo
+      const binWorldUpdate = serializeWorldUpdateFull({
+        monsters,
+        worldObjects,
+        players: playersNearby
+      });
+      logBinary(BINARY_EVENTS.WORLD_UPDATE);
+      player.channel.emit(BINARY_EVENTS.WORLD_UPDATE, new Uint8Array(binWorldUpdate));
+      // NOVO: sempre envie PLAYER_MOVED para o player local
       const binMoved = serializePlayerMoved({
         playerId: player.id,
         posX: player.position.x,
@@ -480,78 +520,7 @@ function broadcastUpdates() {
         hp: player.stats.hp,
         mana: player.stats.mana
       });
-      logBinary(BINARY_EVENTS.PLAYER_MOVED);
       player.channel.emit(BINARY_EVENTS.PLAYER_MOVED, new Uint8Array(binMoved));
-      // Envia posições de outros jogadores
-      for (const otherPlayerId in serializedPlayers) {
-        if (otherPlayerId !== player.id) {
-          // Binário para outros jogadores
-          const other = serializedPlayers[otherPlayerId];
-          const binOtherMoved = serializePlayerMoved({
-            playerId: other.id,
-            posX: other.position.x,
-            posY: other.position.z,
-            rot: other.rotation,
-            hp: other.stats.hp,
-            mana: other.stats.mana
-          });
-          logBinary(BINARY_EVENTS.PLAYER_MOVED);
-          player.channel.emit(BINARY_EVENTS.PLAYER_MOVED, new Uint8Array(binOtherMoved));
-        }
-      }
-      // --- DELTA UPDATE ---
-      if (!lastSentState[player.id]) {
-        lastSentState[player.id] = { monsters: {}, worldObjects: {} };
-      }
-      const prev = lastSentState[player.id];
-      const deltaMonsters = [];
-      const deltaWorldObjects = [];
-      for (const monster of gameWorld.entityManager.monsters.values()) {
-        if (monster.active && player.distanceTo(monster) < 30) {
-          const serialized = monster.serialize();
-          const prevSerialized = prev.monsters[monster.id];
-          if (!prevSerialized || JSON.stringify(prevSerialized) !== JSON.stringify(serialized)) {
-            deltaMonsters.push(serialized);
-            prev.monsters[monster.id] = serialized;
-          }
-        }
-      }
-      for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
-        if (worldObject.active && player.distanceTo(worldObject) < 40) {
-          const serialized = worldObject.serialize();
-          const prevSerialized = prev.worldObjects[worldObject.id];
-          if (!prevSerialized || JSON.stringify(prevSerialized) !== JSON.stringify(serialized)) {
-            deltaWorldObjects.push(serialized);
-            prev.worldObjects[worldObject.id] = serialized;
-          }
-        }
-      }
-      if (deltaMonsters.length > 0 || deltaWorldObjects.length > 0) {
-        const updatePayload = {
-          monsters: deltaMonsters,
-          worldObjects: deltaWorldObjects
-        };
-        const updatePayloadSize = Buffer.byteLength(JSON.stringify(updatePayload));
-        // Envio JSON
-        compressAndSend(player.channel, EVENTS.WORLD.UPDATE, updatePayload);
-        logJson(EVENTS.WORLD.UPDATE);
-        // Envio binário (apenas monstros por exemplo)
-        const binEntities = [];
-        for (const m of deltaMonsters) {
-          binEntities.push({
-            entityId: m.id,
-            posX: m.position.x,
-            posY: m.position.z,
-            rot: m.rotation,
-            hp: m.stats ? m.stats.hp : 0
-          });
-        }
-        if (binEntities.length > 0) {
-          const binWorldUpdate = serializeWorldUpdate(binEntities);
-          logBinary('bin:world:update');
-          player.channel.emit(BINARY_EVENTS.WORLD_UPDATE, new Uint8Array(binWorldUpdate));
-        }
-      }
     }
   } catch (error) {
     console.error('Erro ao enviar atualizações:', error);
