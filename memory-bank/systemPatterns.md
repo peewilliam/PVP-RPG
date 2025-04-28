@@ -718,3 +718,14 @@ Cada função recebe um objeto com os campos relevantes e retorna um ArrayBuffer
 ### Referência: shared/utils/binarySerializer.js
 - O arquivo contém comentários detalhados e exemplos de uso para cada função.
 - Mantém compatibilidade entre cliente e servidor, facilitando debug e expansão futura.
+
+## Sincronização Delta Binária de Monstros
+- Novo evento binário: `BINARY_EVENTS.MONSTER_DELTA_UPDATE`
+- Servidor mantém snapshot de monstros enviados por player
+- A cada tick, envia apenas monstros adicionados/atualizados e IDs removidos
+- Cliente processa monstros apenas pelo delta, removendo lógica de atualização de monstros do pacote principal
+- Arquitetura pronta para expandir o padrão delta para outras entidades (objetos, jogadores)
+
+## Impacto
+- Redução de tráfego e processamento
+- Sincronização robusta e tolerante a perda de pacotes (pode ser expandida com fallback de full update)

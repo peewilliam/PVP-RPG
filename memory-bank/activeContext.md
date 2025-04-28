@@ -259,6 +259,12 @@ O foco atual do desenvolvimento está na otimização de rede do jogo para supor
 - Adição do raio de visibilidade configurável para limitar entidades transmitidas
 - Implementação da compressão adaptativa para mensagens grandes
 - Adição de painéis de depuração para monitoramento de largura de banda
+- Implementado delta update binário para monstros:
+  - Novo evento binário: `BINARY_EVENTS.MONSTER_DELTA_UPDATE`.
+  - Pacote carrega apenas monstros adicionados/atualizados e IDs removidos (delta real).
+  - Monstros removidos do pacote principal `BINARY_EVENTS.WORLD_UPDATE`.
+  - Cliente processa monstros apenas pelo delta, mantendo objetos/jogadores no evento principal.
+  - Servidor mantém snapshot de monstros enviados por player para cálculo eficiente do delta.
 
 ## Próximos Passos
 - Expandir o sistema de otimização para incluir mais tipos de dados
@@ -266,6 +272,8 @@ O foco atual do desenvolvimento está na otimização de rede do jogo para supor
 - Adicionar prefetching inteligente de recursos baseado em movimento do jogador
 - Implementar sistema de LOD (Level of Detail) baseado na distância
 - Otimizar sincronização de animações de habilidades
+- Monitorar performance e tráfego em áreas densas.
+- Avaliar expansão do padrão delta para objetos do mundo e jogadores.
 
 ## Decisões e Considerações Ativas
 

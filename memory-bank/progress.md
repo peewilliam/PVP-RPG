@@ -289,45 +289,20 @@ O sistema atual representa uma base sólida para futuras otimizações, com foco
 
 # Progresso Atual
 
-- **Meteor Storm**: 100% funcional. Aplica dano contínuo em área, zona criada e removida corretamente, múltiplos ticks processados, logs detalhados para depuração.
-- **Estacas de Gelo (Frost Spikes)**: 100% funcional. Aplica dano instantâneo e slow em todos os monstros e jogadores na área (exceto caster). Slow dura 3s (ou valor configurado) e afeta movimentação.
-- **Efeito visual de slow**: Implementado no cliente via evento `combat:slow`, deixando o alvo azul durante o efeito.
-- **Bola de Fogo**: 100% funcional. Projétil que causa dano ao impacto.
-- **Teleporte**: 100% funcional. Move o jogador instantaneamente para a posição alvo.
-- **Sistema de Otimização de Rede**: 100% funcional. 
-  - Reduz drasticamente o tráfego (~95%)
-  - Elimina problemas de latência
-  - Resolve erros de maxMessageSize
-  - Aplica compressão adaptativa
-  - Suporta mais de 300 entidades simultâneas
-  - Diminui latência média em ~35%
-  - Fornece monitoramento detalhado de uso de banda
-  - Utiliza protocolo próprio de sincronização delta
-  - Implementa mecanismo adaptativo de compressão
+## O que já funciona
+- Sincronização de monstros via delta update binário (`BINARY_EVENTS.MONSTER_DELTA_UPDATE`)
+- Monstros não são mais enviados no snapshot do pacote principal (`WORLD_UPDATE`)
+- Cliente processa monstros apenas pelo delta, sem duplicidade
+- Tráfego e processamento otimizados para áreas densas
 
-## Correções Implementadas
-- Loop de processamento de ticks na DamageZone atualizado para `while` em vez de `if`, garantindo múltiplos ticks se necessário
-- Adição de ABILITY_IDS no gameConstants para melhorar legibilidade e manutenção
-- Validação e transformação de parâmetros de duração e intervalos de tick
-- Logs detalhados para depuração da criação e ciclo de vida das zonas de dano
-- Garantia de que o dano é aplicado corretamente em cada tick
-- Implementação completa do sistema de otimização de rede:
-  - Delta updates para enviar apenas entidades que mudaram
-  - Envio seletivo de entidades próximas na conexão inicial
-  - Sistema global de compressão adaptativa usando zlib/pako
-  - Monitoramento detalhado do uso de banda e economia de tráfego
-  - Protocolo próprio de sincronização delta
-  - Mecanismo adaptativo que decide quando comprimir baseado no tamanho da mensagem
+## O que falta/construir
+- Expandir padrão delta para objetos do mundo e jogadores (opcional)
+- Monitorar performance em cenários de stress
+- Implementar fallback de full update periódico (se necessário)
 
-## Próximos passos
-- Implementar predição de movimento no cliente para melhorar ainda mais a experiência de rede
-- Otimizar consumo de CPU durante a compressão de dados
-- Refinar efeitos visuais (partículas, shader, etc)
-- Implementar sistema de inventário e drops
-- Expandir para novos tipos de monstros
-- Adicionar novas habilidades seguindo o mesmo padrão
-- Desenvolver sistema de LOD para entidades distantes
-- Implementar prefetching inteligente de recursos
+## Status
+- Sistema robusto, moderno e escalável para monstros
+- Pronto para escalar e fácil de expandir para outras entidades
 
 # Progress
 

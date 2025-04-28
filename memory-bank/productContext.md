@@ -78,4 +78,14 @@ O sistema agora oferece feedback visual e mecânico consistente para habilidades
 
 - O sistema de entidades foi totalmente reestruturado: agora cada tipo (jogador, monstro, objeto do mundo) é gerenciado separadamente, evitando bugs de sumiço ou comportamento estranho e tornando o mundo mais estável.
 - A comunicação entre cliente e servidor foi otimizada com eventos binários: as informações mais importantes do jogo (movimento, status, morte, atualização de mundo) agora são transmitidas em formato binário, reduzindo o tempo de resposta e o uso de internet, deixando a experiência mais fluida mesmo com muitos jogadores.
-- Essas mudanças aumentam a escalabilidade do sistema, permitindo mais jogadores e monstros simultâneos, e preparam o terreno para futuras expansões e novidades. 
+- Essas mudanças aumentam a escalabilidade do sistema, permitindo mais jogadores e monstros simultâneos, e preparam o terreno para futuras expansões e novidades.
+
+## Objetivo
+- Prover uma experiência multiplayer fluida, robusta e escalável, mesmo em áreas densas do mapa.
+- Reduzir o tráfego de rede e o processamento no cliente, mantendo a sincronização visual perfeita.
+
+## Evolução recente
+- Adoção do padrão de delta update binário para monstros:
+  - Apenas monstros que mudam ou entram/saem do alcance são enviados a cada tick.
+  - Redução significativa do tráfego e do custo de processamento.
+  - Arquitetura pronta para expandir o padrão delta para outros tipos de entidades. 
