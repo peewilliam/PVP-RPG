@@ -56,6 +56,13 @@
   - Middleware customizado serve `index.html` da raiz em `/` e `client/index.html` em `/play`.
   - Alias de `/src/*` para `/client/src/*` garante assets corretos sem alterar caminhos no HTML.
   - Solução sem duplicação de arquivos, mantendo build limpo e roteamento flexível.
+- ✅ Sincronização binária robusta de entidades (WORLD_UPDATE_FULL)
+- ✅ Correção de hp/maxHp para monstros dinâmicos (barras de vida sempre corretas)
+- ✅ Padronização de IDs como string no cliente (evita bugs de recriação/remoção)
+- ✅ Sistema de nomes flutuantes (FloatingNameManager) integrado a monstros
+- ✅ Sistema de barra de vida flutuante (FloatingBarManager) robusto para entidades dinâmicas
+- ✅ Otimização de rede: delta updates, compressão adaptativa, envio seletivo
+- ✅ Bugs resolvidos de flicker/recriação de entidades dinâmicas
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens
@@ -69,6 +76,9 @@
   - [ ] Sistema de LOD (Level of Detail) baseado na distância
   - [ ] Priorização de eventos por importância
   - [ ] Métricas individuais por jogador
+- [ ] Expansão do sistema de nomes flutuantes para players/NPCs
+- [ ] Fallback visual para tipos desconhecidos em todas as entidades
+- [ ] Refino do sistema de atualização de presenters para suportar novos tipos de entidades
 
 ## Status Atual
 O mundo do jogo está organizado em biomas distintos, com distribuição balanceada de árvores, rochas e arbustos, evitando sobreposição. O sistema de combate está totalmente funcional, com quatro habilidades implementadas e testadas. O cliente exibe FPS e ping em tempo real na interface, facilitando o monitoramento de performance. A HUD do alvo agora é responsiva, localizada e sincronizada, e o painel visual permite calibrar o visual do jogo em tempo real. 

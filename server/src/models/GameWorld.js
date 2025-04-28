@@ -38,7 +38,7 @@ export class GameWorld {
     // Inicializa áreas de spawn padrão
     this.spawnSystem.initializeDefaultSpawnAreas();
     
-    console.log('Mundo do jogo inicializado com sucesso');
+    // console.log('Mundo do jogo inicializado com sucesso');
   }
   
   /**
@@ -188,7 +188,7 @@ export class GameWorld {
     const damage = params.damage;
     const source = params.source;
     
-    console.log(`GameWorld.applyAreaDamage: Aplicando dano em área em (${center.x}, ${center.z}), raio ${radius}, dano ${damage}`);
+    // console.log(`GameWorld.applyAreaDamage: Aplicando dano em área em (${center.x}, ${center.z}), raio ${radius}, dano ${damage}`);
     
     // Criar um objeto de resultado para rastrear as entidades atingidas
     const result = { 
@@ -208,12 +208,12 @@ export class GameWorld {
       const dist = Math.sqrt(dx * dx + dz * dz);
       
       // Debug
-      console.log(`Distância até monstro ${monster.id}: ${dist} (raio: ${radius})`);
+      // console.log(`Distância até monstro ${monster.id}: ${dist} (raio: ${radius})`);
       
       // Verificar se está dentro do raio
       if (dist <= radius) {
         // Aplicar dano
-        console.log(`Aplicando dano de área (${damage}) ao monstro ${monster.id}`);
+        // console.log(`Aplicando dano de área (${damage}) ao monstro ${monster.id}`);
         const died = monster.takeDamage(damage, source);
         
         // Registrar o hit
@@ -238,12 +238,12 @@ export class GameWorld {
       const dist = Math.sqrt(dx * dx + dz * dz);
       
       // Debug
-      console.log(`Distância até jogador ${player.id}: ${dist} (raio: ${radius})`);
+      // console.log(`Distância até jogador ${player.id}: ${dist} (raio: ${radius})`);
       
       // Verificar se está dentro do raio
       if (dist <= radius) {
         // Aplicar dano
-        console.log(`Aplicando dano de área (${damage}) ao jogador ${player.id}`);
+        // console.log(`Aplicando dano de área (${damage}) ao jogador ${player.id}`);
         const died = player.takeDamage(damage, source);
         
         // Registrar o hit

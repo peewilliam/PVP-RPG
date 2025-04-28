@@ -52,7 +52,7 @@ export class EntityManager {
     if (!MonsterClass) throw new Error(`Tipo de monstro desconhecido: ${type}`);
     const monster = new MonsterClass(id, position, level);
     this.monsters.set(id, monster);
-    console.log('[CLIENT DEBUG] Criando monstro:', id, type);
+    // console.log('[CLIENT DEBUG] Criando monstro:', id, type);
     return monster;
   }
   

@@ -475,88 +475,44 @@ classDiagram
   - `o_` para objetos do mundo
   - `z_` para zonas de dano
 
-## Sistema de Colisão
+## Padrão de Serialização Binária e Sincronização de Entidades
 
-O sistema de colisão usa um algoritmo de detecção de colisão baseado em círculos (sphere collision):
+### Serialização Binária (WORLD_UPDATE_FULL)
+- Eventos críticos de atualização de mundo (monstros, objetos, jogadores) são transmitidos em formato binário customizado para máxima performance e economia de banda.
+- O pacote `WORLD_UPDATE_FULL` inclui, para cada monstro: `id`, `monsterType` (índice), `position`, `rotation`, `stats: { hp, maxHp }`.
+- Objetos do mundo incluem: `id`, `type` (índice), `position`, `rotation`, `status`.
+- Jogadores incluem: `id`, `position`, `rotation`, `stats: { hp, mana }`, `level`.
+- O serializador binário (`serializeWorldUpdateFull`/`deserializeWorldUpdateFull`) garante que todos os campos críticos estejam presentes, inclusive para entidades dinâmicas (spawnadas após login).
+- O campo `maxHp` é sempre serializado e desserializado para monstros, evitando bugs de barra de vida zerada.
 
-```mermaid
-graph TD
-    A[Verificar Colisões] --> B{Entidades Colidem?}
-    B -->|Sim| C[Resolver Colisão]
-    B -->|Não| D[Próximo Par]
-    C --> E[Calcular Vetor de Empurramento]
-    E --> F[Aplicar Separação]
-```
+### Padronização de IDs
+- Todos os IDs de entidades (monstros, objetos, jogadores) são convertidos para string no cliente antes de serem usados como chave em presenters ou mapas.
+- Isso evita bugs de recriação/remoção indevida de entidades por mismatch de tipo (string vs int).
+- O padrão é: sempre que um pacote binário chega, converter `id: String(id)` antes de atualizar presenters.
 
-### Matriz de Colisão
-Define quais tipos de entidades colidem entre si:
+### Atualização Robusta de Entidades Dinâmicas
+- Presenters (MonsterPresenter, WorldObjectPresenter) atualizam entidades existentes ou criam novas se não existirem.
+- A atualização só recria o mesh se o tipo da entidade mudou (ex: `monsterType` ou `type` diferente).
+- Campos de status (hp, maxHp, status) são sempre atualizados, mesmo para entidades criadas dinamicamente.
+- FloatingBarManager e FloatingNameManager são integrados no momento da criação e atualização, garantindo que barras de vida e nomes flutuantes estejam sempre corretos.
 
-| | Jogador | Monstro | Objeto | Habilidade |
-|---|---|---|---|---|
-| **Jogador** | ✗ | ✓ | ✓ | ✗ |
-| **Monstro** | ✓ | ✓ | ✓ | ✓ |
-| **Objeto** | ✓ | ✓ | ✓ | ✗ |
-| **Habilidade** | ✗ | ✓ | ✗ | ✗ |
+### Fallback Visual e Robustez
+- Se o tipo de entidade recebido não for reconhecido, presenters usam um fallback visual seguro (ex: cubo vermelho para monstros desconhecidos).
+- Logs de advertência são emitidos para facilitar debug de tipos não mapeados.
+- Presenters nunca recriam mesh sem necessidade, evitando flicker e perda de performance.
 
-## Sistema de Habilidades
+### Garantia de hp/maxHp e Sincronização Visual
+- Sempre que um monstro é criado ou atualizado, a barra de vida (FloatingBarManager) é sincronizada usando os valores de `hp` e `maxHp` recebidos do servidor.
+- Isso garante que monstros dinâmicos (spawnados após login) tenham barra de vida correta e responsiva ao sofrer dano.
+- O mesmo padrão se aplica a jogadores e outros tipos de entidades com barra de status.
 
-O sistema suporta 4 tipos principais de habilidades:
-
-```mermaid
-classDiagram
-    class AbilitySystem {
-        +useAbility(playerId, abilityId, targetPos)
-        +resolveAbilityEffects(ability)
-    }
-    
-    class Ability {
-        +id: number
-        +type: string
-        +damage: number
-        +cost: number
-        +cooldown: number
-    }
-    
-    class ProjectileAbility {
-        +speed: number
-        +range: number
-    }
-    
-    class AreaAbility {
-        +radius: number
-        +applyEffects()
-    }
-    
-    class MobilityAbility {
-        +range: number
-        +teleport()
-    }
-    
-    class ZoneAbility {
-        +radius: number
-        +duration: number
-        +tickInterval: number
-        +createDamageZone()
-    }
-    
-    Ability <|-- ProjectileAbility
-    Ability <|-- AreaAbility
-    Ability <|-- MobilityAbility
-    Ability <|-- ZoneAbility
-    
-    AbilitySystem --> Ability
-```
-
-### Processo de Habilidades
-1. Cliente envia `player:useAbility` com ID de habilidade e posição alvo
-2. Servidor valida mana, cooldown e posição
-3. Servidor processa a habilidade baseado no tipo:
-   - Projétil: cria objeto que se move e causa dano no impacto
-   - Área: aplica efeito imediato em uma área circular
-   - Mobilidade: move o jogador instantaneamente
-   - Zona: cria uma área que causa dano ao longo do tempo
-4. Servidor emite eventos de feedback (`player:abilityUsed`, `combat:damageDealt`)
-5. Cliente apresenta efeitos visuais
+### Resumo do Fluxo Binário Moderno
+1. Servidor monta arrays de entidades próximas ao jogador, incluindo todos os campos críticos.
+2. Serializador binário compacta e envia o pacote `WORLD_UPDATE_FULL`.
+3. Cliente desserializa, converte IDs para string e atualiza presenters.
+4. Presenters criam/atualizam entidades, sincronizam barras de vida e nomes flutuantes.
+5. Fallback visual é aplicado para tipos desconhecidos, logs são emitidos para debug.
+6. O fluxo garante robustez, performance e experiência visual consistente mesmo com entidades dinâmicas.
 
 ## Sistema de Combate
 
