@@ -13,7 +13,8 @@ import {
   logBinary,
   logJson,
   deserializePlayerMoveInput,
-  serializeWorldUpdateFull
+  serializeWorldUpdateFull,
+  serializeMonsterDeltaUpdate
 } from '../../shared/utils/binarySerializer.js';
 
 const app = express();
@@ -77,6 +78,31 @@ gameWorld.initialize();
 
 // Snapshot do último estado enviado para cada jogador
 const lastSentState = {};
+
+// Snapshot de monstros enviados por player
+const lastSentMonsters = new Map(); // playerId -> Map<monsterId, { ...dados }>
+
+// --- MÉTRICAS DE TRÁFEGO POR CLIENTE ---
+const trafficStats = new Map(); // playerId -> { bytes: 0, lastLog: Date.now(), ticks: 0 }
+
+function logTraffic(playerId, bytes) {
+  let stat = trafficStats.get(playerId);
+  if (!stat) {
+    stat = { bytes: 0, lastLog: Date.now(), ticks: 0 };
+    trafficStats.set(playerId, stat);
+  }
+  stat.bytes += bytes;
+  stat.ticks++;
+  const now = Date.now();
+  if (now - stat.lastLog >= 5000) {
+    const kb = (stat.bytes / 1024).toFixed(2);
+    const avgPerTick = stat.ticks ? (stat.bytes / stat.ticks).toFixed(1) : 0;
+    console.log(`[TRÁFEGO] Player ${playerId}: ${kb} KB em 5s | Média: ${(kb/5).toFixed(2)} KB/s | ${avgPerTick} bytes/tick`);
+    stat.bytes = 0;
+    stat.ticks = 0;
+    stat.lastLog = now;
+  }
+}
 
 // Gerenciamento de conexões
 io.onConnection(channel => {
@@ -456,62 +482,80 @@ process.on('unhandledRejection', (reason, promise) => {
 // Função para enviar atualizações aos clientes
 function broadcastUpdates() {
   try {
-    // Serializa todos os jogadores ativos
-    const serializedPlayers = {};
-    for (const player of gameWorld.entityManager.players.values()) {
-      if (player.active) {
-        serializedPlayers[player.id] = {
-          id: player.id,
-          position: { ...player.position },
-          rotation: player.rotation,
-          stats: { ...player.stats },
-          level: player.level,
-          xp: player.xp,
-          nextLevelXp: player.nextLevelXp,
-          name: player.name
-        };
-      }
-    }
     for (const player of gameWorld.entityManager.players.values()) {
       if (!player.active || !player.channel) continue;
-      // Monstros próximos
-      const monsters = [];
+      // --- DELTA DE MONSTROS ---
+      const currentMonsters = new Map();
       for (const monster of gameWorld.entityManager.monsters.values()) {
         if (monster.active && player.distanceTo(monster) < 40) {
-          // console.log(`[SERVER DEBUG] Monstro: id=${monster.id} monsterType=${monster.monsterType}`);
-          monsters.push(monster);
-        }
-      }
-      // Objetos do mundo próximos
-      const worldObjects = [];
-      for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
-        if (worldObject.active && player.distanceTo(worldObject) < 40) {
-          // console.log(`[SERVER DEBUG] id=${worldObject.id} type=${worldObject.objectType}`);
-          worldObjects.push({
-            id: worldObject.id,
-            type: worldObject.objectType, // string, ex: 'TREE'
-            position: { ...worldObject.position },
-            rotation: worldObject.rotation,
-            status: 0 // ou outro campo se desejar
+          currentMonsters.set(monster.id, {
+            id: monster.id,
+            monsterType: monster.monsterType,
+            position: { ...monster.position },
+            rotation: monster.rotation,
+            stats: { ...monster.stats }
           });
         }
       }
-      // Jogadores próximos (exceto ele mesmo)
+      const prev = lastSentMonsters.get(player.id) || new Map();
+      const addedOrUpdated = [];
+      const removed = [];
+      for (const [id, data] of currentMonsters) {
+        if (!prev.has(id)) {
+          addedOrUpdated.push(data);
+        } else {
+          const prevData = prev.get(id);
+          if (
+            data.position.x !== prevData.position.x ||
+            data.position.z !== prevData.position.z ||
+            data.rotation !== prevData.rotation ||
+            data.stats.hp !== prevData.stats.hp
+          ) {
+            addedOrUpdated.push(data);
+          }
+        }
+      }
+      for (const id of prev.keys()) {
+        if (!currentMonsters.has(id)) {
+          removed.push(id);
+        }
+      }
+      lastSentMonsters.set(player.id, currentMonsters);
+      // Envia delta binário de monstros
+      const binMonsterDelta = serializeMonsterDeltaUpdate({ addedOrUpdated, removed });
+      player.channel.emit(BINARY_EVENTS.MONSTER_DELTA_UPDATE, new Uint8Array(binMonsterDelta));
+      // --- OBJETOS E JOGADORES (WORLD_UPDATE) ---
+      const worldObjects = [];
+      for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
+        if (worldObject.active && player.distanceTo(worldObject) < 40) {
+          worldObjects.push({
+            id: worldObject.id,
+            type: worldObject.objectType,
+            position: { ...worldObject.position },
+            rotation: worldObject.rotation,
+            status: 0
+          });
+        }
+      }
       const playersNearby = [];
       for (const other of gameWorld.entityManager.players.values()) {
         if (other.active && other.id !== player.id && player.distanceTo(other) < 40) {
           playersNearby.push(other);
         }
       }
-      // Serializa e envia pacote binário completo
+      const t0 = Date.now();
+      // Monstros REMOVIDOS do pacote WORLD_UPDATE!
       const binWorldUpdate = serializeWorldUpdateFull({
-        monsters,
+        monsters: [], // <- não envia mais monstros aqui
         worldObjects,
         players: playersNearby
       });
-      logBinary(BINARY_EVENTS.WORLD_UPDATE);
+      const t1 = Date.now();
       player.channel.emit(BINARY_EVENTS.WORLD_UPDATE, new Uint8Array(binWorldUpdate));
-      // NOVO: sempre envie PLAYER_MOVED para o player local
+      const t2 = Date.now();
+      logTraffic(player.id, binWorldUpdate.byteLength || binWorldUpdate.length || 0);
+      // console.log(`[PERF] Player ${player.id}: serialização=${t1-t0}ms | envio=${t2-t1}ms | total=${t2-t0}ms | monstros=DELTA | objetos=${worldObjects.length}`);
+      // PLAYER_MOVED permanece igual
       const binMoved = serializePlayerMoved({
         playerId: player.id,
         posX: player.position.x,

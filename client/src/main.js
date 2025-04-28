@@ -38,6 +38,7 @@ import {
 import { FloatingBarManager } from './presenters/FloatingBarManager.js';
 import { deserializeWorldUpdateFull } from '../../shared/utils/binarySerializer.js';
 import { MONSTER_TYPE_BY_INDEX } from '../../shared/constants/gameConstants.js';
+import { deserializeMonsterDeltaUpdate } from '../../shared/utils/binarySerializer.js';
 
 // Log para debug - verificando a porta que está sendo usada
 console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
@@ -1889,6 +1890,23 @@ function initServerEvents() {
       console.error('Erro ao processar monster:spiderLeap:', error);
     }
   });
+
+  // Handler para delta binário de monstros
+  channel.on(BINARY_EVENTS.MONSTER_DELTA_UPDATE, buffer => {
+    const { addedOrUpdated, removed } = deserializeMonsterDeltaUpdate(buffer);
+    // Atualiza/cria monstros
+    if (monsterPresenter && addedOrUpdated) {
+      for (const monster of addedOrUpdated) {
+        monsterPresenter.updateExistingMonster(String(monster.id), { ...monster, id: String(monster.id) });
+      }
+    }
+    // Remove monstros
+    if (monsterPresenter && removed) {
+      for (const id of removed) {
+        monsterPresenter.removeMonster(String(id));
+      }
+    }
+  });
 }
 
 // Configurar sincronização periódica
@@ -2382,27 +2400,9 @@ channel.on(BINARY_EVENTS.PLAYER_MOVED, buffer => {
 });
 
 channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
-  // console.log('[CLIENT] [BINARY_EVENTS.WORLD_UPDATE] Recebido');
-  // logBinary(BINARY_EVENTS.WORLD_UPDATE);
-  // Novo: desserializa pacote binário completo
+  const t0 = performance.now();
   const data = deserializeWorldUpdateFull(buffer);
-  // Atualiza monstros
-    // Log detalhado para cada monstro antes do presenter
-  if (monsterPresenter && data.monsters) {
-    for (const monster of data.monsters) {
-      // console.log('[DEBUG] Antes do presenter:', monster.id, monster.monsterType);
-      monsterPresenter.updateExistingMonster(String(monster.id),{ ...monster, id: String(monster.id) });
-      
-    }
-     // Remove monstros que não vieram no update (saíram do alcance)
-    const receivedIds = new Set(data.monsters.map(m => String(m.id)));
-    for (const id of monsterPresenter.monsters.keys()) {
-      if (!receivedIds.has(id)) {
-        monsterPresenter.removeMonster(id);
-      }
-    }
-  }
-
+  const t1 = performance.now();
   // Atualiza objetos do mundo
   if (worldObjectPresenter && data.worldObjects) {
     for (const o of data.worldObjects) {
@@ -2425,7 +2425,6 @@ channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
   // Atualiza jogadores próximos
   if (playerPresenter && data.players) {
     for (const pl of data.players) {
-      // console.log('[CLIENT] [BINARY_EVENTS.WORLD_UPDATE] Atualizando player:', pl.id, playerId);
       if (Number(pl.id) === Number(playerId)) continue; // Não atualiza o player local!
       playerPresenter.updateExistingPlayer(String(pl.id), {
         position: { x: pl.position.x, z: pl.position.z },
@@ -2435,20 +2434,8 @@ channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
       });
     }
   }
-  // --- COMENTADO: Processamento JSON antigo ---
-  /*
-  const data = deserializeWorldUpdate(buffer);
-  if (monsterPresenter && data.entities) {
-    for (const ent of data.entities) {
-      const id = String(ent.entityId);
-      monsterPresenter.updateExistingMonster(id, {
-        position: { x: ent.posX, y: 0.5, z: ent.posY },
-        rotation: ent.rot,
-        stats: { hp: ent.hp }
-      });
-    }
-  }
-  */
+  const t2 = performance.now();
+  // console.log(`[PERF][CLIENT] WORLD_UPDATE: desserialização=${(t1-t0).toFixed(2)}ms | atualização visual=${(t2-t1).toFixed(2)}ms | total=${(t2-t0).toFixed(2)}ms | monstros=DELTA | objetos=${data.worldObjects?.length||0}`);
 });
 
 channel.on(BINARY_EVENTS.PLAYER_STATUS, buffer => {

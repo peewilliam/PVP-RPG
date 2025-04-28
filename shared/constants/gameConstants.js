@@ -242,7 +242,8 @@ export const BINARY_EVENTS = {
   PLAYER_MOVED: 'bin:player:moved', // Evento de movimento do jogador confirmado (funcionando 100% e unico)
   MONSTER_DEATH: 'bin:monster:death',
   WORLD_UPDATE: 'bin:world:update', // Evento de atualização do mundo
-  PLAYER_STATUS: 'bin:player:status' // Evento de status do jogador (funcionando 100% e unico)
+  PLAYER_STATUS: 'bin:player:status', // Evento de status do jogador (funcionando 100% e unico)
+  MONSTER_DELTA_UPDATE: 'bin:monster:delta',
 };
 
 // Tabela de índices para tipos de monstros (para serialização binária)

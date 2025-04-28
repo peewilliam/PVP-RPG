@@ -358,6 +358,65 @@ function deserializeWorldUpdateFull(buffer) {
   return { opcode, monsters, worldObjects, players };
 }
 
+// Serialização binária para delta de monstros (adicionados/atualizados e removidos)
+// Formato:
+// [opcode][N_add][N_rem][...N_add monstros...][...N_rem ids...]
+// Cada monstro: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 2 hp + 2 maxHp = 12 bytes
+// Cada id removido: 2 bytes
+function serializeMonsterDeltaUpdate({ addedOrUpdated, removed }) {
+  const N_add = addedOrUpdated.length;
+  const N_rem = removed.length;
+  const buffer = new ArrayBuffer(1 + 2 + 2 + (N_add * 12) + (N_rem * 2));
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x21); offset += 1; // opcode exclusivo para delta de monstros
+  view.setUint16(offset, N_add); offset += 2;
+  view.setUint16(offset, N_rem); offset += 2;
+  // Monstros adicionados/atualizados
+  for (let i = 0; i < N_add; i++) {
+    const m = addedOrUpdated[i];
+    view.setUint16(offset, toEntityId(m.id)); offset += 2;
+    const typeIdx = MONSTER_TYPE_INDEX[m.monsterType] ?? 0;
+    view.setUint8(offset, typeIdx); offset += 1;
+    view.setUint16(offset, quantizePos(m.position.x)); offset += 2;
+    view.setUint16(offset, quantizePos(m.position.z)); offset += 2;
+    view.setUint8(offset, quantizeRot(m.rotation)); offset += 1;
+    view.setUint16(offset, m.stats?.hp ?? 0); offset += 2;
+    view.setUint16(offset, m.stats?.maxHp ?? 1); offset += 2;
+  }
+  // IDs removidos
+  for (let i = 0; i < N_rem; i++) {
+    view.setUint16(offset, toEntityId(removed[i])); offset += 2;
+  }
+  return buffer;
+}
+
+function deserializeMonsterDeltaUpdate(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const N_add = view.getUint16(offset); offset += 2;
+  const N_rem = view.getUint16(offset); offset += 2;
+  const addedOrUpdated = [];
+  for (let i = 0; i < N_add; i++) {
+    const id = view.getUint16(offset); offset += 2;
+    const typeIdx = view.getUint8(offset); offset += 1;
+    const monsterType = MONSTER_TYPE_BY_INDEX[typeIdx] ?? 'BLACK_MIST_ZOMBIE';
+    const posX = dequantizePos(view.getUint16(offset)); offset += 2;
+    const posZ = dequantizePos(view.getUint16(offset)); offset += 2;
+    const rot = dequantizeRot(view.getUint8(offset)); offset += 1;
+    const hp = view.getUint16(offset); offset += 2;
+    const maxHp = view.getUint16(offset); offset += 2;
+    addedOrUpdated.push({ id: String(id), monsterType, position: { x: posX, z: posZ }, rotation: rot, stats: { hp, maxHp } });
+  }
+  const removed = [];
+  for (let i = 0; i < N_rem; i++) {
+    removed.push(String(view.getUint16(offset))); offset += 2;
+  }
+  return { opcode, addedOrUpdated, removed };
+}
+
 export {
   serializePlayerMove,
   deserializePlayerMove,
@@ -376,5 +435,7 @@ export {
   serializeMonsterDeath,
   deserializeMonsterDeath,
   serializeWorldUpdateFull,
-  deserializeWorldUpdateFull
+  deserializeWorldUpdateFull,
+  serializeMonsterDeltaUpdate,
+  deserializeMonsterDeltaUpdate
 }; 
