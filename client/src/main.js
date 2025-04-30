@@ -45,7 +45,7 @@ console.log(`Tentando conectar ao servidor na porta: ${SERVER.PORT}`);
 
 // Configurações do cliente
 // Força a conexão explicitamente usando a porta das constantes
-const channel = geckos({ port: SERVER.PORT });
+const channel = geckos({ url: 'http://152.70.210.134/' });
 
 // Defina cameraSize como variável global
 const cameraSize = 15;
