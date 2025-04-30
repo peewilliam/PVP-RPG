@@ -42,7 +42,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    open: false,
+    open: true,
     cors: true,
     hmr: true,
     proxy: {
@@ -56,6 +56,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './client/src'),
+      crypto: 'crypto-browserify',
     },
   },
   build: {
