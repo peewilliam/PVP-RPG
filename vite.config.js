@@ -42,7 +42,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    open: true,
+    open: false,
     cors: true,
     hmr: true,
     proxy: {
