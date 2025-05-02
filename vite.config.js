@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import fs from 'fs';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
   root: '.',
@@ -38,7 +39,15 @@ export default defineConfig({
           }
         });
       }
-    }
+    },
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'home/js/*', // Origem dos arquivos
+          dest: 'home/js'   // Destino dentro de dist
+        }
+      ]
+    })
   ],
   server: {
     port: 5173,
