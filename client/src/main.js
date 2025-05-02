@@ -93,6 +93,22 @@ let prevKeys = {
   d: false
 };
 
+// Sistema de predição de movimento
+const movementPrediction = {
+  enabled: true,                      // Habilitar/desabilitar predição (para testes)
+  inputBuffer: [],                    // Buffer de comandos enviados
+  lastPredictionTime: 0,              // Timestamp da última predição
+  serverReconciliationEnabled: true,  // Habilitar/desabilitar reconciliação
+  reconciliationThreshold: 0.05,      // Limiar de diferença para reconciliação (em unidades)
+  sequenceNumber: 0,                  // Número sequencial para acompanhar comandos
+  lastAcknowledgedSeq: -1,            // Último número de sequência confirmado pelo servidor
+  lastServerPosition: null,           // Última posição recebida do servidor
+  predictedPosition: null,            // Posição predita localmente
+  reconciliationLerpFactor: 0.2,      // Fator de interpolação para reconciliação
+  speedModifier: 1.0,                 // Modificador de velocidade (para efeitos, slow, etc.)
+  isSlowed: false,                    // Flag para status de lentidão
+  slowValue: 0.4,                     // Valor de redução de velocidade quando lento
+};
 
 // Flag global para efeitos visuais avançados
 let visualEffectsActive = true;
@@ -632,6 +648,25 @@ function sendMovementInput() {
   };
 
   try {
+    // Se a predição estiver ativada, adiciona o comando ao buffer
+    if (movementPrediction.enabled) {
+      const currentSeq = movementPrediction.sequenceNumber++;
+      const inputData = {
+        sequence: currentSeq,
+        input: { ...cameraRelativeInput },
+        timestamp: Date.now()
+      };
+      movementPrediction.inputBuffer.push(inputData);
+      
+      // Limita o tamanho do buffer para evitar crescimento excessivo
+      if (movementPrediction.inputBuffer.length > 30) {
+        movementPrediction.inputBuffer.shift();
+      }
+      
+      // Registra o tempo do último comando para cálculo de latência
+      lastMovementCommand = Date.now();
+    }
+    
     // Envia input de movimento em binário
     const buffer = serializePlayerMoveInput(cameraRelativeInput);
     channel.emit(BINARY_EVENTS.PLAYER_MOVE, new Uint8Array(buffer));
@@ -699,7 +734,63 @@ let framesThisSecond = 0;
 let lastFpsUpdateTime = performance.now();
 let fps = 0;
 
+// Medidor de latência
+let lastMovementCommand = 0;
+let lastMovementResponse = 0;
+let estimatedLatency = 0;
 
+// Painel de status da predição
+const predictionStatusPanel = document.createElement('div');
+predictionStatusPanel.style.position = 'fixed';
+predictionStatusPanel.style.bottom = '8px';
+predictionStatusPanel.style.right = '8px';
+predictionStatusPanel.style.zIndex = 9999;
+predictionStatusPanel.style.background = 'rgba(0,0,0,0.5)';
+predictionStatusPanel.style.color = '#fff';
+predictionStatusPanel.style.fontSize = '12px';
+predictionStatusPanel.style.padding = '4px 8px';
+predictionStatusPanel.style.borderRadius = '4px';
+predictionStatusPanel.style.pointerEvents = 'none';
+predictionStatusPanel.style.maxWidth = '200px';
+predictionStatusPanel.style.textAlign = 'right';
+document.body.appendChild(predictionStatusPanel);
+
+// Função para atualizar o painel de status da predição
+function updatePredictionStatus() {
+  if (!movementPrediction.enabled) {
+    predictionStatusPanel.style.display = 'none';
+    return;
+  }
+  
+  predictionStatusPanel.style.display = 'block';
+  
+  // Calcula a reconciliação atual (distância entre posição predita e posição do servidor)
+  let reconcileDistance = 0;
+  if (movementPrediction.predictedPosition && movementPrediction.lastServerPosition) {
+    const dx = movementPrediction.predictedPosition.x - movementPrediction.lastServerPosition.x;
+    const dz = movementPrediction.predictedPosition.z - movementPrediction.lastServerPosition.z;
+    reconcileDistance = Math.sqrt(dx * dx + dz * dz);
+  }
+  
+  // Status da predição
+  let status = '✅';
+  if (reconcileDistance > movementPrediction.reconciliationThreshold) {
+    status = '🔄'; // Reconciliando
+  }
+  if (reconcileDistance > 1.0) {
+    status = '⚠️'; // Divergência significativa
+  }
+  
+  // Formata a latência
+  const latencyText = estimatedLatency > 0 ? `${estimatedLatency.toFixed(0)}ms` : '--';
+  
+  // Atualiza o painel
+  predictionStatusPanel.innerHTML = `
+    <div>Predict: ${status}</div>
+    <div>Error: ${reconcileDistance.toFixed(3)}</div>
+    <div>Ping: ${latencyText}</div>
+  `;
+}
 
 // Listener para mudanças de configuração
 window.addEventListener('pvpRpgUserSettingsChanged', (e) => {
@@ -732,10 +823,18 @@ let animate = function() {
 
   // --- Medição do tempo de atualização de monstros/UI ---
   const uiStart = performance.now();
-  // Processa movimentos
+  
+  // Aplica a predição de movimento local
+  if (movementPrediction.enabled && player) {
+    applyPredictedMovement(deltaTime);
+  }
+  
+  // Processa movimentos - apenas para envio de comandos ao servidor
   handleMovementInput();
+  
   // Atualiza a posição da câmera para seguir o jogador
   updateCameraPosition();
+  
   // Atualiza posições interpoladas dos outros jogadores
   if (playerPresenter.updatePositions) {
     playerPresenter.updatePositions(deltaTime);
@@ -1325,12 +1424,44 @@ channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
         targetMesh = player;
         // Salva a posição de origem antes do teleporte
         const origem = player.position.clone();
-        // Teleporta o jogador imediatamente
-        player.position.set(
-          data.teleportPosition.x,
-          data.teleportPosition.y || player.position.y,
-          data.teleportPosition.z
-        );
+        
+        // NOVO: Atualizar também a posição predita para o sistema de predição
+        if (movementPrediction.enabled && movementPrediction.predictedPosition) {
+          // Atualiza a posição predita diretamente para a posição de teleporte
+          movementPrediction.predictedPosition.set(
+            data.teleportPosition.x,
+            0.5,
+            data.teleportPosition.z
+          );
+          
+          // Define a posição atual e alvo diretamente (sem interpolação)
+          player.position.set(
+            data.teleportPosition.x,
+            0.5,
+            data.teleportPosition.z
+          );
+          player.targetPosition.set(
+            data.teleportPosition.x,
+            0.5,
+            data.teleportPosition.z
+          );
+          
+          // Armazena a posição de teleporte como última posição do servidor
+          // para que a reconciliação não tente "corrigir" o teleporte
+          movementPrediction.lastServerPosition = new THREE.Vector3(
+            data.teleportPosition.x,
+            0.5,
+            data.teleportPosition.z
+          );
+        } else {
+          // Teleporta o jogador imediatamente (comportamento original)
+          player.position.set(
+            data.teleportPosition.x,
+            data.teleportPosition.y || player.position.y,
+            data.teleportPosition.z
+          );
+        }
+        
         // Chama o efeito visual de teleporte
         skillManager.spawnSkillEffect(2, origem, new THREE.Vector3(data.teleportPosition.x, data.teleportPosition.y || player.position.y, data.teleportPosition.z), player);
         // (Opcional) Texto flutuante
@@ -1907,6 +2038,21 @@ function initServerEvents() {
       }
     }
   });
+
+  // Atualiza o status de slow quando o jogador recebe esse efeito
+  channel.on('combat:slow', data => {
+    if (data && data.targetId === playerId) {
+      // Atualiza o status de lentidão na predição
+      movementPrediction.isSlowed = true;
+      movementPrediction.slowValue = data.value || 0.4;
+      
+      // Atualiza o status no objeto do jogador também para consistência
+      if (player && player.userData) {
+        if (!player.userData.status) player.userData.status = {};
+        player.userData.status.slowedUntil = Date.now() + (data.duration || 3000);
+      }
+    }
+  });
 }
 
 // Configurar sincronização periódica
@@ -2372,19 +2518,32 @@ function selectTarget(id, type) {
 channel.on(BINARY_EVENTS.PLAYER_MOVED, buffer => {
   logBinary(BINARY_EVENTS.PLAYER_MOVED);
   const data = deserializePlayerMoved(buffer);
+  
+  // Calcula latência se este for um movimento do jogador local
+  if (data.playerId === playerId && lastMovementCommand > 0) {
+    lastMovementResponse = Date.now();
+    estimatedLatency = lastMovementResponse - lastMovementCommand;
+  }
+  
   if (playerPresenter) {
     // console.log('[BINÁRIO] playerId evento:', data.playerId, '| playerId local:', playerId, '| pos:', data.posX, data.posY);
     if (data.playerId === playerId) {
       // console.log('>> Atualizando POSIÇÃO do PLAYER LOCAL:', data.posX, data.posY);
       if (player) {
-        player.position.set(data.posX, 0.5, data.posY);
-        player.targetPosition = new THREE.Vector3(data.posX, 0.5, data.posY);
-        player.rotation.y = data.rot;
+        // Atualiza status
         if (player.userData && player.userData.stats) {
           player.userData.stats.hp = data.hp;
           player.userData.stats.mana = data.mana;
         }
-        // console.log('Nova posição do player local:', player.position);
+        
+        // Verifica se o jogador está sob efeito de lentidão (slow)
+        if (player.userData && player.userData.status) {
+          const slowedUntil = player.userData.status.slowedUntil;
+          movementPrediction.isSlowed = slowedUntil && slowedUntil > Date.now();
+        }
+        
+        // Reconcilia a posição do servidor com a predita localmente
+        reconcilePosition(data.posX, data.posY, data.rot);
       } else {
         console.log('Objeto player local não encontrado:', player);
       }
@@ -2708,5 +2867,222 @@ function updateDiagPanel() {
 const oldAnimateDiag = animate;
 animate = function() {
   updateDiagPanel();
+  updatePredictionStatus(); // Adiciona atualização do painel de predição
   oldAnimateDiag();
 };
+
+// Função para aplicar o movimento predito localmente
+function applyPredictedMovement(deltaTime) {
+  if (!player || !movementPrediction.enabled) return;
+  
+  // Reseta a velocidade local
+  const velocity = { x: 0, z: 0 };
+  
+  // Usa a velocidade base definida nas constantes
+  // Essa velocidade é calibrada para o tick rate do servidor (20 ticks por segundo)
+  let moveSpeed = PLAYER.SPEED * movementPrediction.speedModifier;
+  
+  // Aplica efeito de lentidão se estiver ativo
+  if (movementPrediction.isSlowed) {
+    moveSpeed *= movementPrediction.slowValue;
+  }
+  
+  // Calcula a direção baseada nos inputs ativos
+  let dirX = 0;
+  let dirZ = 0;
+  
+  if (keys.w) {
+    dirX -= 1;
+    dirZ -= 1;
+  }
+  if (keys.s) {
+    dirX += 1;
+    dirZ += 1;
+  }
+  if (keys.a) {
+    dirX -= 1;
+    dirZ += 1;
+  }
+  if (keys.d) {
+    dirX += 1;
+    dirZ -= 1;
+  }
+  
+  // Se não há movimento, não faz nada
+  if (dirX === 0 && dirZ === 0) return;
+  
+  // Normaliza o vetor de direção para evitar movimento mais rápido na diagonal
+  const length = Math.sqrt(dirX * dirX + dirZ * dirZ);
+  dirX /= length;
+  dirZ /= length;
+  
+  // Calcula o movimento baseado no delta time normalizado para o tick rate do servidor
+  // O servidor usa um tick rate de 20 (50ms), então normalizamos para esse valor
+  const normalizedDelta = deltaTime * 1000 / 50;
+  velocity.x = dirX * moveSpeed * normalizedDelta;
+  velocity.z = dirZ * moveSpeed * normalizedDelta;
+  
+  // Calcula a rotação baseada na direção
+  let angle;
+  
+  // Usa o estado das teclas para identificar movimento puro e diagonais
+  const { w, s, a, d } = keys;
+  
+  if (w && !s && !a && !d) {
+    // Apenas W pressionado (frente)
+    angle = Math.atan2(-1, -1); // Direção padrão frente (no sistema isométrico)
+  } else if (s && !w && !a && !d) {
+    // Apenas S pressionado (trás)
+    angle = Math.atan2(1, 1); // Direção padrão trás
+  } else if (w && d && !s && !a) {
+    // W + D (Norte)
+    angle = Math.PI; // 180°
+  } else if (w && a && !s && !d) {
+    // W + A (Oeste)
+    angle = 1.5 * Math.PI; // 270°
+  } else if (s && d && !w && !a) {
+    // S + D (Leste)
+    angle = 0.5 * Math.PI; // 90°
+  } else if (s && a && !w && !d) {
+    // S + A (Sul)
+    angle = 0; // 0°
+  } else {
+    // Para os demais casos, mantém a inversão
+    angle = Math.atan2(-dirZ, -dirX);
+  }
+  
+  if (angle < 0) angle += 2 * Math.PI;
+  
+  // Aplica o movimento predito
+  if (!movementPrediction.predictedPosition) {
+    movementPrediction.predictedPosition = player.position.clone();
+  }
+  
+  // Atualiza a posição predita
+  movementPrediction.predictedPosition.x += velocity.x;
+  movementPrediction.predictedPosition.z += velocity.z;
+  
+  // Restringe ao limite do mundo
+  const halfWidth = WORLD.SIZE.WIDTH / 2;
+  const halfHeight = WORLD.SIZE.HEIGHT / 2;
+  const minX = -halfWidth + WORLD.BOUNDARIES.BORDER_WIDTH;
+  const maxX = halfWidth - WORLD.BOUNDARIES.BORDER_WIDTH;
+  const minZ = -halfHeight + WORLD.BOUNDARIES.BORDER_WIDTH;
+  const maxZ = halfHeight - WORLD.BOUNDARIES.BORDER_WIDTH;
+  
+  movementPrediction.predictedPosition.x = Math.max(minX, Math.min(maxX, movementPrediction.predictedPosition.x));
+  movementPrediction.predictedPosition.z = Math.max(minZ, Math.min(maxZ, movementPrediction.predictedPosition.z));
+  
+  // Define a posição alvo para o jogador
+  player.targetPosition.copy(movementPrediction.predictedPosition);
+  
+  // Aplica a rotação calculada
+  player.rotation.y = angle;
+  
+  // Salva o timestamp da predição
+  movementPrediction.lastPredictionTime = Date.now();
+}
+
+// Função para reconciliar a posição do jogador após receber a atualização do servidor
+function reconcilePosition(serverX, serverZ, serverRot) {
+  if (!player || !movementPrediction.enabled || !movementPrediction.serverReconciliationEnabled) return;
+  
+  // Se não temos uma posição predita, simplesmente aceita a posição do servidor
+  if (!movementPrediction.predictedPosition) {
+    player.position.set(serverX, 0.5, serverZ);
+    player.targetPosition.set(serverX, 0.5, serverZ);
+    player.rotation.y = serverRot;
+    movementPrediction.predictedPosition = player.position.clone();
+    return;
+  }
+  
+  // Calcula a diferença entre a posição predita e a recebida do servidor
+  const dx = serverX - movementPrediction.predictedPosition.x;
+  const dz = serverZ - movementPrediction.predictedPosition.z;
+  const distance = Math.sqrt(dx * dx + dz * dz);
+  
+  // Salva a última posição recebida do servidor
+  movementPrediction.lastServerPosition = new THREE.Vector3(serverX, 0.5, serverZ);
+  
+  // NOVO: Se a distância for muito grande (maior que um limiar de "teleporte"),
+  // assume que foi um teleporte ou outra habilidade de movimentação instantânea
+  // e simplesmente aceita a posição do servidor diretamente
+  const teleportThreshold = 5.0; // 5 unidades é considerado um teleporte
+  if (distance > teleportThreshold) {
+    // Teleporte ou grande correção - aceita a posição do servidor diretamente
+    player.position.set(serverX, 0.5, serverZ);
+    player.targetPosition.set(serverX, 0.5, serverZ);
+    movementPrediction.predictedPosition.set(serverX, 0.5, serverZ);
+    player.rotation.y = serverRot;
+    console.log(`[PREDICT] Detectado grande salto de posição (${distance.toFixed(2)} unidades) - possivelmente teleporte ou correção`);
+    return;
+  }
+  
+  // Se a diferença for maior que o limiar, reconcilia
+  if (distance > movementPrediction.reconciliationThreshold) {
+    // Interpola suavemente para a posição correta
+    const lerpFactor = movementPrediction.reconciliationLerpFactor;
+    
+    // Corrige a posição predita (com lerp para suavizar)
+    movementPrediction.predictedPosition.x += dx * lerpFactor;
+    movementPrediction.predictedPosition.z += dz * lerpFactor;
+    
+    // Atualiza a posição alvo do jogador
+    player.targetPosition.copy(movementPrediction.predictedPosition);
+  }
+  
+  // Atualiza a rotação diretamente
+  player.rotation.y = serverRot;
+}
+
+// Função para alternar a predição de movimento
+function toggleMovementPrediction() {
+  movementPrediction.enabled = !movementPrediction.enabled;
+  
+  // Feedback visual
+  const message = movementPrediction.enabled ? 
+    'Predição de movimento: ATIVADA' : 
+    'Predição de movimento: DESATIVADA';
+  
+  // Cria um elemento de notificação
+  const notification = document.createElement('div');
+  notification.style.position = 'fixed';
+  notification.style.top = '50%';
+  notification.style.left = '50%';
+  notification.style.transform = 'translate(-50%, -50%)';
+  notification.style.background = 'rgba(0,0,0,0.7)';
+  notification.style.color = '#fff';
+  notification.style.padding = '15px 25px';
+  notification.style.borderRadius = '8px';
+  notification.style.fontSize = '16px';
+  notification.style.fontWeight = 'bold';
+  notification.style.zIndex = 10000;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  // Remove a notificação após 2 segundos
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    notification.style.transition = 'opacity 0.5s';
+    setTimeout(() => document.body.removeChild(notification), 500);
+  }, 2000);
+  
+  console.log(message);
+  
+  // Se desativando a predição, reseta o estado para evitar bugs
+  if (!movementPrediction.enabled) {
+    // Limpa o buffer de inputs
+    movementPrediction.inputBuffer = [];
+    // Reseta a posição predita
+    movementPrediction.predictedPosition = null;
+    // Reseta a última posição do servidor
+    movementPrediction.lastServerPosition = null;
+  }
+}
+
+// Evento de teclado para alternar a predição (F9)
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'F9') {
+    toggleMovementPrediction();
+  }
+});
