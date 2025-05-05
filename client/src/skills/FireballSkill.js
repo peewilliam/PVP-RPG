@@ -5,6 +5,11 @@ import { SKILLS } from '../../../shared/skills/skillsConfig.js';
 const activeProjectiles = [];
 
 export function spawnFireballEffect(origin, target, scene, effect = {}) {
+  console.log('[DEBUG] Criando efeito de Bola de Fogo', 
+    'Origem:', origin instanceof THREE.Vector3 ? `Vector3(${origin.x.toFixed(2)}, ${origin.y.toFixed(2)}, ${origin.z.toFixed(2)})` : origin,
+    'Alvo:', target instanceof THREE.Vector3 ? `Vector3(${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)})` : target
+  );
+  
   const originPos = origin instanceof THREE.Vector3 ? origin : new THREE.Vector3(origin.x, origin.y, origin.z);
   const targetPos = target instanceof THREE.Vector3 ? target : new THREE.Vector3(target.x, target.y, target.z);
 

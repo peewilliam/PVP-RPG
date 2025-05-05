@@ -1,6 +1,9 @@
 # Status de Progresso
 
 ## O que funciona
+- ✅ **Refatoração Modular do Cliente**: Implementação completa de arquitetura modular no client/src/, com separação clara entre controllers, managers, presenters, services, systems, ui, skills e effects.
+- ✅ **Sistema de Habilidades Independentes**: Cada habilidade (Fireball, Teleport, IceSpike, MeteorStorm) agora possui um arquivo próprio com seu respectivo efeito visual encapsulado.
+- ✅ **HUD do alvo sincronizada**: Sistema completo com atualização automática da vida do alvo quando sofre dano e visualização aprimorada com efeitos visuais modernos.
 - ✅ Estrutura básica do projeto e comunicação cliente-servidor
 - ✅ Sincronização e movimentação autoritativa de jogadores
 - ✅ Renderização isométrica e arquitetura MCP
@@ -33,7 +36,6 @@
 - ✅ Monstro Goblin renomeado para BlackMistZombie (interno) e Zumbi da Névoa Negra (exibido)
 - ✅ UI agora sempre exibe nomes localizados de monstros usando o campo NAME da configuração
 - ✅ Padrão de localização e clareza implementado para nomes de entidades
-- ✅ **HUD do alvo sincronizada**: vida, mana, nome pt-br e status sempre corretos ao receber dano ou atualização do mundo
 - ✅ **Painel visual (lil-gui)**: ajuste em tempo real de exposição, luzes e bloom
 - ✅ **Seleção de alvo robusta**: mantém alvo ao clicar em área vazia, remove ao clicar no próprio player ou ESC
 - ✅ **Refinamento visual**: iluminação, pós-processamento, clareza visual, feedback imediato

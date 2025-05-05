@@ -50,6 +50,8 @@ export class HUDManager {
     this.chatManager = new ChatManager(document.body);
     // Painel de métricas de performance
     this.createPerformancePanel();
+    // Painel de status de predição
+    this.createPredictionPanel();
     // Botão de configurações
     this.createSettingsButton();
     // Carregar configurações do usuário
@@ -652,6 +654,7 @@ export class HUDManager {
     }
     this.pingListener = () => {
       this.ping = Math.round(performance.now() - this.pingStartTime);
+      console.log('[HUD] Pong recebido, ping:', this.ping);
     };
     if (this.channel && this.channel.on) {
       this.channel.on('pong', this.pingListener);
@@ -663,6 +666,7 @@ export class HUDManager {
     if (this.channel && this.channel.emit) {
       this.pingStartTime = performance.now();
       this.channel.emit('ping');
+      console.log('[HUD] Ping enviado');
     }
   }
 
@@ -869,13 +873,15 @@ export class HUDManager {
   }
 
   updatePerformancePanel(now) {
-    // FPS
-    this.frameCount++;
-    if (now - this.lastFpsTime >= 1000) {
-      this.fps = this.frameCount;
-      this.frameCount = 0;
-      this.lastFpsTime = now;
-    }
+    // FPS instantâneo
+    const realFps = typeof window.fps === 'number' ? window.fps : this.fps;
+    // Histórico para média móvel
+    if (!this.fpsHistory) this.fpsHistory = [];
+    this.fpsHistory.push(realFps);
+    if (this.fpsHistory.length > 30) this.fpsHistory.shift();
+    const fpsAvg = this.fpsHistory.length
+      ? Math.round(this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length)
+      : '--';
     // Memória
     let mem = '--';
     if (window.performance && performance.memory) {
@@ -929,15 +935,40 @@ export class HUDManager {
       }
       pingText += ` <span style="color:${pingColor}">${pingStatus}</span>`;
     }
-    // FPS histórico para média móvel
-    const realFps = typeof window.fps === 'number' ? window.fps : this.fps;
-    if (!this.fpsHistory) this.fpsHistory = [];
-    this.fpsHistory.push(realFps);
-    if (this.fpsHistory.length > 30) this.fpsHistory.shift();
-    const fpsAvg = this.fpsHistory.length
-      ? Math.round(this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length)
-      : '--';
-    this.perfPanel.innerHTML = `FPS: ${realFps}<br>FPS Média: ${fpsAvg}<br>Ping: ${pingText}<br>Memória: ${mem}<br>Render: ${renderAvg} ms <span style=\"color:${renderStatus.color}\">${renderStatus.text}</span><br>Monstros/UI: ${uiAvg} ms <span style=\"color:${uiStatus.color}\">${uiStatus.text}</span>`;
+    // --- NOVO: Métricas Three.js e da cena ---
+    let lights = '--', objects = '--', geometries = '--', textures = '--', drawCalls = '--', mode = '--';
+    let renderer = window.renderer;
+    let scene = window.gameController && window.gameController.sceneManager && window.gameController.sceneManager.scene;
+    if (scene) {
+      lights = scene.children.filter(obj => obj.isLight).length;
+      objects = scene.children.length;
+    }
+    if (!renderer && window.gameController && window.gameController.renderManager) {
+      renderer = window.gameController.renderManager.renderer;
+    }
+    if (renderer && renderer.info) {
+      geometries = renderer.info.memory.geometries;
+      textures = renderer.info.memory.textures;
+      drawCalls = renderer.info.render.calls;
+    }
+    // Detecta modo de renderização (composer ou puro)
+    if (window.gameController && window.gameController.sceneManager) {
+      const sm = window.gameController.sceneManager;
+      mode = (sm.visualEffectsActive && sm.composer) ? 'Composer' : 'Render Puro';
+    }
+
+    this.perfPanel.innerHTML =
+      `FPS: ${realFps}<br>` +
+      `FPS Média: ${fpsAvg}<br>` +
+      `Ping: ${pingText}<br>` +
+      `Memória: ${mem}<br>` +
+      `Render: ${renderAvg} ms <span style="color:${renderStatus.color}">${renderStatus.text}</span><br>` +
+      `Monstros/UI: ${uiAvg} ms <span style="color:${uiStatus.color}">${uiStatus.text}</span><br>` +
+      `<hr style="border:none;border-top:1px solid #333;margin:4px 0;">` +
+      `Luzes: ${lights} | Objetos: ${objects}<br>` +
+      `Geometrias: ${geometries} | Texturas: ${textures}<br>` +
+      `Draw Calls: ${drawCalls}<br>` +
+      `Modo: <b>${mode}</b>`;
     requestAnimationFrame(this.updatePerformancePanel.bind(this));
   }
 
@@ -1020,5 +1051,70 @@ export class HUDManager {
     window.__pvpRpgUserSettings = settings;
     this.toggleSettingsMenu(false);
     window.dispatchEvent(new CustomEvent('pvpRpgUserSettingsChanged', { detail: settings }));
+
+    // --- APLICAÇÃO IMEDIATA DAS CONFIGS ---
+    if (window.gameController && window.gameController.sceneManager) {
+      // Troca efeitos visuais avançados imediatamente
+      const sm = window.gameController.sceneManager;
+      if (typeof sm.visualEffectsActive !== 'undefined') {
+        sm.visualEffectsActive = settings.visualEffects;
+        if (typeof sm.updateVisualEffectsMode === 'function') {
+          sm.updateVisualEffectsMode();
+        }
+      }
+    }
+    if (window.gameController && window.gameController.renderManager) {
+      // Limita FPS imediatamente
+      const rm = window.gameController.renderManager;
+      if (typeof rm.fpsLimitActive !== 'undefined') {
+        rm.fpsLimitActive = settings.fpslimit;
+        if (settings.fpslimit) {
+          rm.minFrameTime = 1000 / 30;
+        } else {
+          rm.minFrameTime = 0;
+        }
+      }
+    }
+  }
+
+  createPredictionPanel() {
+    this.predictionPanel = document.createElement('div');
+    this.predictionPanel.id = 'prediction-status-panel';
+    this.predictionPanel.style.position = 'fixed';
+    this.predictionPanel.style.top = '8px';
+    this.predictionPanel.style.right = '60px';
+    this.predictionPanel.style.background = 'rgba(30,30,60,0.92)';
+    this.predictionPanel.style.color = '#ffe066';
+    this.predictionPanel.style.fontSize = '13px';
+    this.predictionPanel.style.padding = '8px 14px';
+    this.predictionPanel.style.borderRadius = '8px';
+    this.predictionPanel.style.zIndex = '4001';
+    this.predictionPanel.style.pointerEvents = 'none';
+    this.predictionPanel.style.boxShadow = '0 2px 8px #0008';
+    this.predictionPanel.innerHTML = 'Predict: --<br>Erro: --<br>Ping: --';
+    document.body.appendChild(this.predictionPanel);
+    // Atualização automática
+    requestAnimationFrame(this.updatePredictionPanel.bind(this));
+  }
+
+  updatePredictionPanel() {
+    // movementPrediction deve estar disponível globalmente ou ser setado via método
+    const mp = window.movementPrediction || (window.gameController && window.gameController.movementPrediction);
+    let reconcileDistance = 0;
+    let status = '❓';
+    let predictionPing = '--';
+    if (mp && mp.enabled) {
+      if (mp.predictedPosition && mp.lastServerPosition) {
+        const dx = mp.predictedPosition.x - mp.lastServerPosition.x;
+        const dz = mp.predictedPosition.z - mp.lastServerPosition.z;
+        reconcileDistance = Math.sqrt(dx * dx + dz * dz);
+      }
+      status = '✅';
+      if (reconcileDistance > (mp.reconciliationThreshold || 0.05)) status = '🔄';
+      if (reconcileDistance > 1.0) status = '⚠️';
+      if (typeof mp.lastPredictionPing === 'number' && mp.lastPredictionPing > 0) predictionPing = `${mp.lastPredictionPing} ms`;
+    }
+    this.predictionPanel.innerHTML = `Predict: ${status}<br>Erro: ${reconcileDistance.toFixed(3)}<br>Ping Predição: ${predictionPing}`;
+    requestAnimationFrame(this.updatePredictionPanel.bind(this));
   }
 } 

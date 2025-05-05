@@ -485,4 +485,19 @@ function createBurnParticles(pos, scene) {
   }
   scene.add(group);
   setTimeout(() => scene.remove(group), 900);
+}
+
+/**
+ * Atualiza os meteoros em movimento
+ * @param {number} deltaTime - Tempo desde o último frame em segundos
+ * @param {THREE.Scene} scene - Cena onde os meteoros estão
+ */
+export function updateMeteorProjectiles(deltaTime, scene) {
+  // Esta função é um placeholder para compatibilidade com o sistema de atualização
+  // A animação dos meteoros já é feita através de callbacks do requestAnimationFrame
+  // dentro das funções createSingleMeteor e animateMeteor
+  
+  // Se no futuro for necessário adicionar uma lógica de atualização por frame,
+  // ela seria implementada aqui
+  return;
 } 

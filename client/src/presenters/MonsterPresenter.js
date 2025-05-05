@@ -122,52 +122,56 @@ export class MonsterPresenter {
 
   /**
    * Atualiza um monstro existente com novos dados
-   * @param {string} id - ID do monstro
+   * @param {string|number} id - ID do monstro
    * @param {Object} data - Novos dados do monstro
    */
   updateExistingMonster(id, data) {
     id = String(id);
     let monster = this.monsters.get(id);
     if (!monster) {
+      console.log('[DEBUG] Criando novo monstro:', id, data.position);
       this.createMonster(id, data);
       monster = this.monsters.get(id);
       if (!monster) return;
     }
-
-    // Atualiza o tipo do monstro se vier diferente (ex: novo monstro binário)
+    // Atualiza tipo se necessário
     if (data.monsterType && monster.userData.monsterType !== data.monsterType) {
       this.createMonster(id, data);
       monster = this.monsters.get(id);
       if (!monster) return;
     }
-    // Atualiza posição se fornecida
+    // Atualiza posição alvo para interpolação
     if (data.position) {
-      monster.position.set(
+      if (!monster.targetPosition) {
+        monster.targetPosition = new THREE.Vector3();
+      }
+      monster.targetPosition.set(
         Number(data.position.x) || monster.position.x,
         Number(data.position.y) || monster.position.y,
         Number(data.position.z) || monster.position.z
       );
+      // console.log('[DEBUG] Monstro', id, 'targetPosition atualizada para', monster.targetPosition.x, monster.targetPosition.y, monster.targetPosition.z);
     }
     // Atualiza rotação se fornecida
     if (data.rotation !== undefined) {
       monster.rotation.y = Number(data.rotation) || monster.rotation.y;
     }
-    // Atualiza stats de forma incremental
+    // Atualiza stats
     if (data.stats) {
       monster.userData.stats = {
         ...monster.userData.stats,
         ...data.stats
       };
     }
-    // Atualiza level se fornecido
+    // Atualiza level
     if (data.level !== undefined) {
       monster.userData.level = data.level;
     }
-    // Atualiza o estado ativo/inativo
+    // Atualiza visibilidade
     if (data.active !== undefined) {
       monster.visible = data.active;
     }
-    // Marca o timestamp da última atualização
+    // Marca timestamp
     monster.userData.lastUpdated = Date.now();
     // Atualiza barra de vida
     if (this.floatingBarManager && data.stats) {
@@ -268,5 +272,42 @@ export class MonsterPresenter {
       hp = 0;
     }
     // ... resto do código ...
+  }
+
+  /**
+   * Atualiza as posições interpoladas dos monstros
+   * @param {number} deltaTime - Tempo em segundos desde o último frame
+   */
+  updatePositions(deltaTime) {
+    // Se não existem monstros, não há o que atualizar
+    if (!this.monsters || this.monsters.size === 0) return;
+    
+    // Para cada monstro, verifica se precisa atualizar posição
+    for (const [id, monster] of this.monsters.entries()) {
+      // Verifica se o monstro tem uma posição alvo definida
+      if (monster.targetPosition) {
+        // Só mostra logs a cada ~1 segundo (não em cada frame)
+        const shouldLog = Math.random() < 0.01; // ~1% de chance por frame
+        
+        // Calcula a distância atual para a posição alvo
+        const distance = monster.position.distanceTo(monster.targetPosition);
+        
+        // Se já chegou próximo o suficiente da posição alvo, não continua interpolando
+        if (distance < 0.01) {
+          monster.position.copy(monster.targetPosition);
+          continue;
+        }
+        
+        // Interpola a posição atual em direção à posição alvo
+        // Ajusta o fator de interpolação com base na distância - movimento mais rápido para distâncias maiores
+        const lerpFactor = Math.min(0.1 * (1 + distance * 2), 0.3);
+        monster.position.lerp(monster.targetPosition, lerpFactor);
+        
+        // Debug: mostra a posição sendo interpolada (com taxa reduzida)
+        if (shouldLog) {
+          // console.log(`[DEBUG] Monstro ${id} movendo para X:${monster.targetPosition.x.toFixed(2)}, Z:${monster.targetPosition.z.toFixed(2)}, Distância: ${distance.toFixed(2)}`);
+        }
+      }
+    }
   }
 } 

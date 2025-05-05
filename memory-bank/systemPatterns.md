@@ -1,5 +1,137 @@
 # Padrões do Sistema
 
+## Arquitetura Refatorada do Cliente
+
+A refatoração do cliente segue uma abordagem modular e extensível, separando claramente responsabilidades e permitindo manutenção e evolução mais fáceis do código.
+
+### Estrutura de Diretórios Modular
+```
+client/src/
+├── controllers/       # Controladores de entrada e fluxo principal
+│   ├── GameController.js
+│   ├── InputController.js
+│   └── CameraController.js
+├── managers/          # Gerenciadores de recursos e estados
+│   ├── EntityManager.js
+│   ├── SceneManager.js
+│   └── RenderManager.js
+├── presenters/        # Apresentação visual das entidades
+│   ├── PlayerPresenter.js
+│   ├── MonsterPresenter.js
+│   └── WorldObjectPresenter.js
+├── services/          # Serviços de comunicação com servidor
+│   └── NetworkManager.js
+├── systems/           # Sistemas de mecânicas específicas
+│   └── MovementPrediction.js
+├── ui/                # Interface do usuário
+│   ├── HUDManager.js
+│   └── ChatManager.js
+├── skills/            # Habilidades e seus efeitos visuais
+│   ├── FireballSkill.js
+│   ├── TeleportSkill.js
+│   ├── IceSpikeSkill.js
+│   └── MeteorStormSkill.js
+├── effects/           # Efeitos visuais e partículas
+│   └── FloatingTextManager.js
+└── main-refactored.js # Ponto de entrada refatorado
+```
+
+### Principais Componentes Refatorados
+
+#### 1. GameController
+- Orquestra todos os outros componentes
+- Inicializa e conecta sistemas (renderização, rede, entrada)
+- Configura callbacks de rede e input
+- Gerencia o ciclo de vida do jogo (inicialização, loop principal, término)
+
+#### 2. EntityManager
+- Gerencia todas as entidades do jogo (jogadores, monstros, objetos)
+- Mantém referência ao jogador local
+- Processa atualizações do servidor (processWorldUpdate)
+- Gerencia seleção de alvos e HUD relacionada
+- Integra sistema de nomes flutuantes e barras de vida
+
+#### 3. RenderManager
+- Gerencia o loop de renderização usando requestAnimationFrame
+- Atualiza todos os sistemas registrados a cada frame
+- Controla o renderizador Three.js e pós-processamento
+- Monitora performance e FPS
+
+#### 4. NetworkManager
+- Abstrai comunicação com o servidor via geckos.io
+- Expõe interface baseada em eventos para o resto do sistema
+- Gerencia eventos binários e JSON
+- Implementa compressão e otimização de rede
+
+#### 5. Sistema de Habilidades Modular
+- Cada habilidade agora tem seu próprio arquivo (FireballSkill.js, etc.)
+- Efeitos visuais encapsulados em funções específicas (spawnFireballEffect)
+- Permite expansão fácil com novas habilidades
+- Melhor separação entre lógica de jogo e efeitos visuais
+
+### Padrões de Design Implementados
+
+#### Observer Pattern
+- Sistema de eventos do NetworkManager
+- Callbacks registrados para eventos de rede e input
+- Atualizações baseadas em inscrições de sistemas
+
+#### Component Pattern
+- Entidades compostas por componentes (mesh, userData, stats)
+- Componentes visuais como anéis de seleção, nomes flutuantes, etc.
+
+#### Factory Pattern
+- Criação padronizada de entidades via presenters
+- Método createLocalPlayer para jogador principal
+
+#### Dependency Injection
+- Componentes recebem suas dependências no construtor
+- Facilita testes e extensibilidade
+
+#### Command Pattern
+- Inputs do jogador transformados em comandos para o servidor
+- Estrutura clara para ações do jogador
+
+### Fluxo de Renderização
+
+```mermaid
+flowchart TD
+    Start[RenderManager.animate] --> A[Calcular deltaTime]
+    A --> B[Atualizar estatísticas]
+    B --> C[Atualizar sistemas registrados]
+    C --> D{Para cada sistema}
+    D --> E[Chamar método de update]
+    E --> D
+    D --> F[Renderizar cena]
+    F --> G[Próximo frame via requestAnimationFrame]
+    G --> Start
+```
+
+### Fluxo de Processamento de Eventos
+
+```mermaid
+flowchart TD
+    Event[Evento recebido do servidor] --> Check{Tipo de evento?}
+    Check -->|player:init| Init[Inicializar jogador local]
+    Check -->|world:update| Update[Processar atualizações do mundo]
+    Check -->|combat:damageDealt| Damage[Processar dano em combate]
+    Init --> EntityCreate[Criar entidade do jogador]
+    Init --> CameraFollow[Configurar câmera para seguir]
+    Update --> EntityUpdate[Atualizar entidades existentes]
+    Update --> EntityCleanup[Remover entidades obsoletas]
+    Damage --> FloatingText[Exibir texto de dano]
+    Damage --> UpdateHUD[Atualizar HUD do alvo]
+```
+
+### Benefícios da Refatoração
+
+1. **Modularidade**: Cada sistema tem responsabilidade única e bem definida
+2. **Testabilidade**: Componentes isolados são mais fáceis de testar
+3. **Manutenibilidade**: Bugs e novas features podem ser localizados em módulos específicos
+4. **Escalabilidade**: Novos sistemas podem ser adicionados sem afetar os existentes
+5. **Performance**: Melhor gerenciamento de recursos e otimizações específicas
+6. **Colaboração**: Várias pessoas podem trabalhar em diferentes módulos simultaneamente
+
 ## Novos Padrões e Melhorias Recentes
 
 ### HUD do Alvo Sincronizada
@@ -518,214 +650,4 @@ classDiagram
 
 O sistema de combate gerencia dano, efeitos de status e morte:
 
-```mermaid
-sequenceDiagram
-    participant P as Player
-    participant CS as CombatSystem
-    participant T as Target
-    
-    P->>CS: applyDamage(target, amount)
-    CS->>T: takeDamage(amount)
-    alt Target HP > 0
-        T->>CS: damageDealt
-        CS->>P: damageDealt event
-    else Target HP <= 0
-        T->>CS: death
-        CS->>P: death event
-        Note over CS,T: Processo de Drop e XP
-    end
 ```
-
-### CombatSystem
-- Processa todas as interações de dano
-- Gerencia efeitos de status (slow, stun, etc.)
-- Calcula modificadores de dano
-- Emite eventos de feedback
-
-## Sistema de Renderização
-
-O cliente usa Three.js para renderização 3D isométrica:
-
-```mermaid
-graph TD
-    A[Scene Setup] --> B[Camera Setup]
-    B --> C[Renderer Setup]
-    C --> D[Lighting Setup]
-    D --> E[Load Assets]
-    E --> F[Main Loop]
-    
-    F --> G[Process Inputs]
-    G --> H[Update Scene]
-    H --> I[Render]
-    I --> F
-```
-
-### Presenters
-Cada tipo de entidade tem um Presenter responsável pela sua representação visual:
-
-- `PlayerPresenter`: Renderiza jogadores
-- `MonsterPresenter`: Renderiza monstros
-- `WorldObjectPresenter`: Renderiza objetos do mundo
-- `AbilityPresenter`: Renderiza efeitos visuais de habilidades
-
-## Sistema de Input
-
-O sistema processa entradas do usuário e as converte em comandos:
-
-```mermaid
-graph TD
-    A[Event Listeners] --> B[Input Manager]
-    B --> C{Type of Input}
-    C -->|Movement| D[Send Move Command]
-    C -->|Ability| E[Send Ability Command]
-    C -->|Interaction| F[Send Interact Command]
-```
-
-### Sistema de UI
-
-A interface do usuário é composta por vários elementos:
-
-- Barras de HP e Mana
-- Cooldowns de habilidades
-- Contador de FPS e Ping
-- HUD de alvo selecionado
-- Painel de chat
-- Floating Names para identificação visual de entidades
-
-## Sistema de Eventos
-
-O sistema usa um padrão baseado em eventos para comunicação entre componentes:
-
-```mermaid
-classDiagram
-    class EventEmitter {
-        +on(event, callback)
-        +emit(event, ...args)
-        +off(event, callback)
-    }
-    
-    class GameClient {
-        +eventEmitter: EventEmitter
-        +connect()
-        +disconnect()
-    }
-    
-    class GameServer {
-        +eventEmitter: EventEmitter
-        +broadcast(event, data)
-        +sendTo(playerId, event, data)
-    }
-    
-    GameClient --> EventEmitter
-    GameServer --> EventEmitter
-```
-
-### Exemplos de Eventos
-- `player:joined`: Novo jogador conectado
-- `player:moved`: Jogador moveu-se
-- `monster:spawned`: Novo monstro surgiu
-- `combat:damageDealt`: Dano aplicado a uma entidade
-
-## Estratégias de Otimização
-
-Além do sistema de otimização de rede, o projeto implementa várias estratégias para garantir performance:
-
-### No Servidor
-- Processamento apenas de entidades em áreas ocupadas
-- Sistema de ticks assíncronos para lógica pesada
-- Pooling de objetos para evitar garbage collection excessivo
-
-### No Cliente
-- Level of Detail (LOD) para renderização
-- Frustum culling para evitar renderizar objetos fora da visão
-- Object pooling para efeitos visuais
-- Throttling para reduzir eventos de input
-- Lazy loading de assets
-
-## Padrão de Simulação e Balanceamento
-- Scripts de simulação (ex: `test-xp.js`) devem consumir as mesmas fontes de verdade das constantes do jogo (`gameConstants.js`), evitando duplicação de lógica e garantindo previsibilidade.
-- O script de simulação de XP é usado para prever, balancear e validar o progresso de níveis, grind, quests e impacto de cada monstro real do jogo.
-- Mudanças em parâmetros de XP, recompensas ou monstros devem ser refletidas tanto no runtime quanto nos scripts de simulação para garantir consistência.
-- O padrão é: **tudo que influencia o balanceamento do jogo deve ser centralizado em arquivos de constantes e consumido por qualquer ferramenta de análise/simulação**.
-
-## Observações
-- Esse padrão facilita o ajuste fino do balanceamento, a comunicação entre devs/designers e a manutenção do projeto a longo prazo.
-
-### Multi-Entry Vite com Middleware
-- Quando o frontend precisa servir diferentes SPAs ou páginas em rotas distintas (ex: landing page em `/` e jogo em `/play`), usar Vite com root na raiz do projeto.
-- Implementar middleware customizado que:
-  - Serve `index.html` da raiz em `/`
-  - Serve `client/index.html` em `/play`
-  - Faz alias de `/src/*` para `/client/src/*` para garantir que assets funcionem sem alterar caminhos no HTML
-- Não duplicar arquivos nem criar projetos separados; manter build limpo e roteamento flexível.
-- Exemplo de configuração:
-  - Plugin Vite com `configureServer` interceptando `/play` e servindo o HTML correto
-  - Middleware para alias de assets
-- Motivo: Permite múltiplos pontos de entrada reais, sem gambiarras, mantendo a arquitetura limpa e fácil de manter.
-
-## Sistema de Eventos Binários e Serialização (binarySerializer.js)
-
-### Visão Geral
-Para otimizar a comunicação entre cliente e servidor, migramos eventos críticos de JSON para um formato binário customizado, implementado em `shared/utils/binarySerializer.js`. Isso reduz drasticamente o tamanho dos pacotes, melhora a performance e diminui a latência, especialmente em cenários com muitos jogadores e entidades.
-
-### Vantagens
-- Redução de até 80% no tamanho dos pacotes de rede para eventos críticos.
-- Menor latência e uso de banda, permitindo mais entidades simultâneas.
-- Integração incremental: eventos menos críticos continuam em JSON, facilitando manutenção e debug.
-- Quantização de posições e rotações para empacotamento eficiente.
-
-### Como funciona
-- Cada evento binário possui um opcode único (1 byte) que identifica o tipo de mensagem.
-- Os dados são serializados em ArrayBuffer/DataView, usando quantização para posições (-100 a +100 mapeado para 0-65535) e rotações (0-2PI mapeado para 0-255).
-- IDs de entidades são convertidos para inteiros compactos.
-- O utilitário `toArrayBuffer` garante compatibilidade entre diferentes formatos de buffer.
-
-### Eventos Binários Implementados
-- **player:move** (opcode 0x01): Envia movimento do jogador (id, posX, posY, rot).
-- **player:moved** (opcode 0x02): Atualização de posição, HP e mana do jogador.
-- **monster:move** (opcode 0x03): Movimento de monstro (id, posX, posY, rot).
-- **world:update** (opcode 0x05): Atualização de múltiplas entidades essenciais (id, posX, posY, rot, hp).
-- **player:status** (opcode 0x10): Status completo do jogador (hp, maxHp, mana, maxMana, level, xp, nextLevelXp).
-- **playerMoveInput**: Input de movimento WASD (bits 0-3).
-- **monster:death** (opcode 0x20): Notificação de morte de monstro (id).
-
-### Exemplo de Serialização/Deserialização
-```js
-// Serializar movimento do jogador
-const buffer = serializePlayerMove({ playerId: 1, posX: 10.5, posY: -3.2, rot: Math.PI });
-// Enviar buffer pelo canal de rede
-
-// No receptor:
-const data = deserializePlayerMove(buffer);
-console.log(data); // { opcode: 1, playerId: 1, posX: 10.5, posY: -3.2, rot: 3.14 }
-```
-
-### Documentação dos Principais Métodos (binarySerializer.js)
-- `serializePlayerMove` / `deserializePlayerMove`
-- `serializePlayerMoved` / `deserializePlayerMoved`
-- `serializeMonsterMove` / `deserializeMonsterMove`
-- `serializeWorldUpdate` / `deserializeWorldUpdate`
-- `serializePlayerStatus` / `deserializePlayerStatus`
-- `serializePlayerMoveInput` / `deserializePlayerMoveInput`
-- `serializeMonsterDeath` / `deserializeMonsterDeath`
-
-Cada função recebe um objeto com os campos relevantes e retorna um ArrayBuffer (serialização) ou objeto JS (deserialização).
-
-### Integração
-- O sistema permite migrar eventos gradualmente: eventos críticos (movimento, status, morte) já usam binário; outros permanecem em JSON.
-- O utilitário pode ser expandido para novos eventos conforme necessário.
-
-### Referência: shared/utils/binarySerializer.js
-- O arquivo contém comentários detalhados e exemplos de uso para cada função.
-- Mantém compatibilidade entre cliente e servidor, facilitando debug e expansão futura.
-
-## Sincronização Delta Binária de Monstros
-- Novo evento binário: `BINARY_EVENTS.MONSTER_DELTA_UPDATE`
-- Servidor mantém snapshot de monstros enviados por player
-- A cada tick, envia apenas monstros adicionados/atualizados e IDs removidos
-- Cliente processa monstros apenas pelo delta, removendo lógica de atualização de monstros do pacote principal
-- Arquitetura pronta para expandir o padrão delta para outras entidades (objetos, jogadores)
-
-## Impacto
-- Redução de tráfego e processamento
-- Sincronização robusta e tolerante a perda de pacotes (pode ser expandida com fallback de full update)

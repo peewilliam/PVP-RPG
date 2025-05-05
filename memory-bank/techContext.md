@@ -219,4 +219,59 @@ Implementamos um sistema avançado de otimização de rede que resolve problemas
 ### Refatoração do Sistema de Entidades
 - Entidades agora são gerenciadas em mapas segmentados por tipo (players, monsters, worldObjects, damageZones), eliminando conflitos de ID e bugs de remoção.
 - Operações de busca, remoção e atualização são sempre feitas no mapa correto, aumentando a robustez e facilitando manutenção.
-- Essa arquitetura prepara o sistema para expansão futura e maior número de entidades simultâneas. 
+- Essa arquitetura prepara o sistema para expansão futura e maior número de entidades simultâneas.
+
+# Contexto Técnico
+
+## Arquitetura Técnica do Cliente Refatorado
+
+A refatoração do cliente segue uma arquitetura modular, separando claramente as responsabilidades e implementando padrões de design modernos para facilitar a manutenção e extensibilidade do código.
+
+### Tecnologias Principais
+- **Three.js**: Framework de renderização 3D para WebGL
+- **Geckos.io**: Sistema de comunicação em tempo real via WebRTC/WebSockets
+- **ES6+ Modules**: Organização do código em módulos JavaScript modernos
+- **RequestAnimationFrame**: API para loop de animação eficiente
+- **WebGL**: API gráfica para renderização 3D
+
+### Padrões de Design Implementados
+- **Observer Pattern**: Sistema de eventos para comunicação entre componentes
+- **Component Pattern**: Composição de entidades a partir de componentes modulares
+- **Factory Pattern**: Criação padronizada de entidades através de presenters
+- **Dependency Injection**: Componentes recebem suas dependências no construtor
+- **Command Pattern**: Inputs do jogador transformados em comandos para o servidor
+
+### Estrutura de Diretórios
+```
+client/src/
+├── controllers/       # Controladores de input e fluxo principal
+├── managers/          # Gerenciadores de recursos e estados
+├── presenters/        # Apresentação visual das entidades
+├── services/          # Comunicação com servidor
+├── systems/           # Sistemas de mecânicas específicas
+├── ui/                # Interface do usuário
+├── skills/            # Habilidades e seus efeitos visuais
+└── effects/           # Efeitos visuais e partículas
+```
+
+### Benefícios Técnicos
+1. **Modularidade**: Facilita a localização e solução de bugs
+2. **Testabilidade**: Componentes isolados são mais fáceis de testar
+3. **Manutenibilidade**: Arquitetura clara facilita manutenção de longo prazo
+4. **Extensibilidade**: Novos componentes podem ser adicionados sem afetar os existentes
+5. **Performance**: Melhor gerenciamento de recursos e otimizações específicas
+6. **Colaboração**: Permite que várias pessoas trabalhem em diferentes partes do sistema
+
+### Fluxo de Dados
+O sistema segue um fluxo de dados bem definido:
+1. Input é capturado pelo InputController
+2. GameController orquestra a lógica global
+3. NetworkManager envia comandos para o servidor
+4. Eventos do servidor são recebidos e processados
+5. EntityManager atualiza o estado das entidades
+6. Presenters atualizam a representação visual
+7. RenderManager executa o loop de renderização
+
+# Contexto Técnico
+
+## Linguagens 

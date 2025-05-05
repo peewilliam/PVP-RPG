@@ -1,6 +1,14 @@
 # Active Context
 
 ## Foco atual
+- **Refatoração Modular do Cliente**: Implementação completa de uma arquitetura modular e extensível no client/src/, com separação clara de responsabilidades:
+  - Controllers gerenciam entrada e fluxo principal (GameController, InputController, CameraController)
+  - Managers orquestram recursos e estados (EntityManager, SceneManager, RenderManager)
+  - Presenters cuidam da apresentação visual das entidades (PlayerPresenter, MonsterPresenter, WorldObjectPresenter)
+  - Services lidam com comunicação servidor (NetworkManager)
+  - Systems implementam mecânicas específicas (MovementPrediction)
+  - UI gerencia interfaces (HUDManager, ChatManager)
+  - Skills encapsula efeitos visuais de habilidades, cada uma em seu próprio arquivo
 - Refino visual e usabilidade da barra de skills, HUD, chat e HUD do alvo.
 - Sincronização e atualização instantânea da HUD do alvo (vida, mana, nome pt-br, status) ao receber dano ou atualização do mundo.
 - Painel visual (lil-gui) para ajuste em tempo real de exposição, luzes e bloom.
