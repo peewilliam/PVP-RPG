@@ -417,6 +417,47 @@ function deserializeMonsterDeltaUpdate(buffer) {
   return { opcode, addedOrUpdated, removed };
 }
 
+// Serialização binária para batching de efeitos de combate (dano, cura, status, floating text)
+// Formato: [opcode][N][N efeitos...]
+// Cada efeito: 2 sourceId + 2 targetId + 1 skillId + 2 value + 1 effectType + 1 statusType = 9 bytes
+function serializeCombatEffects(effects) {
+  const N = effects.length;
+  const buffer = new ArrayBuffer(1 + 2 + N * 9);
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x30); offset += 1; // opcode exclusivo para combat:effects
+  view.setUint16(offset, N); offset += 2;
+  for (let i = 0; i < N; i++) {
+    const e = effects[i];
+    view.setUint16(offset, toEntityId(e.sourceId)); offset += 2;
+    view.setUint16(offset, toEntityId(e.targetId)); offset += 2;
+    view.setUint8(offset, e.skillId ?? 0); offset += 1;
+    view.setUint16(offset, e.value ?? 0); offset += 2;
+    view.setUint8(offset, e.effectType ?? 0); offset += 1;
+    view.setUint8(offset, e.statusType ?? 0); offset += 1;
+  }
+  return buffer;
+}
+
+function deserializeCombatEffects(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const N = view.getUint16(offset); offset += 2;
+  const effects = [];
+  for (let i = 0; i < N; i++) {
+    const sourceId = view.getUint16(offset); offset += 2;
+    const targetId = view.getUint16(offset); offset += 2;
+    const skillId = view.getUint8(offset); offset += 1;
+    const value = view.getUint16(offset); offset += 2;
+    const effectType = view.getUint8(offset); offset += 1;
+    const statusType = view.getUint8(offset); offset += 1;
+    effects.push({ sourceId, targetId, skillId, value, effectType, statusType });
+  }
+  return effects;
+}
+
 export {
   serializePlayerMove,
   deserializePlayerMove,
@@ -437,5 +478,7 @@ export {
   serializeWorldUpdateFull,
   deserializeWorldUpdateFull,
   serializeMonsterDeltaUpdate,
-  deserializeMonsterDeltaUpdate
+  deserializeMonsterDeltaUpdate,
+  serializeCombatEffects,
+  deserializeCombatEffects
 }; 

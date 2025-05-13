@@ -65,6 +65,12 @@
 - ✅ Sistema de barra de vida flutuante (FloatingBarManager) robusto para entidades dinâmicas
 - ✅ Otimização de rede: delta updates, compressão adaptativa, envio seletivo
 - ✅ Bugs resolvidos de flicker/recriação de entidades dinâmicas
+- ✅ **Sistema de auditoria/logs estruturados:** Todos os eventos enviados do servidor para o cliente (binários e JSON) agora são logados de forma padronizada (auditLogger.js, compressAndSend.js).
+- ✅ **Painel web SPA (/audit):** Criado painel completo para análise dos logs, com filtros dinâmicos (data, tipo de evento, player), paginação (100 eventos/página), gráficos de tráfego e serialização (últimos 500 eventos), métricas resumo e loading visual.
+- ✅ **Logging padronizado:** Todos os eventos do gameConstants.js (EVENTS e BINARY_EVENTS) são logados, tanto no loop principal quanto em métodos de entidades (Player, Monster, etc).
+- ✅ **Correção de imports e paths relativos:** Todos os utilitários são importados corretamente, evitando erros de módulo não encontrado.
+- ✅ **Performance do painel:** Otimizado para grandes volumes de eventos, fluido mesmo com milhares de logs.
+- ✅ **Análise de gargalos facilitada:** O painel permite identificar facilmente picos de tráfego, eventos mais frequentes, tipos de evento e possíveis gargalos de rede.
 
 ## O que está faltando construir
 - [ ] Sistema de inventário e drops de itens
@@ -291,21 +297,41 @@ O sistema atual representa uma base sólida para futuras otimizações, com foco
 
 # Progresso
 
-## O que já funciona
-- Player com escala, colisão e visual polidos (1.3x1.3x1.3, cone 0.4x1.2, colisão 0.65)
-- Assets do mundo (árvore, rocha, cacto, arbusto) proporcionais, realistas e com sombras
-- Colisão e bloqueio ajustados para clareza de passagens
-- Labels/efeitos de chão para spots e boss integrados e visíveis
-- Iluminação global realista, névoa sutil, materiais padronizados
-- Spawn do player e respawn sempre no início do mapa DESERT_PATH
+## O que funciona
+- Sistema binário de combate 100% funcional e centralizado: todos os efeitos de dano, status e floating text são enviados em lote via buffer binário.
+- Cliente processa todos os efeitos de combate a partir do evento binário, exibindo texto flutuante, efeitos visuais de status e integrações visuais de habilidades (WebShot, Leap, Frost, Meteor Storm) de forma sincronizada.
+- Eliminação de duplicidade de eventos antigos de combate: apenas o evento binário é utilizado.
+- Feedback visual imediato e consistente para todas as ações de combate.
+- Registro correto de meshes no presenter, garantindo exibição de efeitos visuais para todos os alvos.
+- Sistema de entidades robusto, com Maps para jogadores, monstros, objetos do mundo e zonas de dano.
+- Delta update binário para monstros: apenas monstros que mudam ou entram/saem do alcance são enviados a cada tick.
+- Arquitetura MCP implementada e padronizada em todo o projeto.
+- Sistema de skills centralizado e fácil de expandir.
+- Sistema de colisão autoritativo e validado.
+- HUD, chat, seleção de alvo, barra de skills e feedback visual integrados e funcionais.
 
-## O que falta
-- Testes visuais finais e revisão de experiência do usuário
-- Ajustes finos de performance e feedback visual
+## O que falta/construir
+- Expansão do padrão binário para outros tipos de efeitos/status (cura, buffs, debuffs visuais).
+- Refino visual dos efeitos de status (slow/freeze, burn, etc) para monstros e jogadores.
+- Otimização adicional do delta update para entidades além de monstros.
+- Revisão e padronização de todos os presenters e managers do cliente para garantir consistência visual.
+- Documentação incremental dos eventos binários e contratos compartilhados.
+- Novos biomas, assets, monstros e habilidades.
 
-## Status
-- Sistema robusto, moderno e escalável para monstros
-- Pronto para escalar e fácil de expandir para outras entidades
+## Status dos sistemas
+- **Combate:** Binário, centralizado, sem duplicidade, feedback visual 100% integrado.
+- **Skills:** Centralizadas, fácil expansão, efeitos visuais dedicados.
+- **Entidades:** Gerenciadas por Map, robustez e performance.
+- **Colisão:** Autoritativa, validada, matriz de colisão.
+- **HUD/UI:** Integrada, responsiva, feedback visual imediato.
+- **Rede:** geckos.io, eventos binários, baixa latência.
+
+## Próximos marcos
+- Expansão do sistema binário para novos efeitos/status.
+- Refino visual e polimento dos efeitos de habilidades/status.
+- Otimização do delta update para todos os tipos de entidades.
+- Novos conteúdos (biomas, monstros, habilidades, assets visuais).
+- Documentação e contratos sempre atualizados para facilitar manutenção e expansão.
 
 # Progress
 

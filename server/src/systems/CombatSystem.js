@@ -4,6 +4,9 @@
  */
 import { WORLD, EVENTS, ABILITY_IDS, MONSTERS } from '../../../shared/constants/gameConstants.js';
 
+// Adiciona no topo para garantir acesso ao buffer global
+const combatEffectsBuffer = global.combatEffectsBuffer || [];
+
 export class CombatSystem {
   /**
    * @param {EntityManager} entityManager - Gerenciador de entidades
@@ -353,14 +356,7 @@ export class CombatSystem {
           // Feedback visual: emitir evento de dano para TODOS os jogadores conectados
           for (const player of this.entityManager.players.values()) {
             if (player.channel) {
-              player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-                targetId: monster.id,
-                targetType: 'monster',
-                targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
-                damage: realDamage,
-                died: realDamage <= 0,
-                position: { ...monster.position }
-              });
+              combatEffectsBuffer.push({ sourceId: projectile.owner?.id || 0, targetId: monster.id, skillId: projectile.ability?.ID || 0, value: realDamage, effectType: 0, statusType: 0 });
             }
           }
           // console.log(`[EVENTO] DAMAGE_DEALT emitido para todos os jogadores (monstro atingido)`);
@@ -385,29 +381,12 @@ export class CombatSystem {
           // console.log(`[DANO] Aplicado ${damage} ao jogador ${player.id} (morreu=${realDamage <= 0})`);
           // Feedback visual: emitir evento de dano para o lançador
           if (projectile.owner && projectile.owner.channel) {
-            projectile.owner.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-              sourceId: projectile.owner.id,
-              sourceType: 'player',
-              sourceName: MONSTERS[projectile.owner.monsterType]?.NAME || projectile.owner.monsterType,
-              targetId: player.id,
-              targetType: 'player',
-              targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-              damage: realDamage,
-              died: realDamage <= 0,
-              position: { ...player.position }
-            });
+            combatEffectsBuffer.push({ sourceId: projectile.owner.id, targetId: player.id, skillId: 0, value: realDamage, effectType: 0, statusType: 0 });
             // console.log(`[EVENTO] DAMAGE_DEALT emitido para lançador ${projectile.owner.id}`);
           }
           // Emitir também para o alvo atingido (caso seja jogador)
           if (player.channel) {
-            player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-              targetId: player.id,
-              targetType: 'player',
-              targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-              damage: realDamage,
-              died: realDamage <= 0,
-              position: { ...player.position }
-            });
+            combatEffectsBuffer.push({ sourceId: player.id, targetId: player.id, skillId: 0, value: realDamage, effectType: 0, statusType: 0 });
             // console.log(`[EVENTO] DAMAGE_DEALT emitido para alvo ${player.id}`);
           }
           projectile.markedForRemoval = true;
@@ -453,27 +432,14 @@ export class CombatSystem {
               // Emitir evento para efeito visual de congelado
               for (const player of this.entityManager.players.values()) {
                 if (player.channel) {
-                  player.channel.emit('combat:slow', {
-                    targetId: monster.id,
-                    targetType: 'monster',
-                    targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
-                    slowDuration,
-                    slowUntil: monster.status.slowedUntil
-                  });
+                  combatEffectsBuffer.push({ sourceId: zone.owner?.id || 0, targetId: monster.id, skillId: zone.ability?.ID || 0, value: slowDuration, effectType: 2, statusType: 1 });
                 }
               }
             }
             // Emitir evento para todos os jogadores
             for (const player of this.entityManager.players.values()) {
               if (player.channel) {
-                player.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-                  targetId: monster.id,
-                  targetType: 'monster',
-                  targetName: MONSTERS[monster.monsterType]?.NAME || monster.monsterType,
-                  damage: realDamage,
-                  died: realDamage <= 0,
-                  position: { ...monster.position }
-                });
+                combatEffectsBuffer.push({ sourceId: zone.owner?.id || 0, targetId: monster.id, skillId: zone.ability?.ID || 0, value: realDamage, effectType: 0, statusType: 0 });
               }
             }
           }
@@ -503,27 +469,14 @@ export class CombatSystem {
               // Emitir evento para efeito visual de congelado
               for (const p of this.entityManager.players.values()) {
                 if (p.channel) {
-                  p.channel.emit('combat:slow', {
-                    targetId: player.id,
-                    targetType: 'player',
-                    targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-                    slowDuration,
-                    slowUntil: player.status.slowedUntil
-                  });
+                  combatEffectsBuffer.push({ sourceId: zone.owner?.id || 0, targetId: player.id, skillId: zone.ability?.ID || 0, value: slowDuration, effectType: 2, statusType: 1 });
                 }
               }
             }
             // Emitir evento para todos os jogadores
             for (const p of this.entityManager.players.values()) {
               if (p.channel) {
-                p.channel.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-                  targetId: player.id,
-                  targetType: 'player',
-                  targetName: MONSTERS[player.monsterType]?.NAME || player.monsterType,
-                  damage: realDamage,
-                  died: realDamage <= 0,
-                  position: { ...player.position }
-                });
+                combatEffectsBuffer.push({ sourceId: zone.owner?.id || 0, targetId: player.id, skillId: zone.ability?.ID || 0, value: realDamage, effectType: 0, statusType: 0 });
               }
             }
           }

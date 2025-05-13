@@ -88,6 +88,10 @@ export class EntityManager {
   setLocalPlayerId(id) {
     this.localPlayerId = id;
     this.playerPresenter.setLocalPlayerId(id);
+    // Garante que o mesh do player local seja registrado com o ID real
+    if (this.localPlayer && this.playerPresenter && id) {
+      this.playerPresenter.players.set(String(id), this.localPlayer);
+    }
     return this;
   }
   

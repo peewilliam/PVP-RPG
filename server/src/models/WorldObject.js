@@ -147,7 +147,17 @@ export class WorldObject extends Entity {
   /**
    * Serializa o objeto para o cliente
    */
-  serialize() {
+  serialize(options = {}) {
+    if (options.compact) {
+      return {
+        id: this.id,
+        objectType: this.objectType,
+        position: { ...this.position },
+        rotation: this.rotation,
+        scale: { ...this.scale },
+        biome: this.biome
+      };
+    }
     return {
       ...super.serialize(),
       objectType: this.objectType,

@@ -1,27 +1,64 @@
 # Active Context
 
-## Foco atual
-- **Refatoração Modular do Cliente**: Implementação completa de uma arquitetura modular e extensível no client/src/, com separação clara de responsabilidades:
-  - Controllers gerenciam entrada e fluxo principal (GameController, InputController, CameraController)
-  - Managers orquestram recursos e estados (EntityManager, SceneManager, RenderManager)
-  - Presenters cuidam da apresentação visual das entidades (PlayerPresenter, MonsterPresenter, WorldObjectPresenter)
-  - Services lidam com comunicação servidor (NetworkManager)
-  - Systems implementam mecânicas específicas (MovementPrediction)
-  - UI gerencia interfaces (HUDManager, ChatManager)
-  - Skills encapsula efeitos visuais de habilidades, cada uma em seu próprio arquivo
-- Refino visual e usabilidade da barra de skills, HUD, chat e HUD do alvo.
-- Sincronização e atualização instantânea da HUD do alvo (vida, mana, nome pt-br, status) ao receber dano ou atualização do mundo.
-- Painel visual (lil-gui) para ajuste em tempo real de exposição, luzes e bloom.
-- Seleção de alvo robusta: mantém alvo ao clicar em área vazia, remove ao clicar no próprio player ou ESC.
-- Correção de bugs de cooldown e nomes de habilidades/jogadores.
-- Aprimoramento visual dos modelos 3D (árvores, vegetação, rochas, etc).
-- Correção de cores escuras nas árvores (folhas e tronco).
-- Implementação de sistema de iluminação avançado (ambiente, sol, hemisférica, névoa).
-- Otimização de performance: LOD, culling, materiais simplificados para objetos distantes.
-- Estrutura para instanciamento futuro de objetos repetidos.
-- **Chat em tempo real** implementado e integrado ao HUD, com atalhos de teclado, foco automático e sem bloquear inputs de gameplay.
-- **NOVIDADE:** Sistema de nomes flutuantes para monstros implementado, exibindo nome pt-br acima da cabeça, centralizado, responsivo à distância e com visual MMORPG.
-- **NOVIDADE:** Implementação de sistema avançado de otimização de rede usando delta updates, compressão de dados e envio seletivo de entidades.
+## Foco Atual
+- Centralização de todos os efeitos de combate (dano, status, floating text) no buffer binário do servidor.
+- Processamento de todos os efeitos de combate no cliente via evento binário único, com integração visual dedicada para cada habilidade/status.
+- Eliminação de duplicidade de eventos antigos de combate (DAMAGE_DEALT, FLOATING_TEXT, combat:slow, etc).
+- Otimização do fluxo de comunicação, reduzindo latência e uso de banda.
+- Garantia de feedback visual imediato e sincronizado para todas as ações de combate.
+- Implementação e padronização completa do sistema de auditoria de eventos de rede.
+- Logging estruturado de todos os eventos enviados do servidor para o cliente (binários e JSON), incluindo todos os eventos definidos em gameConstants.js.
+- Criação de painel web SPA (/audit) para visualização dos logs, com filtros por data, tipo de evento, player, paginação, gráficos de tráfego, métricas e análise de gargalos.
+- Correção de performance do painel: paginação (100 eventos por página), gráficos limitados aos últimos 500 eventos, loading visual.
+- Padronização do uso de compressAndSend para todos os eventos JSON (EVENTS, CHAT, CUSTOM), garantindo logging automático.
+- Logging explícito para todos os eventos binários (BINARY_EVENTS) enviados por entidades (Player, Monster, etc), com import estático seguro do auditLogger.
+- Correção de todos os caminhos de importação relativos para evitar erros de módulo não encontrado.
+- Criação do utilitário compressAndSend.js em server/src/utils/.
+- Garantia de logging para todos os eventos do gameConstants.js, tanto no loop principal quanto em métodos de entidades.
+- O painel web permite análise detalhada de tráfego, eventos, picos, tipos de evento e gargalos de rede.
+
+## Decisões Recentes
+- Remoção de todos os emits antigos de combate no servidor.
+- Push no buffer binário para todo dano (melee, habilidades, PvP, projéteis, zonas de dano).
+- Integração visual de habilidades (WebShot, Leap, Frost, Meteor Storm) via presenters e skills dedicados no cliente.
+- Registro correto de meshes no presenter para garantir exibição de efeitos visuais.
+- Validação e logs detalhados para depuração de efeitos de combate.
+- Implementação do utilitário auditLogger.js para logging estruturado em JSONL.
+- Criação do utilitário compressAndSend.js para envio padronizado de eventos e logging automático.
+- Refatoração dos arquivos Player.js, BaseMonster.js e index.js para garantir logging de todos os eventos enviados ao cliente.
+- Correção de todos os caminhos de importação dos utilitários.
+- Criação do painel web SPA em server/src/audit-panel/, servido em /audit, com:
+  - Filtros dinâmicos (data, tipo de evento, player)
+  - Paginação (100 eventos por página)
+  - Gráficos de tráfego e serialização (Chart.js, últimos 500 eventos)
+  - Métricas resumo (médias, picos, totais)
+  - Loading visual
+- Garantia de logging para todos os eventos do gameConstants.js (EVENTS e BINARY_EVENTS).
+- Logging explícito após cada emit de evento binário em entidades.
+- Padronização do uso de compressAndSend para todos os eventos JSON.
+- Correção de todos os erros de importação e paths relativos.
+- Testes de performance e fluidez do painel com grandes volumes de eventos.
+
+## Próximos Passos
+- Expandir o padrão binário para outros tipos de efeitos/status (ex: cura, buffs, debuffs visuais).
+- Refino visual dos efeitos de status (slow/freeze, burn, etc) para monstros e jogadores.
+- Otimização adicional do delta update para entidades além de monstros.
+- Revisão e padronização de todos os presenters e managers do cliente para garantir consistência visual.
+- Documentação incremental dos eventos binários e contratos compartilhados.
+
+## Bugs Conhecidos e Prioridades
+- Garantir que todos os efeitos visuais sejam exibidos corretamente em todos os casos (mesh encontrado, efeito visual chamado).
+- Monitorar possíveis edge cases de sincronização (ex: entidades removidas antes do efeito ser exibido).
+- Prioridade máxima: manter o sistema binário de combate como única fonte de verdade para efeitos visuais e feedback de combate.
+
+## Estado Atual
+- Sistema binário de combate 100% funcional e centralizado.
+- Efeitos visuais de habilidades e status integrados e sincronizados.
+- Nenhuma duplicidade de eventos antigos de combate.
+- Arquitetura pronta para expansão e refino visual.
+- Sistema de auditoria robusto, logs completos e painel web funcional para análise de rede.
+- Todos os eventos críticos do jogo estão sendo logados e podem ser analisados em tempo real ou histórico.
+- Pronto para análise de gargalos, otimização de rede e acompanhamento detalhado do tráfego do servidor para o cliente.
 
 ## Mudanças recentes
 - HUD do alvo agora sincronizada e localizada, com nome pt-br e atualização instantânea.
@@ -74,18 +111,31 @@
 - Essas mudanças aumentam a performance, permitem mais entidades simultâneas e melhoram a experiência do jogador, tornando o sistema mais escalável e preparado para o futuro.
 
 ## Próximos passos
-- Refino de tooltips, responsividade mobile, e integração de novas habilidades.
-- Testes de usabilidade e coleta de feedback dos jogadores.
-- Implementar sistema de inventário e drops de itens.
-- Melhorias visuais e efeitos para habilidades.
-- Adicionar novos tipos de monstros e desafios.
-- **Expandir sistema de nomes flutuantes para outros tipos de entidades (players, NPCs, bosses) e refino visual adicional.**
-- Refinar efeitos visuais das habilidades da aranha (salto, tiro de teia) para combinar com o novo visual cartoon e garantir clareza visual.
-- **Expandir o sistema de otimização de rede:**
-  - Implementar priorização de eventos por importância
-  - Ajuste fino dos raios de visibilidade conforme densidade de entidades
-  - Sistema de invalidação periódica de entidades obsoletas
-  - Métricas de desempenho de rede por jogador
+- Refinar efeitos visuais das habilidades
+- Implementar novas habilidades seguindo o mesmo padrão
+- Adicionar sistema de drops de itens de monstros
+- Implementar sistema de inventário básico
+- Reavaliar retorno de casas/cercas e estruturas especiais
+- Adicionar novos tipos de monstros e desafios
+- Melhorar feedback visual e efeitos
+- **Expandir nomes flutuantes para outros tipos de entidades (players, NPCs, bosses).**
+- **Continuar otimizando a performance de rede e uso de banda.**
+
+## Decisões e Considerações Ativas
+- Mundo grande, explorável, com biomas distintos
+- Objetos do mundo não se sobrepõem (verificação de colisão)
+- Spawns de monstros balanceados por região
+- Interface do cliente com feedback de performance (FPS/ping)
+- Sistema de combate com habilidades de diferentes tipos (projétil, mobilidade, área, zona)
+- Aplicação de dano das habilidades através de sistema de zonas (DamageZone) bem testado
+- **Nomes de monstros sempre localizados, nunca o identificador interno.**
+- **Sistema de nomes flutuantes integrado ao ciclo de animação e presenters.**
+- **Otimização de rede como prioridade para garantir experiência fluida mesmo em conexões mais lentas.**
+- **Compressão adaptativa baseada no tamanho do payload para equilibrar uso de CPU e banda.**
+- **Frontend agora suporta múltiplos pontos de entrada via Vite:**
+  - `/` serve o index.html raiz (landing page, institucional, etc)
+  - `/play` serve o client/index.html (SPA do jogo)
+  - Middleware customizado garante assets corretos e roteamento limpo, sem gambiarras ou duplicação de arquivos.
 
 # Contexto Ativo
 

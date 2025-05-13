@@ -78,6 +78,15 @@ Esses padrões garantem escalabilidade, fácil manutenção e experiência consi
 # Atualizações Recentes
 
 - Refatoração do sistema de entidades: agora jogadores, monstros, objetos do mundo e zonas de dano são gerenciados em mapas separados, eliminando conflitos de ID e tornando o gerenciamento mais seguro e robusto.
-- Implementação de eventos binários para comunicação cliente-servidor: eventos críticos (movimento, status, morte, update de mundo) agora usam serialização binária customizada (ver binarySerializer.js), reduzindo drasticamente o tamanho dos pacotes, a latência e o uso de banda.
+- Implementação de eventos binários para comunicação cliente-servidor: eventos críticos (movimento, status, morte, update de mundo, COMBATE) agora usam serialização binária customizada (ver binarySerializer.js), reduzindo drasticamente o tamanho dos pacotes, a latência e o uso de banda.
+- O sistema de combate agora centraliza todos os efeitos (dano, status, floating text) em um buffer binário, enviado em lote para o cliente, eliminando duplicidade de eventos e otimizando a performance.
+- O cliente processa todos os efeitos de combate a partir do evento binário, exibindo texto flutuante, efeitos visuais de status e integrações visuais de habilidades (ex: WebShot, Leap, Frost, Meteor Storm) de forma sincronizada e performática.
 - Documentação incremental dos eventos binários: cada evento possui opcode, formato e exemplos claros, facilitando manutenção e expansão.
-- Essas mudanças aumentam a performance, permitem mais entidades simultâneas e melhoram a experiência do jogador, tornando o sistema mais escalável e preparado para o futuro. 
+- Essas mudanças aumentam a performance, permitem mais entidades simultâneas e melhoram a experiência do jogador, tornando o sistema mais escalável e preparado para o futuro.
+
+## Sistema de Auditoria e Painel Web
+- Todos os eventos de rede enviados do servidor para o cliente (binários e JSON, definidos em gameConstants.js) são logados de forma estruturada (auditLogger.js, compressAndSend.js).
+- Logging padronizado em todas as entidades (Player, Monster, etc) e no loop principal.
+- Painel web SPA disponível em /audit, com filtros dinâmicos, gráficos, paginação, métricas e análise de gargalos de rede.
+- Permite análise detalhada de tráfego, eventos, picos, tipos de evento e performance de rede.
+- Correção de imports e paths relativos para evitar erros de módulo não encontrado. 

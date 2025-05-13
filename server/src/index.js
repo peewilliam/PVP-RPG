@@ -1,6 +1,6 @@
 // Arquivo principal do servidor
 import geckos from '@geckos.io/server';
-import { SERVER, EVENTS, WORLD, BINARY_EVENTS } from '../../shared/constants/gameConstants.js';
+import { SERVER, EVENTS, WORLD, BINARY_EVENTS, EVENT_TYPE } from '../../shared/constants/gameConstants.js';
 import { GameWorld } from './models/GameWorld.js';
 import zlib from 'zlib';
 import express from 'express';
@@ -14,8 +14,11 @@ import {
   logJson,
   deserializePlayerMoveInput,
   serializeWorldUpdateFull,
-  serializeMonsterDeltaUpdate
+  serializeMonsterDeltaUpdate,
+  serializeCombatEffects
 } from '../../shared/utils/binarySerializer.js';
+import { logAuditEvent } from './utils/auditLogger.js';
+import fs from 'fs';
 
 const app = express();
 const __dirname = path.resolve();
@@ -104,6 +107,11 @@ function logTraffic(playerId, bytes) {
   }
 }
 
+// Buffer global de efeitos de combate por tick
+const combatEffectsBuffer = [];
+// Torna acessível globalmente para outros sistemas (ex: CombatSystem)
+global.combatEffectsBuffer = combatEffectsBuffer;
+
 // Gerenciamento de conexões
 io.onConnection(channel => {
   try {
@@ -114,7 +122,7 @@ io.onConnection(channel => {
     channel.playerId = player.id; // Salva o ID numérico no canal
     
     // Envia ID e dados completos para o cliente
-    channel.emit(EVENTS.PLAYER.INIT, {
+    compressAndSend(channel, EVENTS.PLAYER.INIT, {
       id: player.id,
       position: player.position,
       rotation: player.rotation,
@@ -128,15 +136,15 @@ io.onConnection(channel => {
     // Envia informações sobre objetos do mundo para o novo jogador (apenas próximos)
     const nearbyMonsters = [];
     const nearbyWorldObjects = [];
+    // Usar modo compacto para otimizar o payload inicial
     for (const monster of gameWorld.entityManager.monsters.values()) {
-      if (monster.active && player.distanceTo(monster) < 30) {
-        nearbyMonsters.push(monster.serialize());
+      if (monster.active && player.distanceTo(monster) < WORLD.SIZE.VISIBLE_RANGE) {
+        nearbyMonsters.push(monster.serialize({ compact: true }));
       }
     }
     for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
-      if (worldObject.active && player.distanceTo(worldObject) < 40) {
-        // console.log(`[SERVER DEBUG] id=${worldObject.id} type=${worldObject.objectType}`);
-        nearbyWorldObjects.push(worldObject.serialize());
+      if (worldObject.active && player.distanceTo(worldObject) < WORLD.SIZE.VISIBLE_RANGE) {
+        nearbyWorldObjects.push(worldObject.serialize({ compact: true }));
       }
     }
     const initialPayload = {
@@ -156,7 +164,7 @@ io.onConnection(channel => {
         // Notifica os outros jogadores sobre o novo jogador
         const otherPlayer = gameWorld.entityManager.getPlayer(p.id);
         if (otherPlayer && otherPlayer.channel) {
-          otherPlayer.channel.emit(EVENTS.PLAYER.JOINED, {
+          compressAndSend(otherPlayer.channel, EVENTS.PLAYER.JOINED, {
             id: player.id,
             position: player.position,
             rotation: player.rotation,
@@ -169,7 +177,7 @@ io.onConnection(channel => {
         }
         
         // Envia informações sobre jogadores existentes para o novo jogador
-        channel.emit(EVENTS.PLAYER.EXISTING, {
+        compressAndSend(channel, EVENTS.PLAYER.EXISTING, {
           id: p.id,
           position: p.position,
           rotation: p.rotation,
@@ -289,15 +297,6 @@ io.onConnection(channel => {
                   damage: hit.damage,
                   position: hit.position,
                   abilityId: data.abilityId
-                });
-                
-                // Envia evento de texto flutuante para mostrar dano
-                nearbyPlayer.channel.emit(EVENTS.COMBAT.FLOATING_TEXT, {
-                  text: hit.damage.toString(),
-                  position: hit.position,
-                  color: '#ff0000', // Vermelho para dano
-                  size: Math.min(0.7 + (hit.damage / 50), 1.5), // Tamanho mais controlado baseado no dano
-                  duration: 1200 // Reduzido de 1000 para 1200 ms
                 });
               }
             }
@@ -470,6 +469,8 @@ io.onConnection(channel => {
       player.respawn(pos);
       // (O método respawn já envia o evento de confirmação para o cliente)
     });
+
+    console.log('[DEBUG][SERVER] combatEffectsBuffer para player', player.id, ':', combatEffectsBuffer);
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
   }
@@ -527,9 +528,22 @@ function broadcastUpdates() {
         }
       }
       lastSentMonsters.set(player.id, currentMonsters);
-      // Envia delta binário de monstros
-      const binMonsterDelta = serializeMonsterDeltaUpdate({ addedOrUpdated, removed });
-      player.channel.emit(BINARY_EVENTS.MONSTER_DELTA_UPDATE, new Uint8Array(binMonsterDelta));
+      // Envia delta binário de monstros APENAS se houver entidades para enviar
+      const totalDeltaEntities = addedOrUpdated.length + removed.length;
+      if (totalDeltaEntities > 0) {
+        const t0_mon = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+        const binMonsterDelta = serializeMonsterDeltaUpdate({ addedOrUpdated, removed });
+        const t1_mon = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+        player.channel.emit(BINARY_EVENTS.MONSTER_DELTA_UPDATE, new Uint8Array(binMonsterDelta));
+        logAuditEvent({
+          playerId: player.id,
+          event: 'MONSTER_DELTA_UPDATE',
+          eventType: EVENT_TYPE.BINARY,
+          entitiesSent: totalDeltaEntities,
+          payloadSize: binMonsterDelta.byteLength || binMonsterDelta.length || 0,
+          serializationTimeMs: Number((t1_mon - t0_mon).toFixed(2))
+        });
+      }
       // --- OBJETOS E JOGADORES (WORLD_UPDATE) ---
       const worldObjects = [];
       for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
@@ -549,19 +563,27 @@ function broadcastUpdates() {
           playersNearby.push(other);
         }
       }
-      const t0 = Date.now();
-      // Monstros REMOVIDOS do pacote WORLD_UPDATE!
-      const binWorldUpdate = serializeWorldUpdateFull({
-        monsters: [], // <- não envia mais monstros aqui
-        worldObjects,
-        players: playersNearby
-      });
-      const t1 = Date.now();
-      player.channel.emit(BINARY_EVENTS.WORLD_UPDATE, new Uint8Array(binWorldUpdate));
-      const t2 = Date.now();
-      logTraffic(player.id, binWorldUpdate.byteLength || binWorldUpdate.length || 0);
-      // console.log(`[PERF] Player ${player.id}: serialização=${t1-t0}ms | envio=${t2-t1}ms | total=${t2-t0}ms | monstros=DELTA | objetos=${worldObjects.length}`);
-      // PLAYER_MOVED permanece igual
+      const totalWorldEntities = worldObjects.length + playersNearby.length;
+      if (totalWorldEntities > 0) {
+        const t0_world = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+        const binWorldUpdate = serializeWorldUpdateFull({
+          monsters: [], // <- não envia mais monstros aqui
+          worldObjects,
+          players: playersNearby
+        });
+        const t1_world = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+        player.channel.emit(BINARY_EVENTS.WORLD_UPDATE, new Uint8Array(binWorldUpdate));
+        logAuditEvent({
+          playerId: player.id,
+          event: 'WORLD_UPDATE',
+          eventType: EVENT_TYPE.BINARY,
+          entitiesSent: totalWorldEntities,
+          payloadSize: binWorldUpdate.byteLength || binWorldUpdate.length || 0,
+          serializationTimeMs: Number((t1_world - t0_world).toFixed(2))
+        });
+      }
+      // PLAYER_MOVED permanece igual, mas padroniza o cálculo do tempo
+      const t0_moved = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
       const binMoved = serializePlayerMoved({
         playerId: player.id,
         posX: player.position.x,
@@ -570,10 +592,35 @@ function broadcastUpdates() {
         hp: player.stats.hp,
         mana: player.stats.mana
       });
+      const t1_moved = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
       player.channel.emit(BINARY_EVENTS.PLAYER_MOVED, new Uint8Array(binMoved));
+      logAuditEvent({
+        playerId: player.id,
+        event: 'PLAYER_MOVED',
+        eventType: EVENT_TYPE.BINARY,
+        payloadSize: binMoved.byteLength || binMoved.length || 0,
+        serializationTimeMs: Number((t1_moved - t0_moved).toFixed(2))
+      });
+      // --- ENVIO DE EFEITOS DE COMBATE EM LOTE (BINÁRIO) ---
+      if (combatEffectsBuffer.length > 0) {
+        const t0_combat = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+        const binCombatEffects = serializeCombatEffects(combatEffectsBuffer);
+        const t1_combat = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+        player.channel.emit(BINARY_EVENTS.COMBAT_EFFECTS, new Uint8Array(binCombatEffects));
+        logAuditEvent({
+          playerId: player.id,
+          event: 'COMBAT_EFFECTS',
+          eventType: EVENT_TYPE.BINARY,
+          entitiesSent: combatEffectsBuffer.length,
+          payloadSize: binCombatEffects.byteLength || binCombatEffects.length || 0,
+          serializationTimeMs: Number((t1_combat - t0_combat).toFixed(2))
+        });
+      }
     }
+    // Limpa o buffer após o envio para todos
+    combatEffectsBuffer.length = 0;
   } catch (error) {
-    console.error('Erro ao enviar atualizações:', error);
+    console.error('Erro no broadcastUpdates:', error);
   }
 }
 
@@ -618,24 +665,76 @@ function compressAndSend(channel, eventName, data) {
   try {
     const json = JSON.stringify(data);
     const jsonSize = json.length;
+    let compressed = null;
+    let compressedSize = null;
+    let sentPayload = data;
+    let eventType = 'EVENTS';
+    // Detecta tipo de evento
+    if (eventName.startsWith('chat:')) eventType = 'CHAT';
+    else if (eventName.startsWith('monster:') || eventName.startsWith('player:') || eventName.startsWith('combat:')) eventType = 'CUSTOM';
     // Só compacta se o payload for maior que 500 bytes
     if (jsonSize > 500) {
-      const compressed = zlib.deflateSync(json);
-      const compressedSize = compressed.length;
+      compressed = zlib.deflateSync(json);
+      compressedSize = compressed.length;
       const base64 = compressed.toString('base64');
-      // Log de diagnóstico para monitorar a compactação
-      // console.log(`[COMPRESS] ${eventName}: ${jsonSize} bytes → ${compressedSize} bytes (${Math.round((compressedSize/jsonSize)*100)}%)`);
       channel.emit(eventName, {
         compressed: true,
         data: base64
       });
+      logAuditEvent({
+        playerId: channel.playerId || channel.id,
+        event: eventName,
+        eventType,
+        payloadSize: compressedSize,
+        serializationTimeMs: null
+      });
     } else {
-      // Payloads pequenos são enviados normalmente
       channel.emit(eventName, data);
+      logAuditEvent({
+        playerId: channel.playerId || channel.id,
+        event: eventName,
+        eventType,
+        payloadSize: jsonSize,
+        serializationTimeMs: null
+      });
     }
   } catch (error) {
     console.error(`Erro ao compactar dados para ${eventName}:`, error);
-    // Fallback: envia sem compressão em caso de erro
     channel.emit(eventName, data);
+    logAuditEvent({
+      playerId: channel.playerId || channel.id,
+      event: eventName,
+      eventType: 'EVENTS',
+      payloadSize: JSON.stringify(data).length,
+      serializationTimeMs: null
+    });
   }
-} 
+}
+
+// Rota para acessar os logs de auditoria
+app.get('/audit/logs', (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const logPath = path.resolve('server/src/logs', `audit-${date}.jsonl`);
+    if (!fs.existsSync(logPath)) {
+      return res.status(404).json({ error: 'Arquivo de log não encontrado para a data especificada.' });
+    }
+    const lines = fs.readFileSync(logPath, 'utf-8').split('\n').filter(Boolean);
+    const logs = lines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao ler logs de auditoria.' });
+  }
+});
+
+// Servir arquivos estáticos do painel de auditoria
+app.use('/audit-panel', express.static(path.join(__dirname, 'server/src/audit-panel')));
+app.get('/audit', (req, res) => {
+  res.sendFile(path.join(__dirname, 'server/src/audit-panel/index.html'));
+}); 

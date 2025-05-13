@@ -25,17 +25,17 @@ export function webShotSkill(monster, target, gameWorld) {
       duration: 3000, 
       value: 0.4 
     });
-    console.log(`WebShotSkill: Aranha ${monster.id} aplicou slow em ${target.id} por 3 segundos`);
-    
-    // Emitir texto flutuante para mostrar o efeito
-    if (global.server) {
-      global.server.emit('combat:floatingText', {
+    if (global.combatEffectsBuffer) {
+      global.combatEffectsBuffer.push({
+        sourceId: monster.id,
         targetId: target.id,
-        targetType: target.type || 'player',
-        text: 'Lento',
-        color: '#aaccff'
+        skillId: 0,
+        value: 3000,
+        effectType: 2, // Status
+        statusType: 1  // Slow/Frost
       });
     }
+    console.log(`WebShotSkill: Aranha ${monster.id} aplicou slow em ${target.id} por 3 segundos`);
   } catch (error) {
     console.error('WebShotSkill: Erro ao aplicar efeito slow:', error);
   }

@@ -90,15 +90,12 @@ export class Spider extends BaseMonster {
       });
 
       if (global.gameWorld && typeof global.gameWorld.applyAreaDamage === 'function') {
+        const damage = Math.floor(this.stats.damage * 1.2);
         global.gameWorld.applyAreaDamage({
           source: this,
           position: { x: this.position.x, y: 0, z: this.position.z },
           radius: 5,
-          damageFn: (target) => calculateDamage({
-            attackerAttack: Math.floor(this.stats.damage * 1.2),
-            defenderDefense: target.stats.defense,
-            isPvE: true
-          }),
+          damage: damage,
           type: 'leap',
           color: '#ff3333',
           floatingText: 'Impacto!'
@@ -113,26 +110,6 @@ export class Spider extends BaseMonster {
 
     this.leapTargetId = null;
     this.position.y = 0;
-  }
-
-  emitDamageEvent(target, damage) {
-    if (!global.server) return;
-
-    global.server.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-      sourceId: this.id,
-      sourceType: 'monster',
-      targetId: target.id,
-      targetType: target.type,
-      damage: damage,
-      skillId: null
-    });
-
-    global.server.emit(EVENTS.COMBAT.FLOATING_TEXT, {
-      targetId: target.id,
-      targetType: target.type,
-      text: `-${damage}`,
-      color: '#ff3333'
-    });
   }
 
   updateAI(deltaTime, players) {
@@ -276,7 +253,16 @@ export class Spider extends BaseMonster {
         isPvE: true
       });
       target.takeDamage(damage, this);
-      this.emitDamageEvent(target, damage);
+      if (global.combatEffectsBuffer) {
+        global.combatEffectsBuffer.push({
+          sourceId: this.id,
+          targetId: target.id,
+          skillId: 0,
+          value: damage,
+          effectType: 0,
+          statusType: 0
+        });
+      }
       this.lastAttackTime = now;
     }
   }

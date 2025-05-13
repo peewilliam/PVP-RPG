@@ -9,6 +9,8 @@ import {
 } from '../../../shared/progressionSystem.js';
 import { serializePlayerStatus } from '../../../shared/utils/binarySerializer.js';
 import { BINARY_EVENTS } from '../../../shared/constants/gameConstants.js';
+import { logAuditEvent } from '../utils/auditLogger.js';
+import { compressAndSend } from '../utils/compressAndSend.js';
 
 /**
  * Classe que representa um jogador no jogo.
@@ -214,12 +216,12 @@ export class Player extends Entity {
         (oldMana < (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD) && 
          this.stats.mana >= (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD))) {
       if (this.channel) {
-        // this.channel.emit(EVENTS.PLAYER.MOVED, {
-        //   id: this.id,
-        //   position: { ...this.position },
-        //   rotation: this.rotation,
-        //   stats: { ...this.stats }
-        // });
+        compressAndSend(this.channel, EVENTS.PLAYER.MOVED, {
+          id: this.id,
+          position: { ...this.position },
+          rotation: this.rotation,
+          stats: { ...this.stats }
+        });
         // Envia status completo em binário
         const binStatus = serializePlayerStatus({
           playerId: this.id,
@@ -231,7 +233,8 @@ export class Player extends Entity {
           xp: Math.round(this.xp),
           nextLevelXp: Math.round(this.nextLevelXp)
         });
-        this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+        compressAndSend(this.channel, BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+        logAuditEvent({ event: BINARY_EVENTS.PLAYER_STATUS, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binStatus.byteLength || binStatus.length || 0, serializationTimeMs: null, entitiesSent: null });
       }
     }
   }
@@ -251,9 +254,20 @@ export class Player extends Entity {
       isPvE: source && !source.isPlayer
     });
     this.stats.hp -= damageTaken;
+    // Adiciona efeito de dano ao buffer binário se o source for player
+    if (source && source.type === 'player' && global.combatEffectsBuffer) {
+      global.combatEffectsBuffer.push({
+        sourceId: source.id,
+        targetId: this.id,
+        skillId: 0,
+        value: damageTaken,
+        effectType: 0, // Dano
+        statusType: 0
+      });
+    }
     // Envia evento de dano ao cliente
     if (this.channel) {
-      this.channel.emit(EVENTS.PLAYER.DAMAGE, {
+      compressAndSend(this.channel, EVENTS.PLAYER.DAMAGE, {
         id: this.id,
         damage: damageTaken,
         sourceId: source ? source.id : null,
@@ -270,7 +284,8 @@ export class Player extends Entity {
         xp: Math.round(this.xp),
         nextLevelXp: Math.round(this.nextLevelXp)
       });
-      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_STATUS, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binStatus.byteLength || binStatus.length || 0, serializationTimeMs: null, entitiesSent: null });
     }
     // Verifica se o jogador morreu
     if (this.stats.hp <= 0) {
@@ -318,7 +333,7 @@ export class Player extends Entity {
       }
     }
     if (this.channel) {
-      this.channel.emit(EVENTS.PLAYER.DEATH, {
+      compressAndSend(this.channel, EVENTS.PLAYER.DEATH, {
         id: this.id,
         lostLevel,
         lostXP,
@@ -347,7 +362,7 @@ export class Player extends Entity {
     this.movementState = { forward: false, backward: false, left: false, right: false };
     // Envia evento de respawn para o cliente
     if (this.channel) {
-      this.channel.emit(EVENTS.PLAYER.RESPAWN, {
+      compressAndSend(this.channel, EVENTS.PLAYER.RESPAWN, {
         id: this.id,
         position: { ...this.position },
         stats: { ...this.stats },
@@ -365,7 +380,8 @@ export class Player extends Entity {
         xp: Math.round(this.xp),
         nextLevelXp: Math.round(this.nextLevelXp)
       });
-      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_STATUS, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binStatus.byteLength || binStatus.length || 0, serializationTimeMs: null, entitiesSent: null });
     }
   }
   
@@ -407,7 +423,8 @@ export class Player extends Entity {
         xp: Math.round(this.xp),
         nextLevelXp: Math.round(this.nextLevelXp)
       });
-      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_STATUS, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binStatus.byteLength || binStatus.length || 0, serializationTimeMs: null, entitiesSent: null });
     }
 
     return true;
@@ -456,7 +473,7 @@ export class Player extends Entity {
     this.stats = applyLevelUp(oldLevel, this.level, this.stats);
     // Notifica o cliente sobre o level up
     if (this.channel) {
-      this.channel.emit(EVENTS.PLAYER.LEVEL_UP, {
+      compressAndSend(this.channel, EVENTS.PLAYER.LEVEL_UP, {
         id: this.id,
         level: this.level,
         xp: this.xp,
@@ -474,7 +491,8 @@ export class Player extends Entity {
         xp: Math.round(this.xp),
         nextLevelXp: Math.round(this.nextLevelXp)
       });
-      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_STATUS, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binStatus.byteLength || binStatus.length || 0, serializationTimeMs: null, entitiesSent: null });
     }
   }
   
@@ -519,7 +537,8 @@ export class Player extends Entity {
         xp: Math.round(this.xp),
         nextLevelXp: Math.round(this.nextLevelXp)
       });
-      this.channel.emit(BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_STATUS, new Uint8Array(binStatus));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_STATUS, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binStatus.byteLength || binStatus.length || 0, serializationTimeMs: null, entitiesSent: null });
     }
   }
   

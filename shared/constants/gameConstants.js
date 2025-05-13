@@ -271,6 +271,7 @@ export const BINARY_EVENTS = {
   WORLD_UPDATE: 'bin:world:update', // Evento de atualização do mundo
   PLAYER_STATUS: 'bin:player:status', // Evento de status do jogador (funcionando 100% e unico)
   MONSTER_DELTA_UPDATE: 'bin:monster:delta',
+  COMBAT_EFFECTS: 'bin:combat:effects', // Evento binário de efeitos de combate (dano, status, etc)
 };
 
 // Tabela de índices para tipos de monstros (para serialização binária)
@@ -303,4 +304,13 @@ export const WORLD_OBJECT_TYPE_BY_INDEX = [
   'FENCE',
   'CACTUS'
   // Adicione outros tipos conforme necessário
-]; 
+];
+
+// Tipos padronizados de evento para logging e auditoria
+export const EVENT_TYPE = {
+  BINARY: 'BINARY',
+  JSON: 'JSON',
+  CHAT: 'CHAT',
+  CUSTOM: 'CUSTOM',
+  SYSTEM: 'SYSTEM'
+}; 

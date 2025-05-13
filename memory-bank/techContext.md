@@ -16,25 +16,45 @@
 - CSS customizado para todos os componentes visuais.
 
 ## Tecnologias Utilizadas
+- **Backend:** Node.js (ESM, ECMAScript Modules)
+- **Frontend:** JavaScript Vanilla + Three.js (renderização 3D)
+- **Comunicação:** geckos.io (eventos de rede, baixa latência)
+- **Serialização:** Sistema binário customizado (binarySerializer.js)
+- **Gerenciamento de entidades:** Map, Set, estruturas otimizadas para performance
+- **UI/HUD:** HTML, CSS, integração com Three.js
 
-### Backend
-- **Node.js**: Plataforma de runtime para JavaScript no servidor
-- **ECMAScript Modules (ESM)**: Formato modular para organização do código
-- **geckos.io**: Biblioteca para comunicação cliente-servidor em tempo real via WebRTC
-- **zlib**: Biblioteca nativa do Node.js para compressão de dados
+## Setup e Estrutura
+- Projeto dividido em três camadas principais:
+  - `/client`: renderização, lógica visual, presenters, managers, controllers, integração visual, HUD, chat, efeitos, UI.
+  - `/server`: lógica de jogo, sistemas, entidades, skills, eventos, buffer binário, sincronização, validação, logs.
+  - `/shared`: contratos, constantes, skills, utilitários, eventos, serialização binária.
+- Arquitetura ESM (import/export em todos os módulos).
+- Estrutura de pastas clara e padronizada para facilitar manutenção e expansão.
 
-### Frontend
-- **JavaScript Vanilla**: Sem frameworks para o código do cliente
-- **Three.js**: Biblioteca para renderização 3D no navegador
-- **WebGL**: API utilizada pelo Three.js para renderização 3D
-- **lil-gui**: Painel visual para ajuste em tempo real de exposição, luzes e bloom
-- **pako**: Biblioteca para descompressão de dados no navegador
+## Integrações e Padrões
+- **Eventos binários:** Todos os eventos críticos (movimento, status, morte, update de mundo, combate) usam serialização binária para máxima performance.
+- **Three.js:** Renderização isométrica, materiais realistas, iluminação dinâmica, efeitos visuais de habilidades e status.
+- **geckos.io:** Comunicação em tempo real, baixa latência, eventos customizados, integração com buffer binário.
+- **Sistema de skills:** Configuração centralizada em `shared/skills/skillsConfig.js`, fácil expansão para novas habilidades.
+- **Sistema de combate:** Centralização de efeitos em buffer binário, integração visual automática no cliente.
+- **Sistema de colisão:** Camadas, matriz de colisão, resolução autoritativa no servidor.
 
-### Ferramentas de Desenvolvimento
-- **npm**: Gerenciador de pacotes para dependências do projeto
-- **Git**: Sistema de controle de versão
-- **ESLint**: Linter para garantir qualidade do código JavaScript
-- **nodemon**: Ferramenta de desenvolvimento para reiniciar automaticamente o servidor
+## Constraints e Considerações
+- Foco em performance: otimização de loops, uso de estruturas eficientes, envio de dados apenas quando necessário.
+- Sincronização robusta: cliente nunca é fonte de verdade, servidor sempre autoritativo.
+- Modularidade: fácil expansão para novos tipos de entidades, habilidades, efeitos e biomas.
+- Compatibilidade: código ESM, dependências atualizadas, integração transparente entre client/server/shared.
+
+## Dependências Principais
+- Node.js >= 16.x
+- geckos.io
+- three.js
+- (opcional) outras libs para utilitários, debug, etc.
+
+## Padrões de Integração
+- Novos eventos devem ser implementados como binários sempre que possível.
+- Novas skills e efeitos devem ser integrados via contratos em `/shared` e efeitos visuais dedicados no cliente.
+- Novos sistemas devem seguir o padrão MCP e a separação clara de responsabilidades.
 
 ## Configuração do Ambiente de Desenvolvimento
 
@@ -275,3 +295,10 @@ O sistema segue um fluxo de dados bem definido:
 # Contexto Técnico
 
 ## Linguagens 
+
+## Stack de Auditoria e Painel Web
+- Utilização de auditLogger.js para logging estruturado de todos os eventos de rede (binários e JSON).
+- compressAndSend.js para envio padronizado de eventos JSON e logging automático.
+- Logging padronizado em todas as entidades e no loop principal.
+- Painel web SPA disponível em /audit, com filtros dinâmicos, gráficos, paginação, métricas e análise de gargalos de rede.
+- Correção de imports e paths relativos para evitar erros de módulo não encontrado.

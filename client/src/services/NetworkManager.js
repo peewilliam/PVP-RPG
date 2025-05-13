@@ -1,7 +1,7 @@
 // NetworkManager.js
 // Gerencia a comunicação com o servidor usando geckos.io
 import geckos from '@geckos.io/client';
-import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate } from '../../../shared/utils/binarySerializer.js';
+import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects } from '../../../shared/utils/binarySerializer.js';
 import pako from 'pako';
 
 export class NetworkManager {
@@ -27,20 +27,18 @@ export class NetworkManager {
       onPlayerDamage: [],
       onMonsterDamage: [],
       onPlayerAbilityUsed: [],
-      onCombatDamageDealt: [],
-      onFloatingText: [],
       onPlayerDeath: [],
       onPlayerRespawn: [],
       onSyncResponse: [],
       onMonsterDeath: [],
       onWebShot: [],
       onSpiderLeap: [],
-      onCombatSlow: [],
       onBinaryWorldUpdate: [],
       onBinaryPlayerMoved: [],
       onBinaryPlayerStatus: [],
       onBinaryMonsterDeath: [],
-      onBinaryMonsterDeltaUpdate: []
+      onBinaryMonsterDeltaUpdate: [],
+      onBinaryCombatEffects: []
     };
     
     // Timestamp da última solicitação de sincronização
@@ -242,26 +240,6 @@ export class NetworkManager {
       }
     });
     
-    // Dano causado em combate
-    this.channel.on(EVENTS.COMBAT.DAMAGE_DEALT, data => {
-      try {
-        if (!data || !data.targetId || !data.damage) return;
-        this.callbacks.onCombatDamageDealt.forEach(callback => callback(data));
-      } catch (error) {
-        console.error('Erro ao processar evento DAMAGE_DEALT:', error);
-      }
-    });
-    
-    // Texto flutuante
-    this.channel.on(EVENTS.COMBAT.FLOATING_TEXT, data => {
-      try {
-        if (!data || !data.text || !data.position) return;
-        this.callbacks.onFloatingText.forEach(callback => callback(data));
-      } catch (error) {
-        console.error('Erro ao processar evento de texto flutuante:', error);
-      }
-    });
-    
     // Morte de jogador
     this.channel.on(EVENTS.PLAYER.DEATH, data => {
       try {
@@ -323,13 +301,6 @@ export class NetworkManager {
       }
     });
     
-    // Efeitos de status (slow)
-    this.channel.on('combat:slow', data => {
-      if (data && data.targetId === this.playerId) {
-        this.callbacks.onCombatSlow.forEach(callback => callback(data));
-      }
-    });
-    
     // Eventos binários para maior eficiência
     this.channel.on(BINARY_EVENTS.WORLD_UPDATE, buffer => {
       const data = deserializeWorldUpdateFull(buffer);
@@ -355,6 +326,12 @@ export class NetworkManager {
     this.channel.on(BINARY_EVENTS.MONSTER_DELTA_UPDATE, buffer => {
       const data = deserializeMonsterDeltaUpdate(buffer);
       this.callbacks.onBinaryMonsterDeltaUpdate.forEach(callback => callback(data));
+    });
+    
+    // Novo evento binário: efeitos de combate em lote
+    this.channel.on(BINARY_EVENTS.COMBAT_EFFECTS, buffer => {
+      const effects = deserializeCombatEffects(buffer);
+      this.callbacks.onBinaryCombatEffects.forEach(callback => callback(effects));
     });
   }
   

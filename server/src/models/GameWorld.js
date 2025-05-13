@@ -257,33 +257,6 @@ export class GameWorld {
           died: died,
           position: { ...player.position }
         });
-        
-        // Se o jogador tem canal, emitir evento de texto flutuante
-        if (player.channel && params.floatingText) {
-          player.channel.emit('combat:floatingText', {
-            targetId: player.id,
-            targetType: 'player',
-            text: params.floatingText || `-${damage}`,
-            color: params.color || '#ff3333'
-          });
-        }
-      }
-    }
-    
-    // Notificar todos os jogadores sobre o dano em área
-    for (const hit of result.hits) {
-      for (const player of this.entityManager.players.values()) {
-        if (player.channel) {
-          player.channel.emit('combat:damageDealt', {
-            sourceId: source.id,
-            sourceType: source.type || 'monster',
-            targetId: hit.id,
-            targetType: hit.type,
-            damage: hit.damage,
-            died: hit.died,
-            position: hit.position
-          });
-        }
       }
     }
     

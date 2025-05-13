@@ -3,6 +3,7 @@ import { MONSTERS, PLAYER, EVENTS } from '../../../../shared/constants/gameConst
 import { getLevelBenefits, getXpForLevel, calculateXpGain, calculateDamage } from '../../../../shared/progressionSystem.js';
 import { serializeMonsterDeath } from '../../../../shared/utils/binarySerializer.js';
 import { BINARY_EVENTS } from '../../../../shared/constants/gameConstants.js';
+import { logAuditEvent } from '../../utils/auditLogger.js';
 
 export class BaseMonster extends Entity {
   constructor(id, type, position = { x: 0, y: 0, z: 0 }, level = 1) {
@@ -184,7 +185,17 @@ export class BaseMonster extends Entity {
         isPvE: true
       });
       target.takeDamage(damage, this);
-      this.emitDamageEvent(target, damage);
+      // Adiciona efeito de dano ao buffer binário
+      if (global.combatEffectsBuffer) {
+        global.combatEffectsBuffer.push({
+          sourceId: this.id,
+          targetId: target.id,
+          skillId: 0,
+          value: damage,
+          effectType: 0, // Dano
+          statusType: 0
+        });
+      }
       this.lastAttackTime = Date.now();
     }
   }
@@ -196,6 +207,17 @@ export class BaseMonster extends Entity {
       isPvE: true
     });
     this.stats.hp -= damageTaken;
+    // Adiciona efeito de dano ao buffer binário se o source for player
+    if (source && source.type === 'player' && global.combatEffectsBuffer) {
+      global.combatEffectsBuffer.push({
+        sourceId: source.id,
+        targetId: this.id,
+        skillId: 0,
+        value: damageTaken,
+        effectType: 0, // Dano
+        statusType: 0
+      });
+    }
     if (source && source.type === 'player') {
       this.targetId = source.id;
       if (this.aiState === 'idle' || this.aiState === 'patrolling' || this.aiState === 'returning') {
@@ -255,6 +277,7 @@ export class BaseMonster extends Entity {
           // Evento binário de morte de monstro
           const binDeath = serializeMonsterDeath({ monsterId: this.id });
           channel.emit(BINARY_EVENTS.MONSTER_DEATH, new Uint8Array(binDeath));
+          logAuditEvent({ event: BINARY_EVENTS.MONSTER_DEATH, eventType: 'BINARY_EVENTS', playerId: null, payloadSize: binDeath.byteLength || binDeath.length || 0, serializationTimeMs: null, entitiesSent: null });
           emitted = true;
         }
       }
@@ -264,6 +287,7 @@ export class BaseMonster extends Entity {
           if (player.channel) {
             const binDeath = serializeMonsterDeath({ monsterId: this.id });
             player.channel.emit(BINARY_EVENTS.MONSTER_DEATH, new Uint8Array(binDeath));
+            logAuditEvent({ event: BINARY_EVENTS.MONSTER_DEATH, eventType: 'BINARY_EVENTS', playerId: null, payloadSize: binDeath.byteLength || binDeath.length || 0, serializationTimeMs: null, entitiesSent: null });
             emitted = true;
           }
         }
@@ -284,7 +308,20 @@ export class BaseMonster extends Entity {
     }
   }
 
-  serialize() {
+  serialize(options = {}) {
+    if (options.compact) {
+      return {
+        id: this.id,
+        monsterType: this.monsterType,
+        position: { ...this.position },
+        rotation: this.rotation,
+        stats: {
+          hp: this.stats.hp,
+          maxHp: this.stats.maxHp
+        },
+        level: this.level
+      };
+    }
     return {
       ...super.serialize(),
       monsterType: this.monsterType,
@@ -295,23 +332,5 @@ export class BaseMonster extends Entity {
       },
       aiState: this.aiState
     };
-  }
-
-  emitDamageEvent(target, damage) {
-    if (!global.server) return;
-    global.server.emit(EVENTS.COMBAT.DAMAGE_DEALT, {
-      sourceId: this.id,
-      sourceType: 'monster',
-      targetId: target.id,
-      targetType: target.type,
-      damage: damage,
-      skillId: null
-    });
-    global.server.emit(EVENTS.COMBAT.FLOATING_TEXT, {
-      targetId: target.id,
-      targetType: target.type,
-      text: `-${damage}`,
-      color: '#ff3333'
-    });
   }
 } 

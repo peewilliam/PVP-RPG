@@ -16,6 +16,7 @@ import { spawnFireballEffect } from '../skills/FireballSkill.js';
 import { spawnTeleportEffect } from '../skills/TeleportSkill.js';
 import { spawnIceSpikeEffect } from '../skills/IceSpikeSkill.js';
 import { spawnMeteorStormEffect } from '../skills/MeteorStormSkill.js';
+import { showWebShotEffect } from '../skills/WebShotSkill.js';
 
 export class GameController {
   constructor(serverConfig) {
@@ -351,45 +352,6 @@ export class GameController {
       }
     });
     
-    // Dano em combate
-    this.networkManager.on('onCombatDamageDealt', (data) => {
-      console.log('[DEBUG] Evento de dano recebido:', data);
-      
-      if (!data || !data.targetId || !data.damage) {
-        console.log('[DEBUG] Dados de dano inválidos ou incompletos');
-        return;
-      }
-      
-      // Encontra o alvo (baseado no tipo)
-      let targetEntity = null;
-      if (data.targetType === 'monster') {
-        targetEntity = this.entityManager.monsterPresenter.getMonster(data.targetId);
-        console.log('[DEBUG] Alvo é monstro:', data.targetId, 'Encontrado:', !!targetEntity);
-      } else if (data.targetType === 'player') {
-        // Se for o jogador local, atualiza a HUD
-        if (data.targetId === this.playerId) {
-          console.log('[DEBUG] Dano recebido pelo jogador local');
-          this.hudManager.updateHealth(data.remainingHp || 0);
-        }
-        // Obtém o modelo do jogador
-        targetEntity = this.entityManager.playerPresenter.getPlayer(data.targetId);
-        console.log('[DEBUG] Alvo é jogador:', data.targetId, 'Encontrado:', !!targetEntity);
-      }
-      
-      // Se não encontrou o alvo, retorna
-      if (!targetEntity) {
-        console.log('[DEBUG] Alvo não encontrado para mostrar dano:', data.targetType, data.targetId);
-        return;
-      }
-      
-      // Mostra texto flutuante de dano
-      console.log('[DEBUG] Mostrando texto de dano:', data.damage, 'para', data.targetType, data.targetId);
-      this.entityManager.showFloatingDamage(targetEntity, data.damage);
-      
-      // Atualiza a HUD do alvo se for o alvo selecionado
-      this.entityManager.updateTargetHUDForDamage(data);
-    });
-    
     // Morte de jogador
     this.networkManager.on('onPlayerDeath', (data) => {
       if (!data || !data.id) return;
@@ -493,6 +455,46 @@ export class GameController {
       }
       // Log para depuração
       // console.log('[DEBUG] MONSTER_DELTA_UPDATE processado:', { addedOrUpdated, removed });
+    });
+    
+    // Novo: processamento de efeitos de combate em lote (binário)
+    this.networkManager.on('onBinaryCombatEffects', (effects) => {
+      console.log('[DEBUG][CLIENT] Efeitos de combate recebidos:', effects);
+      console.log('[DEBUG][CLIENT] IDs de players:', Object.keys(this.entityManager.playerPresenter.players));
+      console.log('[DEBUG][CLIENT] IDs de monstros:', Object.keys(this.entityManager.monsterPresenter.monsters));
+      for (const effect of effects) {
+        // Mesh do alvo
+        const mesh = this.entityManager.playerPresenter.getPlayer(String(effect.targetId)) ||
+                     this.entityManager.monsterPresenter.getMonster(String(effect.targetId));
+        console.log('[DEBUG][CLIENT] Mesh encontrado?', !!mesh, 'targetId:', effect.targetId, 'effectType:', effect.effectType);
+        if (!mesh) {
+          console.warn('[DEBUG][CLIENT] Mesh NÃO encontrado para targetId:', effect.targetId, 'effect:', effect);
+        }
+        // Dano
+        if (effect.effectType === 0) {
+          if (mesh) {
+            console.log('[DEBUG][CLIENT] Chamando showFloatingDamage para mesh:', mesh, 'valor:', effect.value);
+            this.entityManager.showFloatingDamage(mesh, effect.value);
+          }
+        }
+        // Slow/freeze
+        if (effect.effectType === 2 && effect.statusType === 1) {
+          console.log('[DEBUG][CLIENT] Aplicando efeito de slow/freeze em:', effect.targetId);
+          if (mesh) {
+            // Se o source for uma aranha, chama o efeito visual da teia
+            const sourceMesh = this.entityManager.monsterPresenter.getMonster(String(effect.sourceId));
+            if (sourceMesh && sourceMesh.userData && sourceMesh.userData.type === 'monster' && sourceMesh.userData.monsterType === 'SPIDER') {
+              showWebShotEffect(sourceMesh, mesh, this.entityManager.scene);
+            }
+            // Se quiser, adicione outros efeitos visuais para slow/freeze genérico aqui
+          }
+        }
+        // Floating text genérico
+        if (effect.effectType === 3) {
+          console.log('[DEBUG][CLIENT] Floating text genérico:', effect.text, 'targetId:', effect.targetId);
+          // (Aqui entraria a lógica visual do texto flutuante genérico)
+        }
+      }
     });
   }
   

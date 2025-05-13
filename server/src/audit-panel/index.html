@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Auditoria - PVP-RPG</title>
+  <link rel="stylesheet" href="/audit-panel/panel.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Painel de Auditoria - PVP-RPG</h1>
+    <div id="filtros">
+      <label>Data: <input type="date" id="filtro-data"></label>
+      <label>Tipo de Evento: <select id="filtro-evento"><option value="">Todos</option></select></label>
+      <span id="filtro-tipo-container"></span>
+      <label>Player ID: <input type="text" id="filtro-player" placeholder="Todos"></label>
+      <button id="btn-atualizar">Atualizar</button>
+    </div>
+  </header>
+  <main>
+    <section id="resumo">
+      <h2>Resumo</h2>
+      <div id="metricas"></div>
+    </section>
+    <section id="graficos">
+      <h2>Gráficos</h2>
+      <canvas id="grafico-trafego" height="120"></canvas>
+      <canvas id="grafico-serializacao" height="120"></canvas>
+    </section>
+    <section id="tabela">
+      <h2>Eventos de Auditoria</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Evento</th>
+            <th>Tipo</th>
+            <th>Player</th>
+            <th>Entidades</th>
+            <th>Tamanho (bytes)</th>
+            <th>Serialização (ms)</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-logs"></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="/audit-panel/panel.js"></script>
+</body>
+</html> 

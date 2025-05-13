@@ -667,3 +667,66 @@ O sistema de combate gerencia dano, efeitos de status e morte:
 ## Clareza de Passagens/Bloqueios
 - Espaçamento mínimo entre objetos aumentado (minDistance 3.5, clusters maiores).
 - Bloqueios naturais (rochas, árvores) delimitam caminhos, mas sempre há passagens claras.
+
+# System Patterns
+
+## Arquitetura Geral
+- Padrão MCP (Model-Controller-Presenter) aplicado em todo o projeto:
+  - **Model (servidor):** Toda lógica de jogo, estado das entidades, regras de combate, colisão, habilidades, status, XP, respawn, etc.
+  - **Controller (servidor):** Orquestra comandos, interpreta inputs, gerencia fluxo de alto nível, integra sistemas (ex: CombatSystem, CollisionSystem, SpawnSystem).
+  - **Presenter (cliente):** Responsável apenas pela renderização, feedback visual, HUD, efeitos visuais, inputs e integração com Three.js.
+
+## Fluxo Binário de Combate
+- Todos os efeitos de combate (dano, status, floating text) são centralizados em um buffer binário no servidor.
+- Ao final de cada tick, o buffer é serializado e enviado em lote para cada player via evento binário (`BINARY_EVENTS.COMBAT_EFFECTS`).
+- O cliente processa todos os efeitos recebidos, exibindo texto flutuante, efeitos visuais de status e integrações visuais de habilidades de forma sincronizada.
+- Eliminação de duplicidade: eventos antigos de combate (DAMAGE_DEALT, FLOATING_TEXT, combat:slow, etc) foram removidos.
+
+## Integração Visual de Habilidades e Status
+- Cada habilidade possui efeito visual dedicado (ex: WebShot, Leap, Frost, Meteor Storm), chamado no cliente ao processar o evento binário correspondente.
+- Efeitos de slow/freeze, burn, etc, são aplicados visualmente no mesh do alvo, com restauração automática após a duração.
+- Floating text de dano/status é exibido sobre o mesh correto, sempre sincronizado com o evento binário.
+
+## Robustez e Validação
+- Todos os dados recebidos do cliente são validados antes de processar.
+- try/catch em handlers críticos para evitar crashes.
+- Logs descritivos para facilitar depuração.
+- Valores numéricos validados para evitar NaN.
+- Sistema de colisão autoritativo, matriz de colisão, camadas e resolução de empurrão.
+
+## Sincronização e Otimização
+- Loop do servidor roda a 20 ticks/s (50ms).
+- Estado do mundo enviado apenas para entidades próximas ao jogador.
+- Atualizações de estado só são enviadas quando há mudanças.
+- Delta update binário para monstros: só monstros que mudam ou entram/saem do alcance são enviados a cada tick.
+- Arquitetura pronta para expandir o padrão delta para outros tipos de entidades.
+
+## Separação de Responsabilidades
+- `/client`: renderização, presenters, managers, controllers, integração visual, HUD, chat, efeitos, UI.
+- `/server`: lógica de jogo, sistemas, entidades, skills, eventos, buffer binário, sincronização.
+- `/shared`: contratos, constantes, skills, utilitários, eventos, serialização binária.
+
+## Decisões Técnicas Recentes
+- Centralização de todos os efeitos de combate no buffer binário.
+- Remoção de todos os emits antigos de combate.
+- Integração visual de habilidades via presenters e skills dedicados.
+- Uso de Map para gerenciar entidades e evitar conflitos de ID.
+- Documentação incremental dos eventos binários (opcode, formato, exemplos).
+
+## Fluxos de Comunicação
+- Cliente envia apenas comandos/intenção (ex: player:move, player:useAbility).
+- Servidor processa, valida, aplica lógica e retorna estado/efeitos via eventos binários.
+- Cliente processa eventos binários e atualiza visual/HUD/efeitos.
+
+## Padrões de Expansão
+- Novas habilidades e efeitos devem seguir o padrão: lógica no servidor, efeito visual dedicado no cliente, integração via evento binário centralizado.
+- Novos tipos de entidades devem ser registrados em Maps e seguir o padrão de serialização binária.
+
+## Padrão de Auditoria e Painel Web
+- Todos os eventos enviados do servidor para o cliente (binários e JSON) são logados de forma estruturada (auditLogger.js, compressAndSend.js).
+- Logging padronizado em todas as entidades (Player, Monster, etc) e no loop principal.
+- Uso obrigatório de compressAndSend para eventos JSON (EVENTS, CHAT, CUSTOM), garantindo logging automático.
+- Logging explícito após cada emit de evento binário (BINARY_EVENTS) em entidades.
+- Painel web SPA disponível em /audit, com filtros dinâmicos, gráficos de tráfego, paginação, métricas e análise de gargalos de rede.
+- Permite análise detalhada de tráfego, eventos, picos, tipos de evento e performance de rede.
+- Correção de imports e paths relativos para evitar erros de módulo não encontrado.

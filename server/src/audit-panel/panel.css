@@ -1,0 +1,127 @@
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #181c24;
+  color: #f3f3f3;
+  margin: 0;
+  padding: 0;
+}
+header {
+  background: #23283a;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 8px #0002;
+}
+header h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.7rem;
+  color: #ffd700;
+}
+#filtros {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#filtros label {
+  font-size: 1rem;
+}
+#filtros input, #filtros select, #filtros button {
+  margin-left: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: none;
+  font-size: 1rem;
+}
+#filtros button {
+  background: #ffd700;
+  color: #23283a;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#filtros button:hover {
+  background: #ffea70;
+}
+main {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+section {
+  margin-bottom: 2.5rem;
+  background: #23283a;
+  border-radius: 8px;
+  padding: 1.2rem 1rem 1.5rem 1rem;
+  box-shadow: 0 2px 8px #0002;
+}
+section h2 {
+  margin-top: 0;
+  color: #ffd700;
+  font-size: 1.2rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #23283a;
+  color: #f3f3f3;
+  font-size: 0.98rem;
+}
+thead {
+  background: #23283a;
+}
+th, td {
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+}
+th {
+  background: #23283a;
+  color: #ffd700;
+  font-weight: 600;
+  border-bottom: 2px solid #ffd70033;
+}
+tbody tr:nth-child(even) {
+  background: #23283a;
+}
+tbody tr:nth-child(odd) {
+  background: #1a1e27;
+}
+tr:hover {
+  background: #2d3347;
+}
+#metricas {
+  display: flex;
+  gap: 2.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+#metricas > div {
+  background: #1a1e27;
+  border-radius: 6px;
+  padding: 0.7rem 1.2rem;
+  min-width: 160px;
+  box-shadow: 0 1px 4px #0002;
+  text-align: center;
+}
+#metricas strong {
+  color: #ffd700;
+  font-size: 1.3rem;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+canvas {
+  background: #1a1e27;
+  border-radius: 6px;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 1px 4px #0002;
+}
+@media (max-width: 800px) {
+  #metricas {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  main {
+    padding: 0 0.2rem;
+  }
+  section {
+    padding: 0.7rem 0.3rem 1rem 0.3rem;
+  }
+} 
