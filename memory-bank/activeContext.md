@@ -248,6 +248,26 @@ Estamos refinando o sistema de combate completo do jogo, que permite aos jogador
 # Contexto Ativo
 
 ## Foco Atual
+- Polimento visual e clareza do mundo (estilo Diablo 4/POE2)
+- Spawn do player sempre no início do mapa DESERT_PATH
+- Clareza de passagens, colisão e bloqueios naturais
+- Labels/efeitos de chão para spots e boss
+
+## Mudanças Recentes
+- Iluminação global ajustada: tons naturais, exposição realista, névoa sutil
+- Materiais dos assets padronizados para realismo (MeshStandard/Physical, roughness >= 0.7, metalness <= 0.2)
+- Proporções e colisão de árvores, rochas, cactos e arbustos revisadas
+- Passagens naturais e espaçamento de clusters aumentados
+- Labels 3D no chão para spots e boss integrados ao WorldObjectPresenter
+- Spawn do player e respawn sempre em { x: 0, y: 0, z: -95 } no DESERT_PATH
+
+## Próximos Passos
+- Testes visuais finais e revisão de UX
+- Ajustes finos de performance e feedback visual
+
+# Contexto Ativo
+
+## Foco Atual
 O foco atual do desenvolvimento está na otimização de rede do jogo para suportar uma grande quantidade de entidades e jogadores simultâneos. Implementamos um sistema avançado de otimização de rede que reduziu significativamente o tráfego e melhorou a experiência de jogo.
 
 ### Sistema de Otimização de Rede

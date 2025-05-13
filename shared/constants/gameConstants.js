@@ -68,12 +68,13 @@ export const ABILITIES = SKILLS;
 export const PLAYER = {
   // A velocidade agora é calibrada para um tick rate de 20 ticks por segundo (50ms por tick)
   // Valores menores significam movimento mais lento, valores maiores significam movimento mais rápido
-  SPEED: 0.3, // Velocidade por tick
+  SPEED: 0.4, // Velocidade por tick
+  // NOVO PADRÃO: Escala visual 1.3x1.3x1.3, cone de direção 0.4x1.2, colisão 0.65 (estilo Diablo 4)
   BASE_STATS: {
-    HP: 240,
-    MANA: 400,
-    ATTACK: 10,
-    DEFENSE: 5
+    HP: 540,
+    MANA: 600,
+    ATTACK: 50,
+    DEFENSE: 1
   },
   // Configurações de regeneração de recursos
   REGENERATION: {
@@ -84,8 +85,8 @@ export const PLAYER = {
   // Sistema de níveis
   LEVEL_SYSTEM: {
     MAX_LEVEL: 50, // Nível máximo que um jogador pode atingir
-    BASE_XP: 100,  // XP base para o nível 2
-    GROWTH_FACTOR: 1.5, // Fator de crescimento da curva de XP
+    BASE_XP: 30,  // XP base para o nível 2
+    GROWTH_FACTOR: 3, // Fator de crescimento da curva de XP
     // Os valores de XP por nível são calculados com a fórmula:
     // XP necessário para o nível N = BASE_XP * (GROWTH_FACTOR ^ (N-1))
     // Exemplo:
@@ -107,22 +108,22 @@ export const MONSTERS = {
     NAME: 'Zumbi da Névoa Negra',
     INTERNAL_NAME: 'BlackMistZombie',
     monsterType: 'BLACK_MIST_ZOMBIE',
-    HP: 50,
+    HP: 120,
     DAMAGE: 50,
-    DEFENSE: 2,
-    SPEED: 0.05,
+    DEFENSE: 5,
+    SPEED: 0.15,
     XP_REWARD: 20,
     ATTACK_RANGE: 1.5,
-    ATTACK_COOLDOWN: 2000 // ms
+    ATTACK_COOLDOWN: 500 // ms
   },
   SPIDER: {
     NAME: 'Aranha Sombria',
-    HP: 80,
-    DAMAGE: 60,
+    HP: 90,
+    DAMAGE: 40,
     DEFENSE: 3,
-    SPEED: 0.15, // Ajustado para ficar consistente com outros monstros
+    SPEED: 0.30, // Ajustado para ficar consistente com outros monstros
     ATTACK_RANGE: 3.0,
-    ATTACK_COOLDOWN: 600,
+    ATTACK_COOLDOWN: 100,
     XP_REWARD: 35,
     // Habilidades especiais:
     // - webShot: Lança teia que reduz a velocidade de movimento do alvo
@@ -162,7 +163,13 @@ export const WORLD_OBJECTS = {
     NAME: 'Cerca',
     IS_COLLIDABLE: true,
     COLLISION_RADIUS: 0.3
-  }
+  },
+  CACTUS: {
+    ID: 6,
+    NAME: 'Cacto',
+    IS_COLLIDABLE: true,
+    COLLISION_RADIUS: 0.6
+  },
 };
 
 // Configurações do mundo
@@ -223,6 +230,26 @@ export const WORLD = {
       X_MAX: 100,
       Z_MIN: -100,
       Z_MAX: -40
+    },
+    DESERT_PATH: {
+      // Mapa linear com ramificações, 7 spots e boss no final
+      // O caminho principal vai de Z_MIN a Z_MAX, com pequenas ramificações laterais
+      X_MIN: -30,
+      X_MAX: 30,
+      Z_MIN: -100,
+      Z_MAX: 100,
+      // Spots principais (coordenadas aproximadas, podem ser ajustadas depois)
+      SPOTS: [
+        { id: 'spot1', x: 0, z: -80 },
+        { id: 'spot2', x: -10, z: -55 },
+        { id: 'spot3', x: 12, z: -30 },
+        { id: 'spot4', x: -8, z: 0 },
+        { id: 'spot5', x: 15, z: 25 },
+        { id: 'spot6', x: -12, z: 55 },
+        { id: 'spot7', x: 0, z: 80 }
+      ],
+      // Boss arena
+      BOSS: { id: 'boss', x: 0, z: 95, radius: 10 }
     }
   },
   // Limitações físicas
@@ -264,7 +291,8 @@ export const WORLD_OBJECT_TYPE_INDEX = {
   ROCK: 1,
   BUSH: 2,
   HOUSE: 3,
-  FENCE: 4
+  FENCE: 4,
+  CACTUS: 5
   // Adicione outros tipos conforme necessário
 };
 export const WORLD_OBJECT_TYPE_BY_INDEX = [
@@ -272,6 +300,7 @@ export const WORLD_OBJECT_TYPE_BY_INDEX = [
   'ROCK',
   'BUSH',
   'HOUSE',
-  'FENCE'
+  'FENCE',
+  'CACTUS'
   // Adicione outros tipos conforme necessário
 ]; 

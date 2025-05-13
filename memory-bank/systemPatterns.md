@@ -650,4 +650,20 @@ classDiagram
 
 O sistema de combate gerencia dano, efeitos de status e morte:
 
-```
+## Padrão de Spawn Inicial
+- Em mapas lineares (ex: DESERT_PATH), o player sempre nasce e respawna no início do caminho (x:0, y:0, z:-95).
+- Para mapas abertos, spawn aleatório dentro da zona SPAWN.
+
+## Padrão Visual
+- Iluminação global realista: tons naturais, exposição calibrada, névoa sutil para profundidade.
+- Materiais dos assets: MeshStandard/Physical, roughness >= 0.7, metalness <= 0.2.
+- Proporções dos assets baseadas no player (árvore 2.5~3.5x mais alta, rocha até 2.0, arbusto até 0.9, cacto 1.5~2.2).
+- Sombras sempre ativas para assets principais.
+
+## Labels/Efeitos de Chão
+- Labels 3D sempre visíveis para spots e boss, integrados ao WorldObjectPresenter.
+- Efeito visual profissional, textos em português, cor e outline distintos.
+
+## Clareza de Passagens/Bloqueios
+- Espaçamento mínimo entre objetos aumentado (minDistance 3.5, clusters maiores).
+- Bloqueios naturais (rochas, árvores) delimitam caminhos, mas sempre há passagens claras.

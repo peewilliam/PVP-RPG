@@ -190,6 +190,36 @@ export class SpawnSystem {
    * Inicializa áreas de spawn padrão para o mundo
    */
   initializeDefaultSpawnAreas() {
+    // Se for o mapa desértico, usar spots e boss do novo layout
+    const desert = (typeof WORLD !== 'undefined' && WORLD.ZONES && WORLD.ZONES.DESERT_PATH) ? WORLD.ZONES.DESERT_PATH : null;
+    if (desert) {
+      // Spots de combate
+      for (const spot of desert.SPOTS) {
+        this.registerSpawnArea({
+          id: `desert-spot-${spot.id}`,
+          monsterType: 'BLACK_MIST_ZOMBIE', // Pode variar depois
+          position: { x: spot.x, y: 0, z: spot.z },
+          radius: 6,
+          maxMonsters: 4,
+          respawnTime: 20000,
+          minLevel: 1,
+          maxLevel: 3
+        });
+      }
+      // Boss
+      const boss = desert.BOSS;
+      this.registerSpawnArea({
+        id: 'desert-boss',
+        monsterType: 'SPIDER', // Exemplo de boss
+        position: { x: boss.x, y: 0, z: boss.z },
+        radius: boss.radius,
+        maxMonsters: 1,
+        respawnTime: 60000, // 1 minuto para respawn do boss
+        minLevel: 5,
+        maxLevel: 7
+      });
+      return;
+    }
     // Área 1: Zumbis da Névoa Negra perto do spawn (pequeno grupo)
     this.registerSpawnArea({
       id: 'spawn-blackmistzombies',

@@ -83,7 +83,7 @@ export class PlayerPresenter {
       this.removePlayer(id);
     }
     // Geometria e material para o jogador (cubo azul)
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const geometry = new THREE.BoxGeometry(1.3, 1.3, 1.3); // Escala aumentada
     const material = new THREE.MeshStandardMaterial({ color: 0x0000ff }); // Azul
     
     const player = new THREE.Mesh(geometry, material);
@@ -95,15 +95,15 @@ export class PlayerPresenter {
     const position = data.position || { x: 0, y: 0, z: 0 };
     player.position.set(
       Number(position.x) || 0,
-      0.5, // y fixo em 0.5 para alinhar a base do cubo ao chão
+      0.65, // y fixo em 0.65 para alinhar a base do cubo ao chão
       Number(position.z) || 0
     );
     
     // Adiciona um indicador de direção (cone verde)
-    const frontGeometry = new THREE.ConeGeometry(0.3, 1.0, 4);
+    const frontGeometry = new THREE.ConeGeometry(0.4, 1.2, 4); // Escala aumentada
     const frontMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); // Verde
     const front = new THREE.Mesh(frontGeometry, frontMaterial);
-    front.position.set(0, 0, 0.8);
+    front.position.set(0, 0, 1.05);
     front.rotation.x = Math.PI / 2;
     player.add(front);
     

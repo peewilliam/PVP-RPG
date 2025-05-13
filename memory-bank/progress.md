@@ -289,18 +289,19 @@ O sistema atual representa uma base sólida para futuras otimizações, com foco
 - server/src/network/NetworkManager.js (novo arquivo para gerenciar otimizações de rede)
 - client/src/network/NetworkOptimizer.js (novo arquivo para processar mensagens otimizadas)
 
-# Progresso Atual
+# Progresso
 
 ## O que já funciona
-- Sincronização de monstros via delta update binário (`BINARY_EVENTS.MONSTER_DELTA_UPDATE`)
-- Monstros não são mais enviados no snapshot do pacote principal (`WORLD_UPDATE`)
-- Cliente processa monstros apenas pelo delta, sem duplicidade
-- Tráfego e processamento otimizados para áreas densas
+- Player com escala, colisão e visual polidos (1.3x1.3x1.3, cone 0.4x1.2, colisão 0.65)
+- Assets do mundo (árvore, rocha, cacto, arbusto) proporcionais, realistas e com sombras
+- Colisão e bloqueio ajustados para clareza de passagens
+- Labels/efeitos de chão para spots e boss integrados e visíveis
+- Iluminação global realista, névoa sutil, materiais padronizados
+- Spawn do player e respawn sempre no início do mapa DESERT_PATH
 
-## O que falta/construir
-- Expandir padrão delta para objetos do mundo e jogadores (opcional)
-- Monitorar performance em cenários de stress
-- Implementar fallback de full update periódico (se necessário)
+## O que falta
+- Testes visuais finais e revisão de experiência do usuário
+- Ajustes finos de performance e feedback visual
 
 ## Status
 - Sistema robusto, moderno e escalável para monstros

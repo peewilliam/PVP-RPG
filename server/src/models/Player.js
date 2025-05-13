@@ -25,7 +25,7 @@ export class Player extends Entity {
     this.type = 'player';
     
     // Raio de colisão do jogador
-    this.collisionRadius = 0.5;
+    this.collisionRadius = 0.65;
     
     // Atributos do jogador
     const benefits = getLevelBenefits(1);

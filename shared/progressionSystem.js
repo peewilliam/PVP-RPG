@@ -1,5 +1,5 @@
 // Sistema centralizado de progressão, status e cálculo de XP/level/benefícios
-
+import { PLAYER } from './constants/gameConstants.js';
 // Multiplicador global de XP (ajustável para eventos)
 export let XP_MULTIPLIER = 1;
 
@@ -17,10 +17,10 @@ export function getXpForLevel(level) {
 export function getLevelBenefits(level) {
   // Exemplo: cada level dá +10 HP, +5 Mana, +2 Defesa, +2 Dano
   return {
-    maxHp: 140 + (level - 1) * 10,
-    maxMana: 150 + (level - 1) * 5,
-    defense: 5 + (level - 1) * 2,
-    attack: 10 + (level - 1) * 2,
+    maxHp: PLAYER.BASE_STATS.HP + (level - 1) * 10,
+    maxMana: PLAYER.BASE_STATS.MANA + (level - 1) * 5,
+    defense: PLAYER.BASE_STATS.DEFENSE + (level - 1) * 2,
+    attack: PLAYER.BASE_STATS.ATTACK + (level - 1) * 2,
   };
 }
 

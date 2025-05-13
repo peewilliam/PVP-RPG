@@ -38,20 +38,25 @@ export class WorldObject extends Entity {
   initializePropertiesByType() {
     switch (this.objectType) {
       case 'TREE':
-        this.collisionRadius = 0.8; // Raio de colisão
+        this.collisionRadius = 0.9; // Raio de colisão ajustado ao novo padrão visual
         this.properties.height = 5; // Altura para fins de renderização
         this.properties.canBeHarvested = true; // Pode ser cortado para madeira
         break;
         
       case 'ROCK':
-        this.collisionRadius = 1.2;
+        this.collisionRadius = 1.1; // Ajustado para harmonia visual
         this.properties.size = 'medium'; // Tamanho da rocha
         this.properties.canBeHarvested = true; // Pode ser minerado
         break;
         
       case 'BUSH':
-        this.collisionRadius = 0.4;
+        this.collisionRadius = 0.5; // Arbusto mais robusto visualmente
         this.properties.canBeHarvested = true; // Pode ser coletado para frutas
+        break;
+        
+      case 'CACTUS':
+        this.collisionRadius = 0.7; // Cacto proporcional ao novo padrão
+        this.properties.canBeHarvested = true;
         break;
         
       case 'FENCE':

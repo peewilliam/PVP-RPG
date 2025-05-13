@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createTree } from '../world/assets/Tree.js';
+import { createRock } from '../world/assets/Rock.js';
+import { createBush } from '../world/assets/Bush.js';
+import { createBone } from '../world/assets/Bone.js';
+import { createRuin } from '../world/assets/Ruin.js';
+import { createCactus } from '../world/assets/Cactus.js';
+import { GroundLabelManager } from './GroundLabelManager.js';
 
 /**
  * Presenter responsável por renderizar e gerenciar objetos do mundo no cliente.
@@ -7,55 +13,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
  * apenas recebe dados do servidor e os apresenta visualmente.
  */
 
-// Mapeamento dos modelos por bioma e tipo de objeto (estilo Albion Online com os novos modelos)
-const MODEL_MAP = {
-  SPAWN: {
-    TREE: ['/models-3d/Tree01.glb', '/models-3d/Bush01.glb'],
-    GRASS: '/models-3d/Grass01.glb',
-    FLOWER: '/models-3d/Flower01.glb',
-    ROCK: '/models-3d/Rock01.glb',
-  },
-  FOREST_NORTH: {
-    TREE: '/models-3d/Tree01.glb',
-    BUSH: '/models-3d/Bush01.glb',
-    GRASS: '/models-3d/Grass01.glb',
-    FLOWER: '/models-3d/Flowers01.glb',
-    ROCK: '/models-3d/Rock02.glb',
-  },
-  FOREST_WEST: {
-    TREE: ['/models-3d/Tree01.glb', '/models-3d/Bush01.glb'],
-    GRASS: '/models-3d/Grass01.glb',
-    FLOWER: '/models-3d/Flower01.glb',
-    ROCK: '/models-3d/Rock01.glb',
-  },
-  MOUNTAINS: {
-    TREE: '/models-3d/Tree01.glb',
-    ROCK: '/models-3d/Mountain01.glb',
-    STONE: '/models-3d/Pebbles01.glb',
-    GRASS: '/models-3d/Grass01.glb',
-  },
-  PLAINS: {
-    TREE: '/models-3d/Tree01.glb',
-    GRASS: '/models-3d/Grass01.glb',
-    FLOWER: '/models-3d/Flowers01.glb',
-    ROCK: '/models-3d/Pebbles01.glb',
-  },
-  SWAMP: {
-    TREE: ['/models-3d/Tree01.glb', '/models-3d/Bush01.glb'],
-    GRASS: '/models-3d/Grass01.glb',
-    ROCK: '/models-3d/Rock02.glb',
-  },
-  RUINS: {
-    TREE: '/models-3d/Tree01.glb',
-    ROCK: '/models-3d/Rock01.glb',
-    BRIDGE: '/models-3d/Bridge01.glb',
-    STONE: '/models-3d/Pebbles01.glb',
-  },
-};
-
 // Cache de modelos carregados
 const modelCache = {};
-const loader = new GLTFLoader();
 
 async function loadModel(path) {
   
@@ -63,10 +22,10 @@ async function loadModel(path) {
 
   // console.log('[DEBUG] Carregando modelo:', path);
   return new Promise((resolve, reject) => {
-    loader.load(path, (gltf) => {
-      modelCache[path] = gltf.scene;
-      resolve(gltf.scene.clone());
-    }, undefined, reject);
+    // loader.load(path, (gltf) => {
+    //   modelCache[path] = gltf.scene;
+    //   resolve(gltf.scene.clone());
+    // }, undefined, reject);
   });
 }
 
@@ -315,9 +274,11 @@ function adjustModel(model, objectType, modelPath) {
 export class WorldObjectPresenter {
   /**
    * @param {THREE.Scene} scene - Cena Three.js onde os objetos serão renderizados
+   * @param {THREE.Camera} camera - Câmera principal da cena
    */
-  constructor(scene) {
+  constructor(scene, camera) {
     this.scene = scene;
+    this.camera = camera;
     this.worldObjects = new Map(); // Map para armazenar todos os objetos do mundo por ID
     
     // Sistema de otimização
@@ -334,9 +295,12 @@ export class WorldObjectPresenter {
       LOW: 200     // Objetos entre 100-200 têm qualidade baixa
       // Objetos além de 200 não são renderizados (occlusion culling)
     };
+    this.groundLabelManager = new GroundLabelManager(scene, camera);
   }
 
   /**
+   * PADRÃO VISUAL: Iluminação inspirada em Diablo 4/POE2. Tons naturais, exposição realista, névoa sutil para profundidade, sombras suaves e assets com materiais realistas. Todos os assets importantes devem usar MeshStandardMaterial ou MeshPhysicalMaterial com roughness >= 0.7 e metalness <= 0.2. Sombras sempre ativas para árvores, rochas, cactos e arbustos. Exposição do renderer ajustada para clima diurno claro, sem estourar brancos.
+   *
    * Configura a iluminação da cena para melhorar a aparência visual
    * @param {THREE.Scene} scene - A cena onde aplicar a iluminação
    * @param {THREE.WebGLRenderer} renderer - O renderer para configurar sombras
@@ -349,62 +313,62 @@ export class WorldObjectPresenter {
 
     console.log("[LIGHT] Configurando iluminação e sombras avançadas");
 
-    // Configurando o renderer para sombras com otimizações
+    // --- POLIMENTO VISUAL ---
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Sombras suaves e realistas
-    renderer.outputColorSpace = THREE.SRGBColorSpace; // Correção de cor
-    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Mapeamento de tom realista
-    renderer.toneMappingExposure = 1.22; // Exposição mais alta para dia claro
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12; // Levemente menor para evitar estouro
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // --- LUZ AMBIENTE (preenche sombras, mas não domina a cena) ---
-    const ambientColor = 0xfaf3e3; // Amarelo bem claro
-    const ambientIntensity = 0.35; // Sutil, só para preencher
+    // Luz ambiente: tom neutro, preenche sem dominar
+    const ambientColor = 0xf5f5f5; // Cinza claro neutro
+    const ambientIntensity = 0.28;
     const ambientLight = new THREE.AmbientLight(ambientColor, ambientIntensity);
     this.scene.add(ambientLight);
 
-    // --- LUZ DIRECIONAL (Sol, sombras suaves e claras) ---
-    const sunColor = 0xFFF6D6; // Amarelo quente, quase branco
-    const sunIntensity = 1.0; // Forte, mas não estoura
+    // Luz direcional (sol): tom quente, intensidade realista
+    const sunColor = 0xFFF3C6; // Amarelo suave
+    const sunIntensity = 0.92;
     const dirLight = new THREE.DirectionalLight(sunColor, sunIntensity);
-    dirLight.position.set(60, 200, 0); // Sol alto
+    dirLight.position.set(60, 200, 0);
     dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.mapSize.width = 3072;
+    dirLight.shadow.mapSize.height = 3072;
     dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 200;
-    dirLight.shadow.camera.left = -100;
-    dirLight.shadow.camera.right = 100;
-    dirLight.shadow.camera.top = 100;
-    dirLight.shadow.camera.bottom = -100;
-    dirLight.shadow.bias = -0.0002;
-    dirLight.shadow.normalBias = 0.01;
-    dirLight.shadow.radius = 12; // Sombras bem suaves
+    dirLight.shadow.camera.far = 220;
+    dirLight.shadow.camera.left = -120;
+    dirLight.shadow.camera.right = 120;
+    dirLight.shadow.camera.top = 120;
+    dirLight.shadow.camera.bottom = -120;
+    dirLight.shadow.bias = -0.00018;
+    dirLight.shadow.normalBias = 0.012;
+    dirLight.shadow.radius = 14;
     dirLight.shadow.autoUpdate = false;
     this.lastShadowUpdateTime = 0;
     this.scene.add(dirLight);
 
-    // --- LUZ HEMISFÉRICA (céu azul claro, solo quase branco) ---
-    const skyColor = 0xB3D8FF; // Azul claro do céu
-    const groundColor = 0xFFFDF6; // Solo quase branco
-    const hemiIntensity = 1.25; // Bem forte, estilo Albion
+    // Luz hemisférica: céu e solo naturais
+    const skyColor = 0xB3D8FF;
+    const groundColor = 0xF7F3E6;
+    const hemiIntensity = 1.08;
     const hemiLight = new THREE.HemisphereLight(skyColor, groundColor, hemiIntensity);
     this.scene.add(hemiLight);
 
-    // --- NÉVOA MÁGICA (profundidade, não escurece) ---
-    const fogColor = new THREE.Color(0xDDE6FF); // Azul claro, mágico
-    const fogDensity = 0.0010; // Suave, só para profundidade
+    // Névoa sutil para profundidade
+    const fogColor = new THREE.Color(0xDDE6FF);
+    const fogDensity = 0.0007; // Mais sutil
     this.scene.fog = new THREE.FogExp2(fogColor, fogDensity);
 
-    // --- FUNDO DO CÉU ---
-    this.scene.background = new THREE.Color(0xB3D8FF); // Azul claro do céu
+    // Fundo do céu
+    this.scene.background = new THREE.Color(0xB3D8FF);
 
-    // --- Salvar referências ---
+    // Salvar referências
     this.sunLight = dirLight;
     this.ambientLight = ambientLight;
     this.hemisphereLight = hemiLight;
     
-    console.log("[LIGHT] Iluminação configurada com sucesso");
+    console.log("[LIGHT] Iluminação polida e configurada com sucesso");
   }
 
   /**
@@ -536,32 +500,31 @@ export class WorldObjectPresenter {
   }
 
   /**
-   * Cria uma mesh robusta para o tipo de objeto do mundo (modelo 3D ou primitiva)
+   * Cria uma mesh robusta para o tipo de objeto do mundo (sempre procedural para tipos suportados)
    */
   async createWorldObject(id, data) {
     id = String(id);
     if (this.worldObjects.has(id)) this.removeWorldObject(id);
 
     const type = typeof data.type === 'string' ? data.type : 'TREE';
-    const biome = data.biome || 'SPAWN';
-    let modelPath = MODEL_MAP[biome]?.[type];
-    if (Array.isArray(modelPath)) {
-      modelPath = modelPath[Math.floor(Math.random() * modelPath.length)];
-    }
     let obj = null;
 
-    if (modelPath) {
-      try {
-        // console.log(`[DEBUG] Tentando carregar modelo para ${type} em ${biome}:`, modelPath);
-        obj = await loadModel(modelPath);
-        adjustModel(obj, type, modelPath); // Ajuste visual dos materiais
-      } catch (e) {
-        // console.warn(`[WorldObjectPresenter] Falha ao carregar modelo ${modelPath}, usando primitiva para ${type}`);
-        obj = createPrimitiveObject(type);
-      }
-    } else {
-      console.info(`[WorldObjectPresenter] Sem modelo 3D para ${type} (${biome}), usando primitiva.`);
-      obj = createPrimitiveObject(type);
+    // Sempre usar asset procedural para tipos suportados
+    switch (type) {
+      case 'TREE':
+        obj = createTree(); break;
+      case 'ROCK':
+        obj = createRock(); break;
+      case 'BUSH':
+        obj = createBush(); break;
+      case 'BONE':
+        obj = createBone(); break;
+      case 'RUIN':
+        obj = createRuin(); break;
+      case 'CACTUS':
+        obj = createCactus(); break;
+      default:
+        obj = createPrimitiveObject(type); break;
     }
 
     // Posição inicial
@@ -704,86 +667,71 @@ export class WorldObjectPresenter {
       this.updateObjectCulling();
     }
   }
+
+  /**
+   * Cria labels de spot e boss no chão a partir das coordenadas do mapa
+   * @param {Object} worldConfig - Objeto WORLD das constantes
+   * @param {Object} monsterData - Mapeamento de id para nome/nível do monstro
+   * @param {Object} bossData - Dados do boss (nome, nível)
+   */
+  createSpotAndBossLabels(worldConfig, monsterData, bossData) {
+    this.groundLabelManager.clear();
+    // Spots
+    if (worldConfig.ZONES && worldConfig.ZONES.DESERT_PATH && worldConfig.ZONES.DESERT_PATH.SPOTS) {
+      for (const spot of worldConfig.ZONES.DESERT_PATH.SPOTS) {
+        const monster = monsterData[spot.id] || { nome: 'Monstro', nivel: '?' };
+        const texto = `Spot: ${monster.nome} (Nv. ${monster.nivel})`;
+        this.groundLabelManager.addLabel({
+          text: texto,
+          position: { x: spot.x, y: 0, z: spot.z },
+          color: '#ffe066',
+          outline: '#000000',
+          size: 1.1
+        });
+      }
+    }
+    // Boss
+    if (worldConfig.ZONES && worldConfig.ZONES.DESERT_PATH && worldConfig.ZONES.DESERT_PATH.BOSS) {
+      const boss = worldConfig.ZONES.DESERT_PATH.BOSS;
+      const texto = bossData?.nome ? `Boss: ${bossData.nome} (Nv. ${bossData.nivel})` : 'Boss: ???';
+      this.groundLabelManager.addLabel({
+        text: texto,
+        position: { x: boss.x, y: 0, z: boss.z },
+        color: '#ff4444',
+        outline: '#fff200',
+        size: 1.35
+      });
+    }
+  }
+
+  updateLabels() {
+    if (this.groundLabelManager) this.groundLabelManager.update();
+  }
 }
 
 // Função auxiliar para criar objetos primitivos quando não há modelo
 function createPrimitiveObject(objectType) {
-  let geometry, material;
-  let worldObject;
-  
   switch (objectType) {
     case 'TREE':
-      const treeGroup = new THREE.Group();
-      const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
-      const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-      trunk.position.y = 0.75;
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
-      treeGroup.add(trunk);
-      const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
-      const leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-      const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
-      leaves.position.y = 2.5;
-      leaves.castShadow = true;
-      leaves.receiveShadow = true;
-      treeGroup.add(leaves);
-      worldObject = treeGroup;
-      break;
-      
+      return createTree();
     case 'ROCK':
-      geometry = new THREE.DodecahedronGeometry(0.8, 0);
-      material = new THREE.MeshStandardMaterial({ color: 0x808080 });
-      worldObject = new THREE.Mesh(geometry, material);
-      worldObject.scale.y = 0.7;
-      worldObject.castShadow = true;
-      worldObject.receiveShadow = true;
-      break;
-      
+      return createRock();
     case 'BUSH':
-      geometry = new THREE.SphereGeometry(0.5, 8, 6);
-      material = new THREE.MeshStandardMaterial({ color: 0x32CD32 });
-      worldObject = new THREE.Mesh(geometry, material);
-      worldObject.castShadow = true;
-      worldObject.receiveShadow = true;
-      break;
-      
-    case 'HOUSE':
-      const houseGroup = new THREE.Group();
-      const baseGeometry = new THREE.BoxGeometry(3, 2, 3);
-      const baseMaterial = new THREE.MeshStandardMaterial({ color: 0xD2B48C });
-      const base = new THREE.Mesh(baseGeometry, baseMaterial);
-      base.position.y = 1;
-      base.castShadow = true;
-      base.receiveShadow = true;
-      houseGroup.add(base);
-      const roofGeometry = new THREE.ConeGeometry(3, 1.5, 4);
-      const roofMaterial = new THREE.MeshStandardMaterial({ color: 0x8B0000 });
-      const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-      roof.position.y = 2.75;
-      roof.rotation.y = Math.PI / 4;
-      roof.castShadow = true;
-      roof.receiveShadow = true;
-      houseGroup.add(roof);
-      worldObject = houseGroup;
-      break;
-      
-    case 'FENCE':
-      geometry = new THREE.BoxGeometry(1.5, 0.8, 0.1);
-      material = new THREE.MeshStandardMaterial({ color: 0xA0522D });
-      worldObject = new THREE.Mesh(geometry, material);
-      worldObject.castShadow = true;
-      worldObject.receiveShadow = true;
-      break;
-      
+      return createBush();
+    case 'BONE':
+      return createBone();
+    case 'RUIN':
+      return createRuin();
+    case 'CACTUS':
+      return createCactus();
     default:
+      let geometry, material;
+      let worldObject;
       geometry = new THREE.BoxGeometry(1, 1, 1);
       material = new THREE.MeshStandardMaterial({ color: 0xAAAAAA });
       worldObject = new THREE.Mesh(geometry, material);
       worldObject.castShadow = true;
       worldObject.receiveShadow = true;
-      break;
+      return worldObject;
   }
-  
-  return worldObject;
 } 

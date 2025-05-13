@@ -454,13 +454,19 @@ io.onConnection(channel => {
     channel.on(EVENTS.PLAYER.RESPAWN, () => {
       const player = gameWorld.entityManager.getPlayer(channel.playerId);
       if (!player || !player.dead) return;
-      // Define posição de respawn (spawn zone)
-      const spawnZone = WORLD.ZONES.SPAWN;
-      const pos = {
-        x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
-        y: 0,
-        z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
-      };
+      // Se o mapa ativo for DESERT_PATH, respawn fixo no início do caminho
+      const isDesertPath = !!WORLD.ZONES.DESERT_PATH;
+      let pos;
+      if (isDesertPath) {
+        pos = { x: 0, y: 0, z: -95 };
+      } else {
+        const spawnZone = WORLD.ZONES.SPAWN;
+        pos = {
+          x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
+          y: 0,
+          z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
+        };
+      }
       player.respawn(pos);
       // (O método respawn já envia o evento de confirmação para o cliente)
     });

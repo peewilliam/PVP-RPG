@@ -77,21 +77,24 @@ export class GameWorld {
    * @returns {Player} - Jogador criado
    */
   addPlayer(channel) {
-    // Posição inicial aleatória dentro da zona de spawn definida nas constantes
-    const spawnZone = WORLD.ZONES.SPAWN;
-    
-    
-    const position = {
-      x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN), 
-      y: 0, 
-      z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
-    };
-    
+    // Se o mapa ativo for DESERT_PATH, spawnar o player sempre em { x: 0, y: 0, z: -95 } (início do caminho)
+    const isDesertPath = !!WORLD.ZONES.DESERT_PATH;
+    let position;
+    if (isDesertPath) {
+      // Ponto inicial do caminho desértico
+      position = { x: 0, y: 0, z: -95 };
+    } else {
+      // Posição inicial aleatória dentro da zona de spawn padrão
+      const spawnZone = WORLD.ZONES.SPAWN;
+      position = {
+        x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
+        y: 0,
+        z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
+      };
+    }
     // Cria o jogador
     const player = this.entityManager.createPlayer(channel, position);
-    
-    console.log(`Jogador ${player.id} adicionado ao mundo em (${position.x.toFixed(2)}, ${position.z.toFixed(2)})`);
-    
+    console.log(`[SPAWN] Jogador ${player.id} adicionado em (${position.x.toFixed(2)}, ${position.z.toFixed(2)})`);
     return player;
   }
   

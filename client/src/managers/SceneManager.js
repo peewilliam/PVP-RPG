@@ -123,33 +123,60 @@ export class SceneManager {
   
   // Cria o plano do chão
   createGround() {
-    // Carrega a textura do chão
-    const textureLoader = new THREE.TextureLoader();
-    const groundTexture = textureLoader.load('/textures/environment/tiled_stone_texture.png', (tex) => {
-      console.log('Textura do chão carregada:', tex);
+    // Shader procedural de areia
+    const sandShader = {
+      uniforms: {
+        uColor1: { value: new THREE.Color(0xE2C290) }, // areia clara
+        uColor2: { value: new THREE.Color(0xC2A060) }, // areia escura
+        uDuneScale: { value: 18.0 },
+        uDuneStrength: { value: 0.12 },
+        uWindStrength: { value: 0.08 },
+        uTime: { value: 0.0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor1;
+        uniform vec3 uColor2;
+        uniform float uDuneScale;
+        uniform float uDuneStrength;
+        uniform float uWindStrength;
+        uniform float uTime;
+        varying vec2 vUv;
+        float rand(vec2 co) {
+          return fract(sin(dot(co.xy, vec2(12.9898,78.233))) * 43758.5453);
+        }
+        void main() {
+          float dunes = sin(vUv.x * uDuneScale + uTime * 0.05) * sin(vUv.y * uDuneScale * 0.7 + uTime * 0.03);
+          dunes *= uDuneStrength;
+          float wind = sin((vUv.x + vUv.y) * 40.0 + uTime * 0.2) * uWindStrength;
+          float noise = rand(vUv * 100.0);
+          float sand = dunes + wind + noise * 0.04;
+          vec3 color = mix(uColor1, uColor2, vUv.y + sand);
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `
+    };
+    const planeGeometry = new THREE.PlaneGeometry(this.worldSize.WIDTH, this.worldSize.HEIGHT, 256, 256);
+    const sandMaterial = new THREE.ShaderMaterial({
+      uniforms: sandShader.uniforms,
+      vertexShader: sandShader.vertexShader,
+      fragmentShader: sandShader.fragmentShader,
+      side: THREE.DoubleSide
     });
-    
-    groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-    groundTexture.repeat.set(32, 32); // Ajuste o número de tiles conforme o tamanho do mapa
-    groundTexture.anisotropy = 8;
-    groundTexture.colorSpace = THREE.SRGBColorSpace;
-    
-    // Cria o plano
-    const planeGeometry = new THREE.PlaneGeometry(this.worldSize.WIDTH, this.worldSize.HEIGHT);
-    const planeMaterial = new THREE.MeshStandardMaterial({ 
-      map: groundTexture,
-      color: 0xffffff, // Mantém a cor original da textura
-      side: THREE.DoubleSide,
-      roughness: 0.5, // Mais reflexivo
-      metalness: 0.0, // Não metálico
-      flatShading: false
-    });
-    
-    this.plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    this.plane = new THREE.Mesh(planeGeometry, sandMaterial);
     this.plane.rotation.x = Math.PI / 2;
-    this.plane.receiveShadow = true; // O chão recebe sombras
+    this.plane.receiveShadow = true;
     this.scene.add(this.plane);
-    
+    // Atualização do tempo para animação do shader
+    this._sandUpdate = (dt) => {
+      sandMaterial.uniforms.uTime.value += dt;
+    };
     return this.plane;
   }
   
@@ -317,6 +344,12 @@ export class SceneManager {
     this.composer.addPass(this.colorCorrectionPass);
     window._colorCorrectionPass = this.colorCorrectionPass;
     
+    // Heat haze opcional
+    this.heatHazePass = new ShaderPass(HeatHazeShader);
+    this.heatHazePass.enabled = false;
+    this.composer.addPass(this.heatHazePass);
+    window._heatHazePass = this.heatHazePass;
+    
     return this.composer;
   }
   
@@ -481,6 +514,12 @@ export class SceneManager {
     this.visualGui.add(params, 'Bloom Threshold', 0.0, 1.0, 0.01).onChange(() => this.applyVisualParams(params));
     this.visualGui.add(params, 'Bloom Radius', 0.0, 2.0, 0.01).onChange(() => this.applyVisualParams(params));
     this.visualGui.add(params, 'Reset Preset Albion');
+    
+    // Adiciona novo painel para o heat haze
+    const heatHazePanel = this.visualGui.addFolder('Heat Haze (Miragem)');
+    heatHazePanel.add(this.heatHazePass, 'enabled').name('Heat Haze (Miragem)');
+    heatHazePanel.add(this.heatHazePass.uniforms.uStrength, 'value', 0, 0.3, 0.01).name('Intensidade Miragem');
+    heatHazePanel.add(this.heatHazePass.uniforms.uSpeed, 'value', 0.05, 0.5, 0.01).name('Velocidade Miragem');
   }
   
   // Aplica parâmetros visuais do painel de controle
@@ -572,4 +611,34 @@ export class SceneManager {
     this.createWorldBoundaries();
     this.setupLighting();
   }
-} 
+}
+
+// Shader de heat haze simples
+const HeatHazeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uStrength: { value: 0.12 },
+    uSpeed: { value: 0.25 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uStrength;
+    uniform float uSpeed;
+    varying vec2 vUv;
+    void main() {
+      float offset = sin(vUv.y * 30.0 + uTime * uSpeed) * uStrength * 0.5;
+      offset += sin(vUv.x * 40.0 + uTime * uSpeed * 1.2) * uStrength * 0.3;
+      vec2 uv = vUv + vec2(offset, 0.0);
+      gl_FragColor = texture2D(tDiffuse, uv);
+    }
+  `
+}; 

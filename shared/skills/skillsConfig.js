@@ -5,8 +5,8 @@ export const SKILLS = {
     NAME: 'Bola de Fogo',
     DESCRIPTION: 'Lança uma esfera de fogo em linha reta que explode ao atingir o inimigo, causando dano direto e queimando inimigos ao redor.',
     TYPE: 'projectile',
-    COOLDOWN: 1000, // ms
-    MANA_COST: 40,
+    COOLDOWN: 500, // ms
+    MANA_COST: 15,
     DAMAGE: 20,
     AREA_DAMAGE: 10, // 50% do dano base
     AREA_RADIUS: 2, // metros
@@ -19,8 +19,8 @@ export const SKILLS = {
     NAME: 'Teleporte',
     DESCRIPTION: 'O mago se desfaz em partículas mágicas e se move instantaneamente para outra posição, ignorando obstáculos.',
     TYPE: 'mobility',
-    COOLDOWN: 6000, // ms
-    MANA_COST: 25,
+    COOLDOWN: 1000, // ms
+    MANA_COST: 20,
     RANGE: 15, // metros
     ICON: '/textures/skills/teleport.png',
     EFFECTS: ['fade', 'particles'],
@@ -30,14 +30,14 @@ export const SKILLS = {
     NAME: 'Estacas de Gelo',
     DESCRIPTION: 'O mago conjura uma área de gelo no chão. Após 1 segundo, várias estacas congeladas irrompem da terra, atingindo todos os inimigos na área e aplicando lentidão.',
     TYPE: 'aoe',
-    COOLDOWN: 6000, // ms
+    COOLDOWN: 2000, // ms
     MANA_COST: 60,
     DAMAGE: 30,
     AREA_RADIUS: 5, // metros
     RANGE: 15, // metros
     DELAY: 1000, // ms
     SLOW: 0.4, // 40% de lentidão
-    SLOW_DURATION: 3000, // ms
+    SLOW_DURATION: 5000, // ms
     ICON: '/textures/skills/frost_spikes.png',
     EFFECTS: ['spikes', 'slow'],
   },
@@ -46,9 +46,9 @@ export const SKILLS = {
     NAME: 'Chuva de Meteoros',
     DESCRIPTION: 'O mago invoca uma tempestade de meteoros que caem continuamente por 5 segundos em uma área. Cada meteoro causa dano ao atingir o solo, afetando todos os inimigos na zona.',
     TYPE: 'zone',
-    COOLDOWN: 10000, // ms
+    COOLDOWN: 4000, // ms
     MANA_COST: 90,
-    DAMAGE: 25,
+    DAMAGE: 30,
     AREA_RADIUS: 6, // metros
     RANGE: 18, // metros
     DURATION: 5000, // ms

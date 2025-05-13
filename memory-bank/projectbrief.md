@@ -2,6 +2,15 @@
 
 Desenvolver um MMORPG topdown isométrico com renderização 3D, foco em performance, visual vibrante e arquitetura robusta (MCP). O objetivo é criar um mundo imersivo, com biomas distintos, objetos 3D otimizados, sistema de combate, movimentação fluida, sincronização eficiente entre cliente e servidor e chat em tempo real integrado.
 
+## Objetivo
+Desenvolver um MMORPG topdown isométrico com foco em:
+- Experiência visual clara e realista (inspiração Diablo 4, POE2)
+- Spawn do player sempre no início do mapa linear (ex: DESERT_PATH)
+- Passagens e bloqueios naturais bem definidos
+- Assets do mundo proporcionais, realistas e facilmente reconhecíveis
+- Labels/efeitos de chão para spots e boss, sempre visíveis
+- Iluminação global polida, materiais realistas, névoa sutil
+
 ## Requisitos principais
 - Mundo 3D com biomas, vegetação, rochas, estruturas e ambientação variada.
 - Sincronização de jogadores e entidades via eventos de rede.
@@ -10,6 +19,10 @@ Desenvolver um MMORPG topdown isométrico com renderização 3D, foco em perform
 - Otimização para alta performance mesmo com muitos objetos.
 - Estrutura de código clara, separando cliente, servidor e código compartilhado.
 - **Chat em tempo real** integrado à interface do jogo, permitindo comunicação entre jogadores de forma fluida e intuitiva.
+- Sincronização eficiente de entidades (cliente-servidor)
+- Sistema de colisão robusto e autoritativo
+- Sistema de combate com feedback visual
+- Polimento visual e clareza de UX
 
 ## Objetivo do Projeto
 Desenvolver um MMORPG topdown isométrico (estilo AlbionOnline e MuOnline) com movimentação WSAD e rotação do personagem. O projeto foca em criar um mundo persistente gerenciado pelo servidor, com combate em tempo real, habilidades mágicas e progressão de personagem.

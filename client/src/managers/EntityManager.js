@@ -431,20 +431,14 @@ export class EntityManager {
     // Processa objetos do mundo
     if (data.worldObjects && data.worldObjects.length > 0) {
       console.log(`[WORLD] Processando ${data.worldObjects.length} objetos do mundo`);
-      
-      // Para cada objeto do mundo, cria uma representação visual
       data.worldObjects.forEach(object => {
-        // Cria o objeto visual
         this.worldObjectPresenter.updateWorldObject(object);
       });
-      
-      // Otimiza a cena se disponível
       if (this.worldObjectPresenter.optimizeSceneWithInstancing) {
         console.log('[WORLD] Aplicando otimizações de renderização...');
         this.worldObjectPresenter.optimizeSceneWithInstancing();
       }
     }
-    
     // Processa monstros
     if (data.monsters && data.monsters.length > 0) {
       console.log(`Inicializando ${data.monsters.length} monstros`);
@@ -453,6 +447,23 @@ export class EntityManager {
           this.monsterPresenter.updateMonster(monsterData);
         }
       }
+    }
+    // --- INTEGRAÇÃO LABELS DE SPOT E BOSS ---
+    // Mapeamento de spots para nomes/níveis (ajuste conforme necessário)
+    const monsterData = {
+      spot1: { nome: 'Zumbi da Névoa Negra', nivel: 8 },
+      spot2: { nome: 'Aranha Sombria', nivel: 10 },
+      spot3: { nome: 'Zumbi da Névoa Negra', nivel: 12 },
+      spot4: { nome: 'Aranha Sombria', nivel: 14 },
+      spot5: { nome: 'Zumbi da Névoa Negra', nivel: 16 },
+      spot6: { nome: 'Aranha Sombria', nivel: 18 },
+      spot7: { nome: 'Zumbi da Névoa Negra', nivel: 20 }
+    };
+    const bossData = { nome: 'Guardião da Areia', nivel: 25 };
+    // Importa WORLD das constantes (assume import global ou window.WORLD)
+    const worldConfig = window.WORLD || (typeof WORLD !== 'undefined' ? WORLD : {});
+    if (this.worldObjectPresenter.createSpotAndBossLabels) {
+      this.worldObjectPresenter.createSpotAndBossLabels(worldConfig, monsterData, bossData);
     }
   }
   

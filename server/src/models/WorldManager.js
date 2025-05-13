@@ -29,13 +29,13 @@ export class WorldManager {
       TREE: {
         scale: { x: 1, y: 3, z: 1 },
         density: 0.008,
-        clusterRadius: 12,
+        clusterRadius: 14,
         clusterSize: 5
       },
       ROCK: {
         scale: { x: 1.5, y: 1, z: 1.5 },
         density: 0.004,
-        clusterRadius: 10,
+        clusterRadius: 12,
         clusterSize: 3
       },
       BUSH: {
@@ -108,8 +108,11 @@ export class WorldManager {
    * Inicializa o mundo com objetos
    */
   initializeWorld() {
-    console.log('Inicializando objetos do mundo...');
-    
+    // Se for o mapa desértico, usar o novo layout
+    if (WORLD.ZONES.DESERT_PATH) {
+      this.createDesertPathMap();
+      return;
+    }
     // Povoa cada bioma com seus objetos característicos
     for (const biomeName in this.biomes) {
       const biome = this.biomes[biomeName];
@@ -183,7 +186,7 @@ export class WorldManager {
         }
         
         // Evita colisões com outros objetos (verificação básica)
-        if (this.isPositionOccupied(position, 3)) {
+        if (this.isPositionOccupied(position, 3.5)) {
           continue;
         }
         
@@ -209,7 +212,7 @@ export class WorldManager {
    * @param {number} minDistance - Distância mínima para outros objetos
    * @returns {boolean} - true se ocupada, false se livre
    */
-  isPositionOccupied(position, minDistance = 3) {
+  isPositionOccupied(position, minDistance = 3.5) {
     // Aumentada a distância mínima para evitar aglomeração
     for (const object of this.entityManager.worldObjects.values()) {
       const dx = object.position.x - position.x;
@@ -312,5 +315,78 @@ export class WorldManager {
    */
   getSerializedWorldObjects() {
     return Array.from(this.entityManager.worldObjects.values()).map(obj => obj.serialize());
+  }
+  
+  /**
+   * Cria o mapa desértico detalhado com ambientação, spots e boss
+   */
+  createDesertPathMap() {
+    const zone = WORLD.ZONES.DESERT_PATH;
+    // Cria barreiras laterais (paredes de rocha)
+    const wallStep = 4;
+    for (let z = zone.Z_MIN; z <= zone.Z_MAX; z += wallStep) {
+      this.createWorldObject('ROCK', { x: zone.X_MIN, y: 0, z }, { x: 2, y: 2, z: 2 }, 0, true, 'DESERT_PATH');
+      this.createWorldObject('ROCK', { x: zone.X_MAX, y: 0, z }, { x: 2, y: 2, z: 2 }, 0, true, 'DESERT_PATH');
+    }
+    // Cria spots principais
+    for (const spot of zone.SPOTS) {
+      // Limpa área central do spot para acessibilidade
+      // (não cria obstáculos no raio de 2.5 do centro)
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+        const r = 4;
+        const x = spot.x + Math.cos(a) * r;
+        const z = spot.z + Math.sin(a) * r;
+        this.createWorldObject('ROCK', { x, y: 0, z }, { x: 1.5, y: 1.5, z: 1.5 }, 0, true, 'DESERT_PATH');
+      }
+      // Totem central (ossada)
+      this.createWorldObject('ROCK', { x: spot.x, y: 0, z: spot.z }, { x: 0.5, y: 0.5, z: 3 }, Math.PI/4, true, 'DESERT_PATH');
+    }
+    // Cria boss arena (círculo maior de rochas)
+    const boss = zone.BOSS;
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+      const r = boss.radius;
+      const x = boss.x + Math.cos(a) * r;
+      const z = boss.z + Math.sin(a) * r;
+      this.createWorldObject('ROCK', { x, y: 0, z }, { x: 3, y: 3, z: 3 }, 0, true, 'DESERT_PATH'); // ruína maior
+    }
+    // Ossada central do boss
+    this.createWorldObject('ROCK', { x: boss.x, y: 0, z: boss.z }, { x: 1, y: 0.5, z: 6 }, Math.PI/6, true, 'DESERT_PATH');
+    // Dunas (bush grande e achatado, reduzido para 12)
+    for (let i = 0; i < 12; i++) {
+      const x = this.getRandomInRange(zone.X_MIN + 5, zone.X_MAX - 5);
+      const z = this.getRandomInRange(zone.Z_MIN, zone.Z_MAX);
+      this.createWorldObject('BUSH', { x, y: 0, z }, { x: 4 + Math.random()*2, y: 0.5 + Math.random(), z: 2 + Math.random()*2 }, 0, false, 'DESERT_PATH');
+    }
+    // Ossos espalhados (bone procedural, reduzido para 8)
+    for (let i = 0; i < 8; i++) {
+      const x = this.getRandomInRange(zone.X_MIN + 5, zone.X_MAX - 5);
+      const z = this.getRandomInRange(zone.Z_MIN, zone.Z_MAX);
+      this.createWorldObject('BONE', { x, y: 0, z }, { x: 1, y: 1, z: 1 }, Math.random()*Math.PI, false, 'DESERT_PATH');
+    }
+    // Áreas de sombra (árvore morta ou palmeira seca)
+    for (let i = 0; i < 8; i++) {
+      const x = this.getRandomInRange(zone.X_MIN + 8, zone.X_MAX - 8);
+      const z = this.getRandomInRange(zone.Z_MIN, zone.Z_MAX);
+      this.createWorldObject('TREE', { x, y: 0, z }, { x: 1.2, y: 2.5 + Math.random(), z: 1.2 }, 0, false, 'DESERT_PATH');
+    }
+    // Ruínas (ruína procedural, escala aumentada)
+    for (let i = 0; i < 6; i++) {
+      const cx = this.getRandomInRange(zone.X_MIN + 12, zone.X_MAX - 12);
+      const cz = this.getRandomInRange(zone.Z_MIN, zone.Z_MAX);
+      for (let j = 0; j < 3; j++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 2.5 + Math.random() * 2.5;
+        const x = cx + Math.cos(angle) * dist;
+        const z = cz + Math.sin(angle) * dist;
+        this.createWorldObject('RUIN', { x, y: 0, z }, { x: 2 + Math.random(), y: 2 + Math.random(), z: 1.5 + Math.random() }, 0, true, 'DESERT_PATH');
+      }
+    }
+    // Cactos (asset procedural CACTUS, espaçados)
+    for (let i = 0; i < 18; i++) {
+      const x = this.getRandomInRange(zone.X_MIN + 4, zone.X_MAX - 4);
+      const z = this.getRandomInRange(zone.Z_MIN, zone.Z_MAX);
+      this.createWorldObject('CACTUS', { x, y: 0, z }, { x: 1, y: 1, z: 1 }, 0, true, 'DESERT_PATH');
+    }
+    console.log('Mapa desértico ajustado com ambientação, spots e boss criado!');
   }
 } 
