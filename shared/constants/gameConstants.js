@@ -272,6 +272,7 @@ export const BINARY_EVENTS = {
   PLAYER_STATUS: 'bin:player:status', // Evento de status do jogador (funcionando 100% e unico)
   MONSTER_DELTA_UPDATE: 'bin:monster:delta',
   COMBAT_EFFECTS: 'bin:combat:effects', // Evento binário de efeitos de combate (dano, status, etc)
+  WORLD_INIT: 'bin:world:init', // Novo evento binário para payload inicial do mundo
 };
 
 // Tabela de índices para tipos de monstros (para serialização binária)

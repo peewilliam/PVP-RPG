@@ -80,6 +80,7 @@ export class NetworkManager {
     
     // Eventos base de jogador
     this.channel.on(EVENTS.PLAYER.INIT, data => {
+      console.log('[CLIENT] Recebido evento: player:init', data);
       try {
         console.log('ID recebido do servidor:', data.id);
         this.playerId = data.id;
@@ -89,35 +90,36 @@ export class NetworkManager {
       }
     });
     
-    // Inicialização do mundo
-    this.channel.on(EVENTS.WORLD.INIT, data => {
+    // Inicialização do mundo (binário)
+    this.channel.on(BINARY_EVENTS.WORLD_INIT, data => {
+      console.log('[CLIENT] Recebido evento: bin:world:init', data);
       try {
-        console.log('[WORLD] Recebendo dados iniciais do mundo:', data);
-        
-        // Verifica se os dados estão compactados
-        let worldData = data;
-        if (data.compressed && data.data) {
-          try {
-            // Decodifica base64 para Uint8Array
-            const binaryString = atob(data.data);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            // Descompacta com pako
-            const decompressed = pako.inflate(bytes, { to: 'string' });
-            worldData = JSON.parse(decompressed);
-            console.log('[WORLD] Dados descompactados com sucesso:', worldData);
-          } catch (decompressError) {
-            console.error('[ERRO] Falha ao descompactar dados:', decompressError);
-            return;
+        console.log('[DEBUG] bin:world:init tipo recebido:', data && data.constructor ? data.constructor.name : typeof data, data);
+
+        // Tenta converter se for um objeto "array-like"
+        if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+          const worldData = deserializeWorldUpdateFull(data);
+          this.callbacks.onWorldInit.forEach(callback => callback(worldData));
+          // Envia confirmação para o servidor
+          if (this.channel && typeof this.channel.emit === 'function') {
+            this.channel.emit('client:worldInitAck');
           }
+        } else if (data && typeof data === 'object' && Object.keys(data).every(k => !isNaN(Number(k)))) {
+          // Tenta converter objeto {0:..., 1:..., ...} para Uint8Array
+          const arr = Object.values(data);
+          const uint8 = new Uint8Array(arr);
+          const worldData = deserializeWorldUpdateFull(uint8.buffer);
+          this.callbacks.onWorldInit.forEach(callback => callback(worldData));
+          // Envia confirmação para o servidor
+          if (this.channel && typeof this.channel.emit === 'function') {
+            this.channel.emit('client:worldInitAck');
+          }
+          console.warn('[WARN] bin:world:init chegou como objeto, convertido para Uint8Array automaticamente.');
+        } else {
+          console.error('[ERRO] Payload de bin:world:init não é binário! Ignorando.', data);
         }
-        
-        this.callbacks.onWorldInit.forEach(callback => callback(worldData));
       } catch (error) {
-        console.error('[ERRO] Falha ao processar dados iniciais do mundo:', error);
+        console.error('[ERRO] Falha ao processar dados iniciais do mundo (binário):', error);
       }
     });
     

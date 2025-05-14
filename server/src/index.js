@@ -19,6 +19,7 @@ import {
 } from '../../shared/utils/binarySerializer.js';
 import { logAuditEvent } from './utils/auditLogger.js';
 import fs from 'fs';
+import { compressAndSend } from './utils/compressAndSend.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -112,17 +113,118 @@ const combatEffectsBuffer = [];
 // Torna acessível globalmente para outros sistemas (ex: CombatSystem)
 global.combatEffectsBuffer = combatEffectsBuffer;
 
+// --- CONTROLE DE DUPLICIDADE E SEQUÊNCIA DE EVENTOS ---
+// Mapa: playerId -> { tick: number, sentEvents: Set<string>, worldInitConfirmed: boolean }
+const eventControlMap = new Map();
+let currentTick = 0;
+
+// Função para ser chamada a cada tick do servidor
+function nextServerTick() {
+  currentTick++;
+  // Limpa os eventos enviados por tick
+  for (const ctrl of eventControlMap.values()) {
+    ctrl.sentEvents.clear();
+  }
+}
+
+// Exemplo: chame nextServerTick() no loop principal do servidor a cada tick
+// setInterval(nextServerTick, 50); // 20 ticks por segundo
+
+// Lista de eventos que podem ser enviados múltiplas vezes por tick
+const eventosPermitidosMultiplos = [
+  'combat:effects',
+  'bin:combat:effects',
+  'combat:floatingText',
+  'combat:damageDealt',
+  'player:abilityUsed',
+  'monster:damage',
+  'player:damage',
+  'monster:attack',
+  'monster:attacked',
+  'monster:ability',
+  'player:target',
+  // Adicione outros eventos de efeito em área ou múltiplos hits
+];
+
+function safeCompressAndSend(channel, eventName, data) {
+  const playerId = channel.playerId || channel.id;
+  let ctrl = eventControlMap.get(playerId);
+  if (!ctrl) {
+    ctrl = { tick: currentTick, sentEvents: new Set(), worldInitConfirmed: false };
+    eventControlMap.set(playerId, ctrl);
+  }
+  // Definir eventType
+  let eventType = EVENT_TYPE.JSON;
+  if (eventName.startsWith('chat:')) eventType = EVENT_TYPE.CHAT;
+  else if (eventName.startsWith('bin:')) eventType = EVENT_TYPE.BINARY;
+  else if (eventName.startsWith('monster:') || eventName.startsWith('player:') || eventName.startsWith('combat:')) eventType = EVENT_TYPE.CUSTOM;
+  // Checa duplicidade apenas para eventos que NÃO estão na lista acima
+  if (!eventosPermitidosMultiplos.includes(eventName) && ctrl.sentEvents.has(eventName)) {
+    logAuditEvent({
+      playerId,
+      event: eventName,
+      eventType,
+      tick: currentTick,
+      status: 'suprimido',
+      motivo: 'duplicidade',
+      timestamp: new Date().toISOString(),
+      payloadSize: data?.byteLength || data?.length || JSON.stringify(data).length || 0
+    });
+    return; // Não envia duplicado
+  }
+  // Checa sequência lógica para eventos críticos
+  const eventosCriticos = [
+    'bin:world:init',
+    'bin:world:update',
+    'bin:monster:deltaUpdate',
+    'bin:player:status',
+    'combat:effects',
+    'player:status',
+    'player:abilityUsed',
+    'player:death',
+    'player:respawn',
+    // Adicione outros eventos críticos conforme necessário
+  ];
+  if (eventosCriticos.includes(eventName) && !ctrl.worldInitConfirmed && eventName !== 'bin:world:init') {
+    logAuditEvent({
+      playerId,
+      event: eventName,
+      eventType,
+      tick: currentTick,
+      status: 'suprimido',
+      motivo: 'aguardando confirmação world:init',
+      timestamp: new Date().toISOString(),
+      payloadSize: data?.byteLength || data?.length || JSON.stringify(data).length || 0
+    });
+    return; // Não envia eventos críticos antes da confirmação
+  }
+  // Marca como enviado
+  ctrl.sentEvents.add(eventName);
+  // Envia normalmente
+  compressAndSend(channel, eventName, data);
+  logAuditEvent({
+    playerId,
+    event: eventName,
+    eventType,
+    tick: currentTick,
+    status: 'enviado',
+    motivo: null,
+    timestamp: new Date().toISOString(),
+    payloadSize: data?.byteLength || data?.length || JSON.stringify(data).length || 0
+  });
+}
+
 // Gerenciamento de conexões
 io.onConnection(channel => {
   try {
-    console.log(`Novo jogador conectado: ${channel.id}`);
-    
+    console.log(`[DEBUG] Handler de conexão chamado para canal: ${channel.id}, playerId atual: ${channel.playerId}`);
     // Adiciona jogador ao mundo do jogo
     const player = gameWorld.addPlayer(channel);
+    console.log(`[DEBUG] Player adicionado: ${player.id} para canal: ${channel.id}`);
     channel.playerId = player.id; // Salva o ID numérico no canal
-    
     // Envia ID e dados completos para o cliente
-    compressAndSend(channel, EVENTS.PLAYER.INIT, {
+    console.log(`[DEBUG] Enviando player:init para playerId: ${player.id}, canal: ${channel.id}`);
+    safeCompressAndSend(channel, EVENTS.PLAYER.INIT, {
       id: player.id,
       position: player.position,
       rotation: player.rotation,
@@ -132,11 +234,9 @@ io.onConnection(channel => {
       nextLevelXp: player.nextLevelXp,
       name: player.name
     });
-    
     // Envia informações sobre objetos do mundo para o novo jogador (apenas próximos)
     const nearbyMonsters = [];
     const nearbyWorldObjects = [];
-    // Usar modo compacto para otimizar o payload inicial
     for (const monster of gameWorld.entityManager.monsters.values()) {
       if (monster.active && player.distanceTo(monster) < WORLD.SIZE.VISIBLE_RANGE) {
         nearbyMonsters.push(monster.serialize({ compact: true }));
@@ -147,13 +247,16 @@ io.onConnection(channel => {
         nearbyWorldObjects.push(worldObject.serialize({ compact: true }));
       }
     }
-    const initialPayload = {
+    // --- NOVO: Serialização binária do payload inicial ---
+    const buffer = serializeWorldUpdateFull({
+      monsters: nearbyMonsters,
       worldObjects: nearbyWorldObjects,
-      monsters: nearbyMonsters
-    };
-    const initialPayloadSize = Buffer.byteLength(JSON.stringify(initialPayload));
-    console.log(`[INIT] Enviando WORLD.INIT para ${channel.id}: ${initialPayloadSize} bytes | Objetos: ${initialPayload.worldObjects.length} | Monstros: ${initialPayload.monsters.length}`);
-    compressAndSend(channel, EVENTS.WORLD.INIT, initialPayload);
+      players: [player] // Envia apenas o próprio jogador no payload inicial
+    });
+    const initialPayloadSize = buffer.byteLength || buffer.length;
+    console.log(`[DEBUG] Enviando bin:world:init para playerId: ${player.id}, canal: ${channel.id}`);
+    console.log(`[INIT] Enviando WORLD.INIT (BINÁRIO) para ${channel.id}: ${initialPayloadSize} bytes | Objetos: ${nearbyWorldObjects.length} | Monstros: ${nearbyMonsters.length}`);
+    safeCompressAndSend(channel, BINARY_EVENTS.WORLD_INIT, new Uint8Array(buffer));
     
     // Informa outros jogadores sobre o novo jogador que entrou
     // e envia informações sobre jogadores existentes para o novo jogador
@@ -164,7 +267,7 @@ io.onConnection(channel => {
         // Notifica os outros jogadores sobre o novo jogador
         const otherPlayer = gameWorld.entityManager.getPlayer(p.id);
         if (otherPlayer && otherPlayer.channel) {
-          compressAndSend(otherPlayer.channel, EVENTS.PLAYER.JOINED, {
+          safeCompressAndSend(otherPlayer.channel, EVENTS.PLAYER.JOINED, {
             id: player.id,
             position: player.position,
             rotation: player.rotation,
@@ -177,7 +280,7 @@ io.onConnection(channel => {
         }
         
         // Envia informações sobre jogadores existentes para o novo jogador
-        compressAndSend(channel, EVENTS.PLAYER.EXISTING, {
+        safeCompressAndSend(channel, EVENTS.PLAYER.EXISTING, {
           id: p.id,
           position: p.position,
           rotation: p.rotation,
@@ -249,7 +352,7 @@ io.onConnection(channel => {
         if (!result.success) return;
         
         // Notifica o cliente que a habilidade foi usada
-        compressAndSend(channel, EVENTS.PLAYER.ABILITY_USED, {
+        safeCompressAndSend(channel, EVENTS.PLAYER.ABILITY_USED, {
           id: player.id,
           abilityId: data.abilityId,
           position: player.position,
@@ -268,7 +371,7 @@ io.onConnection(channel => {
         for (const otherPlayer of gameWorld.entityManager.players.values()) {
           if (otherPlayer.id !== player.id && otherPlayer.channel && 
               otherPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE) {
-            compressAndSend(otherPlayer.channel, EVENTS.PLAYER.ABILITY_USED, {
+            safeCompressAndSend(otherPlayer.channel, EVENTS.PLAYER.ABILITY_USED, {
               playerId: player.id,
               abilityId: data.abilityId,
               position: player.position,
@@ -290,7 +393,7 @@ io.onConnection(channel => {
                    (hit.position && nearbyPlayer.distanceTo({position: hit.position}) < WORLD.SIZE.VISIBLE_RANGE))) {
                 
                 // Envia evento de dano
-                compressAndSend(nearbyPlayer.channel, EVENTS.COMBAT.DAMAGE_DEALT, {
+                safeCompressAndSend(nearbyPlayer.channel, EVENTS.COMBAT.DAMAGE_DEALT, {
                   sourceId: player.id,
                   targetId: hit.id,
                   targetType: hit.type,
@@ -325,7 +428,7 @@ io.onConnection(channel => {
             cooldowns[abilityId] = cooldownEndTime;
           }
         }
-        compressAndSend(channel, EVENTS.PLAYER.SYNC_RESPONSE, {
+        safeCompressAndSend(channel, EVENTS.PLAYER.SYNC_RESPONSE, {
           mana: player.stats.mana,
           maxMana: player.stats.maxMana,
           hp: player.stats.hp,
@@ -361,7 +464,7 @@ io.onConnection(channel => {
           if (!other.channel) continue;
           if (other.id === player.id || player.distanceTo(other) < 25) {
             console.log(`[CHAT:MAIN] Enviando para ${other.id} (${other.name}):`, text);
-            compressAndSend(other.channel, 'chat:main', {
+            safeCompressAndSend(other.channel, 'chat:main', {
               from: player.name || 'Player',
               text
             });
@@ -387,7 +490,7 @@ io.onConnection(channel => {
         for (const other of gameWorld.entityManager.players.values()) {
           if (other.channel) {
             console.log(`[CHAT:GLOBAL] Enviando para ${other.id} (${other.name}):`, text);
-            compressAndSend(other.channel, 'chat:global', {
+            safeCompressAndSend(other.channel, 'chat:global', {
               from: player.name || 'Player',
               text
             });
@@ -414,19 +517,19 @@ io.onConnection(channel => {
         const toPlayer = Array.from(gameWorld.entityManager.players.values()).find(p => p.name === data.to);
         if (toPlayer && toPlayer.channel) {
           console.log(`[CHAT:PRIVATE] Enviando para ${toPlayer.id} (${toPlayer.name}):`, text);
-          compressAndSend(toPlayer.channel, 'chat:private', {
+          safeCompressAndSend(toPlayer.channel, 'chat:private', {
             from: player.name || 'Player',
             text
           });
           // Feedback para quem enviou
-          compressAndSend(channel, 'chat:private', {
+          safeCompressAndSend(channel, 'chat:private', {
             from: player.name || 'Player',
             text,
             to: data.to
           });
         } else {
           console.log(`[CHAT:PRIVATE] Destinatário não encontrado: ${data.to}`);
-          compressAndSend(channel, 'chat:private', {
+          safeCompressAndSend(channel, 'chat:private', {
             from: 'Sistema',
             text: `Jogador '${data.to}' não encontrado.`
           });
@@ -468,6 +571,18 @@ io.onConnection(channel => {
       }
       player.respawn(pos);
       // (O método respawn já envia o evento de confirmação para o cliente)
+    });
+
+    // Handler para confirmação do cliente após world:init
+    channel.on('client:worldInitAck', () => {
+      const playerId = channel.playerId || channel.id;
+      let ctrl = eventControlMap.get(playerId);
+      if (!ctrl) {
+        ctrl = { tick: currentTick, sentEvents: new Set(), worldInitConfirmed: false };
+        eventControlMap.set(playerId, ctrl);
+      }
+      ctrl.worldInitConfirmed = true;
+      console.log(`[CONFIRMAÇÃO] Recebida confirmação de world:init do jogador ${playerId}`);
     });
 
     console.log('[DEBUG][SERVER] combatEffectsBuffer para player', player.id, ':', combatEffectsBuffer);
@@ -547,7 +662,7 @@ function broadcastUpdates() {
       // --- OBJETOS E JOGADORES (WORLD_UPDATE) ---
       const worldObjects = [];
       for (const worldObject of gameWorld.entityManager.worldObjects.values()) {
-        if (worldObject.active && player.distanceTo(worldObject) < 40) {
+        if (worldObject.active && player.distanceTo(worldObject) < WORLD.SIZE.VISIBLE_RANGE) {
           worldObjects.push({
             id: worldObject.id,
             type: worldObject.objectType,
@@ -559,7 +674,7 @@ function broadcastUpdates() {
       }
       const playersNearby = [];
       for (const other of gameWorld.entityManager.players.values()) {
-        if (other.active && other.id !== player.id && player.distanceTo(other) < 40) {
+        if (other.active && other.id !== player.id && player.distanceTo(other) < WORLD.SIZE.VISIBLE_RANGE) {
           playersNearby.push(other);
         }
       }
@@ -606,7 +721,7 @@ function broadcastUpdates() {
         const t0_combat = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
         const binCombatEffects = serializeCombatEffects(combatEffectsBuffer);
         const t1_combat = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-        player.channel.emit(BINARY_EVENTS.COMBAT_EFFECTS, new Uint8Array(binCombatEffects));
+        safeCompressAndSend(player.channel, BINARY_EVENTS.COMBAT_EFFECTS, new Uint8Array(binCombatEffects));
         logAuditEvent({
           playerId: player.id,
           event: 'COMBAT_EFFECTS',
@@ -658,57 +773,6 @@ function sanitizeText(text, maxLen = 200) {
   t = t.replace(/[<>]/g, ''); // Remove < >
   t = t.replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove chars de controle
   return t;
-}
-
-// Função utilitária para compactar dados antes de enviar
-function compressAndSend(channel, eventName, data) {
-  try {
-    const json = JSON.stringify(data);
-    const jsonSize = json.length;
-    let compressed = null;
-    let compressedSize = null;
-    let sentPayload = data;
-    let eventType = 'EVENTS';
-    // Detecta tipo de evento
-    if (eventName.startsWith('chat:')) eventType = 'CHAT';
-    else if (eventName.startsWith('monster:') || eventName.startsWith('player:') || eventName.startsWith('combat:')) eventType = 'CUSTOM';
-    // Só compacta se o payload for maior que 500 bytes
-    if (jsonSize > 500) {
-      compressed = zlib.deflateSync(json);
-      compressedSize = compressed.length;
-      const base64 = compressed.toString('base64');
-      channel.emit(eventName, {
-        compressed: true,
-        data: base64
-      });
-      logAuditEvent({
-        playerId: channel.playerId || channel.id,
-        event: eventName,
-        eventType,
-        payloadSize: compressedSize,
-        serializationTimeMs: null
-      });
-    } else {
-      channel.emit(eventName, data);
-      logAuditEvent({
-        playerId: channel.playerId || channel.id,
-        event: eventName,
-        eventType,
-        payloadSize: jsonSize,
-        serializationTimeMs: null
-      });
-    }
-  } catch (error) {
-    console.error(`Erro ao compactar dados para ${eventName}:`, error);
-    channel.emit(eventName, data);
-    logAuditEvent({
-      playerId: channel.playerId || channel.id,
-      event: eventName,
-      eventType: 'EVENTS',
-      payloadSize: JSON.stringify(data).length,
-      serializationTimeMs: null
-    });
-  }
 }
 
 // Rota para acessar os logs de auditoria

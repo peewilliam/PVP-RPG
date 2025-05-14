@@ -137,7 +137,7 @@
   - `/play` serve o client/index.html (SPA do jogo)
   - Middleware customizado garante assets corretos e roteamento limpo, sem gambiarras ou duplicação de arquivos.
 
-# Contexto Ativo
+# Contexto Ativo (atualizado)
 
 ## Foco de Trabalho Atual
 Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
@@ -180,17 +180,17 @@ Estamos desenvolvendo o MMORPG isométrico, e o foco atual está em:
   - `/` serve o index.html raiz (landing page, institucional, etc)
   - `/play` serve o client/index.html (SPA do jogo)
   - Middleware customizado garante assets corretos e roteamento limpo, sem gambiarras ou duplicação de arquivos.
+- Corrigida duplicidade de logs e eventos no sistema de auditoria e painel SPA.
+- Logging centralizado apenas no safeCompressAndSend, removendo logs duplicados do compressAndSend.js.
+- Campo eventType agora sempre preenchido corretamente em todos os logs.
+- Lista de eventos permitidos múltiplos e eventos críticos revisada conforme gameConstants.js.
+- Controle robusto de duplicidade e sequência lógica implementado para todos os eventos críticos e de efeito múltiplo.
+- Cliente validado: cada evento processado uma única vez.
 
 ## Próximos Passos
-- Refinar efeitos visuais das habilidades
-- Implementar novas habilidades seguindo o mesmo padrão
-- Adicionar sistema de drops de itens de monstros
-- Implementar sistema de inventário básico
-- Reavaliar retorno de casas/cercas e estruturas especiais
-- Adicionar novos tipos de monstros e desafios
-- Melhorar feedback visual e efeitos
-- **Expandir nomes flutuantes para outros tipos de entidades (players, NPCs, bosses).**
-- **Continuar otimizando a performance de rede e uso de banda.**
+- Aprimorar relatórios do painel SPA (latência, duplicidade, sequência, payload médio).
+- Documentar padrões finais e aprendizados no memory-bank.
+- Testar impacto real das otimizações na experiência do jogador.
 
 ## Decisões e Considerações Ativas
 - Mundo grande, explorável, com biomas distintos

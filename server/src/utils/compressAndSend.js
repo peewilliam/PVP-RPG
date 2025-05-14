@@ -4,14 +4,23 @@ import { EVENT_TYPE } from '../../../shared/constants/gameConstants.js';
 
 export function compressAndSend(channel, eventName, data) {
   try {
-    const json = JSON.stringify(data);
-    const jsonSize = json.length;
-    let compressed = null;
-    let compressedSize = null;
+    // Detecta se é binário (ArrayBuffer, Buffer, Uint8Array)
+    const isBinary = data instanceof ArrayBuffer ||
+      (typeof Buffer !== 'undefined' && data instanceof Buffer) ||
+      (typeof Uint8Array !== 'undefined' && data instanceof Uint8Array);
     let eventType = EVENT_TYPE.JSON;
     if (eventName.startsWith('chat:')) eventType = EVENT_TYPE.CHAT;
     else if (eventName.startsWith('bin:')) eventType = EVENT_TYPE.BINARY;
     else if (eventName.startsWith('monster:') || eventName.startsWith('player:') || eventName.startsWith('combat:')) eventType = EVENT_TYPE.CUSTOM;
+    if (isBinary) {
+      // Envia binário puro
+      channel.emit(eventName, data);
+      return;
+    }
+    const json = JSON.stringify(data);
+    const jsonSize = json.length;
+    let compressed = null;
+    let compressedSize = null;
     // Só compacta se o payload for maior que 500 bytes
     if (jsonSize > 500) {
       compressed = zlib.deflateSync(json);
@@ -21,32 +30,11 @@ export function compressAndSend(channel, eventName, data) {
         compressed: true,
         data: base64
       });
-      logAuditEvent({
-        playerId: channel.playerId || channel.id,
-        event: eventName,
-        eventType,
-        payloadSize: compressedSize,
-        serializationTimeMs: null
-      });
     } else {
       channel.emit(eventName, data);
-      logAuditEvent({
-        playerId: channel.playerId || channel.id,
-        event: eventName,
-        eventType,
-        payloadSize: jsonSize,
-        serializationTimeMs: null
-      });
     }
   } catch (error) {
     console.error(`Erro ao compactar dados para ${eventName}:`, error);
     channel.emit(eventName, data);
-    logAuditEvent({
-      playerId: channel.playerId || channel.id,
-      event: eventName,
-      eventType: EVENT_TYPE.JSON,
-      payloadSize: JSON.stringify(data).length,
-      serializationTimeMs: null
-    });
   }
 } 
