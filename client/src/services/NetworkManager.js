@@ -157,20 +157,6 @@ export class NetworkManager {
       }
     });
     
-    // Atualizações de rotação
-    this.channel.on(EVENTS.PLAYER.ROTATED, data => {
-      try {
-        if (!data || !data.id || data.rotation === undefined) {
-          console.error('Dados de rotação inválidos:', data);
-          return;
-        }
-        
-        this.callbacks.onPlayerRotated.forEach(callback => callback(data));
-      } catch (error) {
-        console.error('Erro ao processar rotação de jogador:', error);
-      }
-    });
-    
     // Atualizações do mundo
     this.channel.on(EVENTS.WORLD.UPDATE, data => {
       try {

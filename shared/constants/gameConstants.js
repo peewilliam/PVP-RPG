@@ -16,7 +16,6 @@ export const EVENTS = {
     DISCONNECTED: 'player:disconnected',
     JOINED: 'player:joined',    // Notifica quando um novo jogador entra
     EXISTING: 'player:existing', // Envia informações de jogadores existentes
-    ROTATE: 'player:rotate',    // Novo evento para rotação do jogador
     ROTATED: 'player:rotated',  // Confirmação de rotação do jogador
     USE_ABILITY: 'player:useAbility',
     ABILITY_USED: 'player:abilityUsed',
@@ -274,6 +273,8 @@ export const BINARY_EVENTS = {
   PLAYER_DISCONNECTED: 'bin:player:disconnected', // Novo evento binário para desconexão do player
   PLAYER_JOINED: 'bin:player:joined', // Novo evento binário para notificação de novo jogador
   PLAYER_EXISTING: 'bin:player:existing', // Novo evento binário para informar jogadores já presentes
+  PLAYER_ROTATE: 'bin:player:rotate', // Evento binário para rotação do jogador (opcode 0x14)
+  PLAYER_ROTATED: 'bin:player:rotated', // Novo evento binário para confirmação de rotação do jogador (opcode 0x15)
 };
 
 // Enum para motivos de desconexão de jogador (para uso no campo 'reason' do evento binário)

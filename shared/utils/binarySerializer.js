@@ -619,6 +619,44 @@ function deserializePlayerExisting(buffer) {
   return deserializePlayerJoined(buffer);
 }
 
+// Serialização binária para player:rotate (opcode 0x14)
+function serializePlayerRotate({ id, rotation }) {
+  const buffer = new ArrayBuffer(9); // 1 + 4 + 4
+  const view = new DataView(buffer);
+  view.setUint8(0, 0x14); // opcode
+  view.setUint32(1, toEntityId(id), true); // id (little-endian)
+  view.setFloat32(5, rotation, true); // rotation (little-endian)
+  return buffer;
+}
+function deserializePlayerRotate(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  return {
+    opcode: view.getUint8(0),
+    id: view.getUint32(1, true),
+    rotation: view.getFloat32(5, true)
+  };
+}
+
+// Serialização binária para player:rotated (opcode 0x15)
+function serializePlayerRotated({ id, rotation }) {
+  const buffer = new ArrayBuffer(9); // 1 + 4 + 4
+  const view = new DataView(buffer);
+  view.setUint8(0, 0x15); // opcode
+  view.setUint32(1, toEntityId(id), true); // id (little-endian)
+  view.setFloat32(5, rotation, true); // rotation (little-endian)
+  return buffer;
+}
+function deserializePlayerRotated(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  return {
+    opcode: view.getUint8(0),
+    id: view.getUint32(1, true),
+    rotation: view.getFloat32(5, true)
+  };
+}
+
 export {
   serializePlayerMove,
   deserializePlayerMove,
@@ -649,5 +687,9 @@ export {
   serializePlayerJoined,
   deserializePlayerJoined,
   serializePlayerExisting,
-  deserializePlayerExisting
+  deserializePlayerExisting,
+  serializePlayerRotate,
+  deserializePlayerRotate,
+  serializePlayerRotated,
+  deserializePlayerRotated
 }; 

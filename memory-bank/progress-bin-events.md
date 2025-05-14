@@ -10,8 +10,8 @@ Converter todos os eventos críticos de gameplay (movimento, mundo, status, etc)
 - [x] player:disconnected (BINÁRIO ✔️)
 - [x] player:joined (BINÁRIO ✔️)
 - [x] player:existing (BINÁRIO ✔️)
-- [ ] player:rotate (JSON) — binário: NÃO
-- [ ] player:rotated (JSON) — binário: NÃO
+- [x] player:rotate (BINÁRIO ✔️)
+- [x] player:rotated (BINÁRIO ✔️)
 - [ ] player:useAbility (JSON) — binário: NÃO
 - [ ] player:abilityUsed (JSON) — binário: NÃO
 - [ ] player:death (JSON) — binário: NÃO
@@ -202,12 +202,69 @@ Converter todos os eventos críticos de gameplay (movimento, mundo, status, etc)
 - [x] Logging robusto
 - [x] Testado e funcional
 
+## Contrato Binário: player:rotate
+
+**Opcode:** `0x14`
+
+**Formato do Payload:**
+| Campo     | Tipo     | Tamanho/Obs.         |
+|-----------|----------|----------------------|
+| id        | Uint32   | 4 bytes              |
+| rotation  | Float32  | 4 bytes (radianos)   |
+
+**Serialização:**
+```
+[opcode][id][rotation]
+```
+- Todos os campos em little-endian.
+- id: identificador único do jogador.
+- rotation: ângulo em radianos.
+
+**Logging:**
+- Servidor loga cada envio do evento binário, incluindo ID, rotation e payloadSize.
+- Cliente loga cada recebimento do evento binário, incluindo ID, rotation e payloadSize.
+
+**Status:**
+- [x] Serialização/deserialização implementada
+- [x] Evento JSON removido
+- [x] Logging robusto
+- [x] Testado e funcional
+
+## Contrato Binário: player:rotated
+
+**Opcode:** `0x15`
+
+**Formato do Payload:**
+| Campo     | Tipo     | Tamanho/Obs.         |
+|-----------|----------|----------------------|
+| id        | Uint32   | 4 bytes              |
+| rotation  | Float32  | 4 bytes (radianos)   |
+
+**Serialização:**
+```
+[opcode][id][rotation]
+```
+- Todos os campos em little-endian.
+- id: identificador único do jogador.
+- rotation: ângulo em radianos.
+
+**Logging:**
+- Servidor loga cada envio do evento binário, incluindo ID, rotation e payloadSize.
+- Cliente loga cada recebimento do evento binário, incluindo ID, rotation e payloadSize.
+
+**Status:**
+- [x] Serialização/deserialização implementada
+- [x] Evento JSON removido
+- [x] Logging robusto
+- [x] Testado e funcional
+
 ## Progresso e Próximos Passos
 - [x] player:init convertido para binário, testado e funcional
 - [x] player:disconnected convertido para binário, testado e funcional
 - [x] player:joined convertido para binário, testado e funcional
 - [x] player:existing convertido para binário, testado e funcional
-- [ ] Iniciar definição do contrato binário para player:rotate
+- [x] player:rotate convertido para binário, testado e funcional
+- [x] player:rotated convertido para binário, testado e funcional
 - [ ] Implementação, testes e validação do próximo evento
 - [ ] Atualização deste documento a cada etapa concluída
 
