@@ -2,8 +2,9 @@
 
 ## Foco Atual
 - Centralização de todos os efeitos de combate (dano, status, floating text) no buffer binário do servidor.
-- Processamento de todos os efeitos de combate no cliente via evento binário único, com integração visual dedicada para cada habilidade/status.
-- Eliminação de duplicidade de eventos antigos de combate (DAMAGE_DEALT, FLOATING_TEXT, combat:slow, etc).
+- **Sistema de combate agora é 100% binário:** Nenhum evento antigo JSON de combate permanece no código.
+- Todo feedback visual e efeitos de combate são processados exclusivamente via evento binário (`bin:combat:effects`).
+- Código limpo, sem duplicidade, facilitando manutenção e expansão.
 - Otimização do fluxo de comunicação, reduzindo latência e uso de banda.
 - Garantia de feedback visual imediato e sincronizado para todas as ações de combate.
 - Implementação e padronização completa do sistema de auditoria de eventos de rede.

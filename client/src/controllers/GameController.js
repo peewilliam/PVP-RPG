@@ -496,6 +496,32 @@ export class GameController {
         }
       }
     });
+    
+    // Desconexão de jogador (binário)
+    this.networkManager.on('onPlayerDisconnected', (data) => {
+      if (!data || typeof data.id === 'undefined') return;
+      // Remove o jogador da cena
+      this.entityManager.playerPresenter.removePlayer(String(data.id));
+      // Loga o motivo da desconexão
+      console.log(`[CLIENT] Jogador desconectado: ${data.id}, motivo: ${data.reason}`);
+      // Opcional: mostrar mensagem na HUD ou registrar estatísticas
+    });
+    
+    // Novo jogador entrou (binário)
+    this.networkManager.on('onPlayerJoined', (data) => {
+      if (!data || typeof data.id === 'undefined') return;
+      this.entityManager.playerPresenter.updatePlayer(data);
+      console.log(`[CLIENT] Novo jogador entrou: ${data.id} (${data.name})`);
+      // Opcional: mostrar mensagem na HUD ou chat
+    });
+    
+    // Jogador já existente (binário)
+    this.networkManager.on('onPlayerExisting', (data) => {
+      if (!data || typeof data.id === 'undefined') return;
+      this.entityManager.playerPresenter.updatePlayer(data);
+      console.log(`[CLIENT] Jogador já presente: ${data.id} (${data.name})`);
+      // Opcional: mostrar mensagem na HUD ou chat
+    });
   }
   
   // Configura callbacks de input

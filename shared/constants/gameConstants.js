@@ -11,7 +11,6 @@ export const SERVER = {
 // Eventos de rede
 export const EVENTS = {
   PLAYER: {
-    INIT: 'player:init',
     MOVE: 'player:move',
     MOVED: 'player:moved',
     DISCONNECTED: 'player:disconnected',
@@ -43,9 +42,7 @@ export const EVENTS = {
     DAMAGED: 'monster:damaged'
   },
   COMBAT: {
-    HIT: 'combat:hit',         // Indica um acerto bem-sucedido
-    DAMAGE_DEALT: 'combat:damageDealt', // Dano causado por uma habilidade
-    FLOATING_TEXT: 'combat:floatingText' // Texto flutuante (dano, cura, etc)
+    // Eventos antigos removidos: HIT, DAMAGE_DEALT, FLOATING_TEXT
   },
   WORLD: {
     UPDATE: 'world:update',
@@ -273,6 +270,18 @@ export const BINARY_EVENTS = {
   MONSTER_DELTA_UPDATE: 'bin:monster:delta',
   COMBAT_EFFECTS: 'bin:combat:effects', // Evento binário de efeitos de combate (dano, status, etc)
   WORLD_INIT: 'bin:world:init', // Novo evento binário para payload inicial do mundo
+  PLAYER_INIT: 'bin:player:init', // Novo evento binário para inicialização do player
+  PLAYER_DISCONNECTED: 'bin:player:disconnected', // Novo evento binário para desconexão do player
+  PLAYER_JOINED: 'bin:player:joined', // Novo evento binário para notificação de novo jogador
+  PLAYER_EXISTING: 'bin:player:existing', // Novo evento binário para informar jogadores já presentes
+};
+
+// Enum para motivos de desconexão de jogador (para uso no campo 'reason' do evento binário)
+export const PLAYER_DISCONNECT_REASON = {
+  NORMAL: 0,      // Desconexão voluntária
+  TIMEOUT: 1,     // Timeout/inatividade
+  KICK: 2,        // Expulso pelo servidor/admin
+  ERROR: 3        // Erro de rede ou outro
 };
 
 // Tabela de índices para tipos de monstros (para serialização binária)

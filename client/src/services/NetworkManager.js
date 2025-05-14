@@ -1,8 +1,9 @@
 // NetworkManager.js
 // Gerencia a comunicação com o servidor usando geckos.io
 import geckos from '@geckos.io/client';
-import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects } from '../../../shared/utils/binarySerializer.js';
+import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects, deserializePlayerInit, deserializePlayerDisconnected, deserializePlayerJoined, deserializePlayerExisting } from '../../../shared/utils/binarySerializer.js';
 import pako from 'pako';
+import { BINARY_EVENTS } from '../../../shared/constants/gameConstants.js';
 
 export class NetworkManager {
   constructor(serverConfig) {
@@ -78,15 +79,15 @@ export class NetworkManager {
   initServerEvents() {
     const { EVENTS, BINARY_EVENTS } = this.serverConfig;
     
-    // Eventos base de jogador
-    this.channel.on(EVENTS.PLAYER.INIT, data => {
-      console.log('[CLIENT] Recebido evento: player:init', data);
+    // Inicialização do jogador (binário)
+    this.channel.on(BINARY_EVENTS.PLAYER_INIT, buffer => {
       try {
-        console.log('ID recebido do servidor:', data.id);
+        const data = deserializePlayerInit(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:init', data);
         this.playerId = data.id;
         this.callbacks.onPlayerInit.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar ID do jogador:', error);
+        console.error('Erro ao processar bin:player:init:', error);
       }
     });
     
@@ -123,45 +124,36 @@ export class NetworkManager {
       }
     });
     
-    // Jogador desconectado
-    this.channel.on(EVENTS.PLAYER.DISCONNECTED, data => {
+    // Jogador desconectado (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_DISCONNECTED, buffer => {
       try {
-        if (!data || !data.id) {
-          console.error('Dados de desconexão inválidos:', data);
-          return;
-        }
-        
+        const data = deserializePlayerDisconnected(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:disconnected', data);
         this.callbacks.onPlayerDisconnected.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar desconexão de jogador:', error);
+        console.error('Erro ao processar bin:player:disconnected:', error);
       }
     });
     
-    // Jogadores existentes
-    this.channel.on(EVENTS.PLAYER.EXISTING, data => {
+    // Jogador existente (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_EXISTING, buffer => {
       try {
-        if (!data || !data.id || !data.position) {
-          console.error('Dados de jogador existente inválidos:', data);
-          return;
-        }
-        
+        const data = deserializePlayerExisting(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:existing', data);
         this.callbacks.onPlayerExisting.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar jogador existente:', error);
+        console.error('Erro ao processar bin:player:existing:', error);
       }
     });
     
-    // Jogadores que acabaram de se conectar
-    this.channel.on(EVENTS.PLAYER.JOINED, data => {
+    // Jogador entrou (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_JOINED, buffer => {
       try {
-        if (!data || !data.id || !data.position) {
-          console.error('Dados de novo jogador inválidos:', data);
-          return;
-        }
-        
+        const data = deserializePlayerJoined(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:joined', data);
         this.callbacks.onPlayerJoined.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar novo jogador:', error);
+        console.error('Erro ao processar bin:player:joined:', error);
       }
     });
     

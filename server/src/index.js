@@ -1,6 +1,6 @@
 // Arquivo principal do servidor
 import geckos from '@geckos.io/server';
-import { SERVER, EVENTS, WORLD, BINARY_EVENTS, EVENT_TYPE } from '../../shared/constants/gameConstants.js';
+import { SERVER, EVENTS, WORLD, BINARY_EVENTS, EVENT_TYPE, PLAYER_DISCONNECT_REASON } from '../../shared/constants/gameConstants.js';
 import { GameWorld } from './models/GameWorld.js';
 import zlib from 'zlib';
 import express from 'express';
@@ -15,7 +15,11 @@ import {
   deserializePlayerMoveInput,
   serializeWorldUpdateFull,
   serializeMonsterDeltaUpdate,
-  serializeCombatEffects
+  serializeCombatEffects,
+  serializePlayerInit,
+  serializePlayerDisconnected,
+  serializePlayerJoined,
+  serializePlayerExisting
 } from '../../shared/utils/binarySerializer.js';
 import { logAuditEvent } from './utils/auditLogger.js';
 import fs from 'fs';
@@ -222,18 +226,19 @@ io.onConnection(channel => {
     const player = gameWorld.addPlayer(channel);
     console.log(`[DEBUG] Player adicionado: ${player.id} para canal: ${channel.id}`);
     channel.playerId = player.id; // Salva o ID numérico no canal
-    // Envia ID e dados completos para o cliente
-    console.log(`[DEBUG] Enviando player:init para playerId: ${player.id}, canal: ${channel.id}`);
-    safeCompressAndSend(channel, EVENTS.PLAYER.INIT, {
+    // Envia ID e dados completos para o cliente (agora em binário)
+    console.log(`[DEBUG] Enviando bin:player:init para playerId: ${player.id}, canal: ${channel.id}`);
+    const playerInitBuffer = serializePlayerInit({
       id: player.id,
+      name: player.name,
       position: player.position,
       rotation: player.rotation,
       stats: player.stats,
       level: player.level,
       xp: player.xp,
-      nextLevelXp: player.nextLevelXp,
-      name: player.name
+      nextLevelXp: player.nextLevelXp
     });
+    safeCompressAndSend(channel, BINARY_EVENTS.PLAYER_INIT, new Uint8Array(playerInitBuffer));
     // Envia informações sobre objetos do mundo para o novo jogador (apenas próximos)
     const nearbyMonsters = [];
     const nearbyWorldObjects = [];
@@ -267,28 +272,49 @@ io.onConnection(channel => {
         // Notifica os outros jogadores sobre o novo jogador
         const otherPlayer = gameWorld.entityManager.getPlayer(p.id);
         if (otherPlayer && otherPlayer.channel) {
-          safeCompressAndSend(otherPlayer.channel, EVENTS.PLAYER.JOINED, {
+          // Evento binário para notificar outros jogadores sobre o novo jogador
+          const joinedBuffer = serializePlayerJoined({
             id: player.id,
+            name: player.name,
             position: player.position,
             rotation: player.rotation,
             stats: player.stats,
             level: player.level,
             xp: player.xp,
-            nextLevelXp: player.nextLevelXp,
-            name: player.name
+            nextLevelXp: player.nextLevelXp
+          });
+          safeCompressAndSend(otherPlayer.channel, BINARY_EVENTS.PLAYER_JOINED, new Uint8Array(joinedBuffer));
+          logAuditEvent({
+            event: BINARY_EVENTS.PLAYER_JOINED,
+            eventType: EVENT_TYPE.BINARY,
+            playerId: player.id,
+            name: player.name,
+            payloadSize: joinedBuffer.byteLength || joinedBuffer.length || 0,
+            timestamp: new Date().toISOString(),
+            status: 'emitido'
           });
         }
         
         // Envia informações sobre jogadores existentes para o novo jogador
-        safeCompressAndSend(channel, EVENTS.PLAYER.EXISTING, {
+        const existingBuffer = serializePlayerExisting({
           id: p.id,
+          name: p.name,
           position: p.position,
           rotation: p.rotation,
           stats: p.stats,
           level: p.level,
           xp: p.xp,
-          nextLevelXp: p.nextLevelXp,
-          name: p.name
+          nextLevelXp: p.nextLevelXp
+        });
+        safeCompressAndSend(channel, BINARY_EVENTS.PLAYER_EXISTING, new Uint8Array(existingBuffer));
+        logAuditEvent({
+          event: BINARY_EVENTS.PLAYER_EXISTING,
+          eventType: EVENT_TYPE.BINARY,
+          playerId: p.id,
+          name: p.name,
+          payloadSize: existingBuffer.byteLength || existingBuffer.length || 0,
+          timestamp: new Date().toISOString(),
+          status: 'emitido'
         });
       }
     }
@@ -297,12 +323,21 @@ io.onConnection(channel => {
     channel.onDisconnect(() => {
       try {
         console.log(`Jogador desconectado: ${player.id}`);
-        
         // Remove o jogador do mundo
         gameWorld.removePlayer(player.id);
-        
-        // Notifica outros jogadores sobre a desconexão
-        io.emit(EVENTS.PLAYER.DISCONNECTED, { id: player.id });
+        // Notifica outros jogadores sobre a desconexão (BINÁRIO)
+        const reason = PLAYER_DISCONNECT_REASON.NORMAL;
+        const buffer = serializePlayerDisconnected(player.id, reason);
+        io.emit(BINARY_EVENTS.PLAYER_DISCONNECTED, new Uint8Array(buffer));
+        logAuditEvent({
+          event: BINARY_EVENTS.PLAYER_DISCONNECTED,
+          eventType: EVENT_TYPE.BINARY,
+          playerId: player.id,
+          reason,
+          payloadSize: buffer.byteLength || buffer.length || 0,
+          timestamp: new Date().toISOString(),
+          status: 'emitido'
+        });
       } catch (error) {
         console.error('Erro no tratamento de desconexão:', error);
       }
@@ -391,16 +426,8 @@ io.onConnection(channel => {
               if (nearbyPlayer.channel && 
                   (nearbyPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE || 
                    (hit.position && nearbyPlayer.distanceTo({position: hit.position}) < WORLD.SIZE.VISIBLE_RANGE))) {
-                
-                // Envia evento de dano
-                safeCompressAndSend(nearbyPlayer.channel, EVENTS.COMBAT.DAMAGE_DEALT, {
-                  sourceId: player.id,
-                  targetId: hit.id,
-                  targetType: hit.type,
-                  damage: hit.damage,
-                  position: hit.position,
-                  abilityId: data.abilityId
-                });
+                // Evento antigo removido: safeCompressAndSend(nearbyPlayer.channel, EVENTS.COMBAT.DAMAGE_DEALT, {...})
+                // Agora todo o processamento de efeitos de combate é feito via evento binário (bin:combat:effects)
               }
             }
           }
