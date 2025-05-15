@@ -1,7 +1,7 @@
 // NetworkManager.js
 // Gerencia a comunicação com o servidor usando geckos.io
 import geckos from '@geckos.io/client';
-import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects, deserializePlayerInit, deserializePlayerDisconnected, deserializePlayerJoined, deserializePlayerExisting } from '../../../shared/utils/binarySerializer.js';
+import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects, deserializePlayerInit, deserializePlayerDisconnected, deserializePlayerJoined, deserializePlayerExisting, serializePlayerUseAbility, deserializePlayerAbilityUsed, deserializePlayerRespawn, deserializePlayerDeath, deserializePlayerSyncResponse } from '../../../shared/utils/binarySerializer.js';
 import pako from 'pako';
 import { BINARY_EVENTS } from '../../../shared/constants/gameConstants.js';
 
@@ -157,40 +157,6 @@ export class NetworkManager {
       }
     });
     
-    // Atualizações do mundo
-    this.channel.on(EVENTS.WORLD.UPDATE, data => {
-      try {
-        if (!data) {
-          console.error('Dados de atualização do mundo inválidos');
-          return;
-        }
-        
-        // Verifica se os dados estão compactados
-        let update = data;
-        if (data.compressed && data.data) {
-          try {
-            // Decodifica base64 para Uint8Array
-            const binaryString = atob(data.data);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            // Descompacta com pako
-            const decompressed = pako.inflate(bytes, { to: 'string' });
-            update = JSON.parse(decompressed);
-          } catch (decompressError) {
-            console.error('Erro ao descompactar dados:', decompressError);
-            return;
-          }
-        }
-        
-        this.callbacks.onWorldUpdate.forEach(callback => callback(update));
-      } catch (error) {
-        console.error('Erro ao processar atualização do mundo:', error);
-      }
-    });
-    
     // Desconexão do servidor
     this.channel.onDisconnect(() => {
       console.log('Desconectado do servidor');
@@ -198,58 +164,47 @@ export class NetworkManager {
       this.callbacks.onDisconnect.forEach(callback => callback());
     });
     
-    // Processamento de dano em jogadores
-    this.channel.on(EVENTS.PLAYER.DAMAGE, data => {
-      if (!data || !data.id || !data.damage) return;
-      this.callbacks.onPlayerDamage.forEach(callback => callback(data));
-    });
-    
-    // Processamento de dano em monstros
-    this.channel.on(EVENTS.MONSTER.DAMAGE, data => {
-      if (!data || !data.id || !data.damage) return;
-      this.callbacks.onMonsterDamage.forEach(callback => callback(data));
-    });
-    
-    // Uso de habilidades
-    this.channel.on(EVENTS.PLAYER.ABILITY_USED, data => {
+    // Uso de habilidades (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_ABILITY_USED, buffer => {
       try {
-        if (!data || !data.abilityId) return;
+        const data = deserializePlayerAbilityUsed(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:abilityUsed', data);
         this.callbacks.onPlayerAbilityUsed.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar habilidade:', error);
+        console.error('Erro ao processar bin:player:abilityUsed:', error);
       }
     });
     
-    // Morte de jogador
-    this.channel.on(EVENTS.PLAYER.DEATH, data => {
+    // Morte de jogador (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_DEATH, buffer => {
       try {
-        if (!data || !data.id) return;
+        const data = deserializePlayerDeath(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:death', data);
         this.callbacks.onPlayerDeath.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar evento de morte:', error);
+        console.error('Erro ao processar bin:player:death:', error);
       }
     });
     
-    // Respawn de jogador
-    this.channel.on(EVENTS.PLAYER.RESPAWN, data => {
+    // Respawn de jogador (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_RESPAWN, buffer => {
       try {
-        if (!data) return;
+        const data = deserializePlayerRespawn(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:respawn', data);
         this.callbacks.onPlayerRespawn.forEach(callback => callback(data));
       } catch (error) {
-        console.error('Erro ao processar evento de respawn:', error);
+        console.error('Erro ao processar bin:player:respawn:', error);
       }
     });
     
-    // Resposta de sincronização
-    this.channel.on(EVENTS.PLAYER.SYNC_RESPONSE, data => {
+    // Resposta de sincronização (BINÁRIO)
+    this.channel.on(BINARY_EVENTS.PLAYER_SYNC_RESPONSE, buffer => {
       try {
-        console.log("Sincronização recebida:", 
-          `Mana: ${data.mana?.toFixed(1)}/${data.maxMana?.toFixed(1)}`, 
-          `Cooldowns: ${Object.keys(data.cooldowns || {}).length}`);
-        
+        const data = deserializePlayerSyncResponse(buffer);
+        console.log('[CLIENT] Recebido evento: bin:player:syncResponse', data);
         this.callbacks.onSyncResponse.forEach(callback => callback(data));
       } catch (error) {
-        console.error("Erro ao processar sincronização:", error);
+        console.error('Erro ao processar bin:player:syncResponse:', error);
       }
     });
     
@@ -330,17 +285,24 @@ export class NetworkManager {
   // Envia uso de habilidade para o servidor
   sendAbilityUse(abilityId, targetPosition) {
     if (!this.connected || !this.channel) return;
-    
-    this.channel.emit(this.serverConfig.EVENTS.PLAYER.USE_ABILITY, {
-      abilityId,
-      targetPosition
-    });
+    try {
+      const buffer = serializePlayerUseAbility({
+        playerId: this.getPlayerId(),
+        skillId: abilityId,
+        posX: targetPosition?.x || 0,
+        posY: targetPosition?.y || 0,
+        posZ: targetPosition?.z || 0
+      });
+      this.channel.emit(this.serverConfig.BINARY_EVENTS.PLAYER_USE_ABILITY, new Uint8Array(buffer));
+    } catch (error) {
+      console.error('Erro ao enviar uso de habilidade (binário):', error);
+    }
   }
   
   // Envia comando de respawn
   sendRespawnRequest() {
     if (!this.connected || !this.channel) return;
-    
+    console.log('[DEBUG][CLIENT] Chamando this.channel.emit(player:respawn)');
     this.channel.emit(this.serverConfig.EVENTS.PLAYER.RESPAWN);
   }
   

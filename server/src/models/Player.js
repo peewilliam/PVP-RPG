@@ -7,7 +7,7 @@ import {
   applyLevelUp,
   calculateDamage
 } from '../../../shared/progressionSystem.js';
-import { serializePlayerStatus } from '../../../shared/utils/binarySerializer.js';
+import { serializePlayerStatus, serializePlayerRespawn, serializePlayerDeath } from '../../../shared/utils/binarySerializer.js';
 import { BINARY_EVENTS } from '../../../shared/constants/gameConstants.js';
 import { logAuditEvent } from '../utils/auditLogger.js';
 import { compressAndSend } from '../utils/compressAndSend.js';
@@ -216,12 +216,12 @@ export class Player extends Entity {
         (oldMana < (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD) && 
          this.stats.mana >= (this.stats.maxMana * PLAYER.REGENERATION.NOTIFY_THRESHOLD))) {
       if (this.channel) {
-        compressAndSend(this.channel, EVENTS.PLAYER.MOVED, {
-          id: this.id,
-          position: { ...this.position },
-          rotation: this.rotation,
-          stats: { ...this.stats }
-        });
+        // compressAndSend(this.channel, EVENTS.PLAYER.MOVED, {
+        //   id: this.id,
+        //   position: { ...this.position },
+        //   rotation: this.rotation,
+        //   stats: { ...this.stats }
+        // });
         // Envia status completo em binário
         const binStatus = serializePlayerStatus({
           playerId: this.id,
@@ -267,12 +267,12 @@ export class Player extends Entity {
     }
     // Envia evento de dano ao cliente
     if (this.channel) {
-      compressAndSend(this.channel, EVENTS.PLAYER.DAMAGE, {
-        id: this.id,
-        damage: damageTaken,
-        sourceId: source ? source.id : null,
-        remainingHp: this.stats.hp
-      });
+      // compressAndSend(this.channel, EVENTS.PLAYER.DAMAGE, {
+      //   id: this.id,
+      //   damage: damageTaken,
+      //   sourceId: source ? source.id : null,
+      //   remainingHp: this.stats.hp
+      // });
       // Emite status binário atualizado para o HUD
       const binStatus = serializePlayerStatus({
         playerId: this.id,
@@ -303,14 +303,42 @@ export class Player extends Entity {
   die(killer) {
     if (this.dead) return; // Evita múltiplas execuções
     this.dead = true;
-    // Calcula penalidade
+    // Salve os valores antes da penalidade
     const oldLevel = this.level;
     const oldXP = this.xp;
-    const lostLevel = Math.max(1, Math.floor(this.level * 0.5));
-    const lostXP = Math.floor(this.xp * 0.5);
+
+    // --- Penalidade flexível: perda de níveis e/ou XP ---
+    let lostLevel = 0;
+    let lostXP = 0;
+    let newLevel = this.level;
+    let newXP = this.xp;
+
+    // 1. Perda de níveis fixos
+    if (PLAYER.DEATH_PENALTY.LEVELS_LOST > 0) {
+      lostLevel = Math.min(this.level - PLAYER.DEATH_PENALTY.MIN_LEVEL, PLAYER.DEATH_PENALTY.LEVELS_LOST);
+      if (lostLevel > 0) {
+        newLevel = this.level - lostLevel;
+        newXP = 0; // Ao perder nível, XP zera (padrão de MMOs)
+      }
+    }
+
+    // 2. Perda de XP percentual (aplicada após ajuste de nível, se houver)
+    if (PLAYER.DEATH_PENALTY.XP_PERCENT > 0) {
+      lostXP = Math.floor(newXP * PLAYER.DEATH_PENALTY.XP_PERCENT);
+      newXP = Math.max(0, newXP - lostXP);
+      // Se XP ficar negativo, perde níveis adicionais
+      while (newXP < 0 && newLevel > PLAYER.DEATH_PENALTY.MIN_LEVEL) {
+        lostLevel++;
+        newLevel--;
+        const prevLevelXp = getNextLevelXp(newLevel - 1);
+        newXP += prevLevelXp;
+      }
+      if (newXP < 0) newXP = 0;
+    }
+
     // Aplica penalidade
-    this.level = Math.max(1, this.level - lostLevel);
-    this.xp = Math.max(0, this.xp - lostXP);
+    this.level = newLevel;
+    this.xp = newXP;
     this.nextLevelXp = getNextLevelXp(this.level - 1);
     // Recalcula status para o novo level
     const benefits = getLevelBenefits(this.level);
@@ -333,16 +361,39 @@ export class Player extends Entity {
       }
     }
     if (this.channel) {
-      compressAndSend(this.channel, EVENTS.PLAYER.DEATH, {
+      // Calcular valores reais para a tela de morte
+      const killerId = killer ? killer.id : 0;
+      let reason = 3; // OTHER
+      let killerType = 3; // OTHER
+      let killerNameStr = '';
+      if (killer) {
+        if (killer.type === 'monster' && MONSTERS[killer.monsterType]) {
+          reason = 0;
+          killerType = 0;
+          killerNameStr = MONSTERS[killer.monsterType].NAME;
+        } else if (killer.type === 'player') {
+          reason = 1;
+          killerType = 1;
+          killerNameStr = killer.name || '';
+        } else if (killer.type === 'environment') {
+          reason = 2;
+          killerType = 2;
+          killerNameStr = 'Ambiente';
+        }
+      }
+      const binDeath = serializePlayerDeath({
         id: this.id,
+        killer: killerId,
+        reason,
         lostLevel,
         lostXP,
         newLevel: this.level,
         newXP: this.xp,
-        killerId: killer ? killer.id : null,
-        killerName: killerName,
-        killerType: killer ? killer.type : null
+        killerName: killerNameStr,
+        killerType
       });
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_DEATH, new Uint8Array(binDeath));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_DEATH, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binDeath.byteLength || binDeath.length || 0, serializationTimeMs: null, entitiesSent: null, killerId, reason, lostLevel, lostXP, newLevel: this.level, newXP: this.xp, killerName: killerNameStr, killerType });
     }
     // Opcional: notificar outros jogadores (broadcast)
     // ...
@@ -360,15 +411,19 @@ export class Player extends Entity {
     this.position = { ...position };
     this.isAttacking = false;
     this.movementState = { forward: false, backward: false, left: false, right: false };
-    // Envia evento de respawn para o cliente
+    // Envia evento de respawn para o cliente (BINÁRIO)
     if (this.channel) {
-      compressAndSend(this.channel, EVENTS.PLAYER.RESPAWN, {
+      const binRespawn = serializePlayerRespawn({
         id: this.id,
         position: { ...this.position },
-        stats: { ...this.stats },
+        rotation: this.rotation,
+        hp: Math.round(this.stats.hp),
+        mana: Math.round(this.stats.mana),
         level: this.level,
-        xp: this.xp
+        xp: Math.round(this.xp)
       });
+      compressAndSend(this.channel, BINARY_EVENTS.PLAYER_RESPAWN, new Uint8Array(binRespawn));
+      logAuditEvent({ event: BINARY_EVENTS.PLAYER_RESPAWN, eventType: 'BINARY_EVENTS', playerId: this.id, payloadSize: binRespawn.byteLength || binRespawn.length || 0, serializationTimeMs: null, entitiesSent: null });
       // Envia status completo em binário
       const binStatus = serializePlayerStatus({
         playerId: this.id,
@@ -473,13 +528,13 @@ export class Player extends Entity {
     this.stats = applyLevelUp(oldLevel, this.level, this.stats);
     // Notifica o cliente sobre o level up
     if (this.channel) {
-      compressAndSend(this.channel, EVENTS.PLAYER.LEVEL_UP, {
-        id: this.id,
-        level: this.level,
-        xp: this.xp,
-        nextLevelXp: this.nextLevelXp,
-        stats: { ...this.stats }
-      });
+      // compressAndSend(this.channel, EVENTS.PLAYER.LEVEL_UP, {
+      //   id: this.id,
+      //   level: this.level,
+      //   xp: this.xp,
+      //   nextLevelXp: this.nextLevelXp,
+      //   stats: { ...this.stats }
+      // });
       // Envia status completo em binário
       const binStatus = serializePlayerStatus({
         playerId: this.id,

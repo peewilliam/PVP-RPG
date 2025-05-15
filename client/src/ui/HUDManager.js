@@ -817,7 +817,9 @@ export class HUDManager {
         <div style="color: #ffb700; font-size: 1em; margin-bottom: 1.1em;">
           <span style="vertical-align:middle;margin-right:4px;">⚔️</span>
           <b>${deathData.killerName || 'Desconhecido'}</b>
-          <span style="color:#888; font-size:0.9em;">(${deathData.killerType || 'desconhecido'})</span>
+          <span style="color:#888; font-size:0.9em;">
+            ${this.getKillerTypeLabel(deathData.killerType) ? `(${this.getKillerTypeLabel(deathData.killerType)})` : ''}
+          </span>
         </div>
         <button id="btn-respawn" style="background: linear-gradient(90deg,#ffe066,#ffb700); color: #222; font-weight: bold; font-size: 1.1em; border: none; border-radius: 8px; padding: 10px 34px; cursor: pointer; box-shadow: 0 2px 8px #0007; transition: background 0.2s;">Respawnar</button>
       </div>
@@ -1116,5 +1118,15 @@ export class HUDManager {
     }
     this.predictionPanel.innerHTML = `Predict: ${status}<br>Erro: ${reconcileDistance.toFixed(3)}<br>Ping Predição: ${predictionPing}`;
     requestAnimationFrame(this.updatePredictionPanel.bind(this));
+  }
+
+  // Função utilitária para traduzir killerType em texto amigável
+  getKillerTypeLabel(killerType) {
+    switch (killerType) {
+      case 0: return 'Monstro';
+      case 1: return 'Jogador';
+      case 2: return 'Ambiente';
+      default: return '';
+    }
   }
 } 

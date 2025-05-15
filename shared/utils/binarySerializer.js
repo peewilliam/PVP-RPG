@@ -657,6 +657,269 @@ function deserializePlayerRotated(buffer) {
   };
 }
 
+// Serialização binária para player:useAbility (opcode 0x16)
+function serializePlayerUseAbility({ playerId, skillId, targetId = 0, posX = 0, posY = 0, posZ = 0, extra = '' }) {
+  const extraBytes = new TextEncoder().encode(extra || '');
+  const extraLen = Math.min(extraBytes.length, 255);
+  const buffer = new ArrayBuffer(1 + 4 + 1 + 4 + 4 + 4 + 4 + 1 + extraLen);
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x16); offset += 1; // opcode
+  view.setUint32(offset, toEntityId(playerId), true); offset += 4;
+  view.setUint8(offset, skillId); offset += 1;
+  view.setUint32(offset, toEntityId(targetId), true); offset += 4;
+  view.setFloat32(offset, posX, true); offset += 4;
+  view.setFloat32(offset, posY, true); offset += 4;
+  view.setFloat32(offset, posZ, true); offset += 4;
+  view.setUint8(offset, extraLen); offset += 1;
+  for (let i = 0; i < extraLen; i++) {
+    view.setUint8(offset + i, extraBytes[i]);
+  }
+  // Logging detalhado
+  logBinary(`[BINÁRIO] serializePlayerUseAbility: playerId=${playerId}, skillId=${skillId}, targetId=${targetId}, pos=(${posX},${posY},${posZ}), extraLen=${extraLen}`);
+  return buffer;
+}
+
+function deserializePlayerUseAbility(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const playerId = view.getUint32(offset, true); offset += 4;
+  const skillId = view.getUint8(offset); offset += 1;
+  const targetId = view.getUint32(offset, true); offset += 4;
+  const posX = view.getFloat32(offset, true); offset += 4;
+  const posY = view.getFloat32(offset, true); offset += 4;
+  const posZ = view.getFloat32(offset, true); offset += 4;
+  const extraLen = view.getUint8(offset); offset += 1;
+  let extra = '';
+  for (let i = 0; i < extraLen; i++) {
+    extra += String.fromCharCode(view.getUint8(offset + i));
+  }
+  // Logging detalhado
+  logBinary(`[BINÁRIO] deserializePlayerUseAbility: playerId=${playerId}, skillId=${skillId}, targetId=${targetId}, pos=(${posX},${posY},${posZ}), extraLen=${extraLen}`);
+  return { opcode, playerId, skillId, targetId, posX, posY, posZ, extra };
+}
+
+// Serialização binária para player:abilityUsed (opcode 0x17) - CONTRATO ENRIQUECIDO
+function serializePlayerAbilityUsed({ playerId, skillId, posX = 0, posY = 0, posZ = 0, targetId = 0, targetX = 0, targetY = 0, targetZ = 0, teleport = 0, teleportX = 0, teleportY = 0, teleportZ = 0, areaEffect = 0, extra = '' }) {
+  const extraBytes = new TextEncoder().encode(extra || '');
+  const extraLen = Math.min(extraBytes.length, 255);
+  const buffer = new ArrayBuffer(1 + 4 + 1 + 4*3 + 4 + 4*3 + 1 + 4*3 + 1 + 1 + extraLen);
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x17); offset += 1; // opcode
+  view.setUint32(offset, toEntityId(playerId), true); offset += 4;
+  view.setUint8(offset, skillId); offset += 1;
+  view.setFloat32(offset, posX, true); offset += 4;
+  view.setFloat32(offset, posY, true); offset += 4;
+  view.setFloat32(offset, posZ, true); offset += 4;
+  view.setUint32(offset, toEntityId(targetId), true); offset += 4;
+  view.setFloat32(offset, targetX, true); offset += 4;
+  view.setFloat32(offset, targetY, true); offset += 4;
+  view.setFloat32(offset, targetZ, true); offset += 4;
+  view.setUint8(offset, teleport ? 1 : 0); offset += 1;
+  view.setFloat32(offset, teleportX, true); offset += 4;
+  view.setFloat32(offset, teleportY, true); offset += 4;
+  view.setFloat32(offset, teleportZ, true); offset += 4;
+  view.setUint8(offset, areaEffect ? 1 : 0); offset += 1;
+  view.setUint8(offset, extraLen); offset += 1;
+  for (let i = 0; i < extraLen; i++) {
+    view.setUint8(offset + i, extraBytes[i]);
+  }
+  logBinary(`[BINÁRIO] serializePlayerAbilityUsed: playerId=${playerId}, skillId=${skillId}, pos=(${posX},${posY},${posZ}), targetId=${targetId}, target=(${targetX},${targetY},${targetZ}), teleport=${teleport}, teleportPos=(${teleportX},${teleportY},${teleportZ}), areaEffect=${areaEffect}, extraLen=${extraLen}`);
+  return buffer;
+}
+
+function deserializePlayerAbilityUsed(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const playerId = view.getUint32(offset, true); offset += 4;
+  const skillId = view.getUint8(offset); offset += 1;
+  const posX = view.getFloat32(offset, true); offset += 4;
+  const posY = view.getFloat32(offset, true); offset += 4;
+  const posZ = view.getFloat32(offset, true); offset += 4;
+  const targetId = view.getUint32(offset, true); offset += 4;
+  const targetX = view.getFloat32(offset, true); offset += 4;
+  const targetY = view.getFloat32(offset, true); offset += 4;
+  const targetZ = view.getFloat32(offset, true); offset += 4;
+  const teleport = view.getUint8(offset); offset += 1;
+  const teleportX = view.getFloat32(offset, true); offset += 4;
+  const teleportY = view.getFloat32(offset, true); offset += 4;
+  const teleportZ = view.getFloat32(offset, true); offset += 4;
+  const areaEffect = view.getUint8(offset); offset += 1;
+  const extraLen = view.getUint8(offset); offset += 1;
+  let extra = '';
+  for (let i = 0; i < extraLen; i++) {
+    extra += String.fromCharCode(view.getUint8(offset + i));
+  }
+  logBinary(`[BINÁRIO] deserializePlayerAbilityUsed: playerId=${playerId}, skillId=${skillId}, pos=(${posX},${posY},${posZ}), targetId=${targetId}, target=(${targetX},${targetY},${targetZ}), teleport=${teleport}, teleportPos=(${teleportX},${teleportY},${teleportZ}), areaEffect=${areaEffect}, extraLen=${extraLen}`);
+  return {
+    opcode,
+    playerId,
+    skillId,
+    abilityId: skillId, // Compatibilidade com cliente
+    position: { x: posX, y: posY, z: posZ },
+    targetId,
+    targetPosition: { x: targetX, y: targetY, z: targetZ },
+    teleport: !!teleport,
+    teleportPosition: { x: teleportX, y: teleportY, z: teleportZ },
+    areaEffect: !!areaEffect,
+    extra
+  };
+}
+
+// Serialização binária para player:respawn (opcode 0x18)
+function serializePlayerRespawn({ id, position, rotation, hp, mana, level, xp }) {
+  const buffer = new ArrayBuffer(1 + 4 + 4*3 + 4 + 2 + 2 + 1 + 4); // 29 bytes
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x18); offset += 1; // opcode
+  view.setUint32(offset, id, true); offset += 4;
+  view.setFloat32(offset, position.x, true); offset += 4;
+  view.setFloat32(offset, position.y, true); offset += 4;
+  view.setFloat32(offset, position.z, true); offset += 4;
+  view.setFloat32(offset, rotation, true); offset += 4;
+  view.setUint16(offset, hp, true); offset += 2;
+  view.setUint16(offset, mana, true); offset += 2;
+  view.setUint8(offset, level); offset += 1;
+  view.setUint32(offset, xp, true); offset += 4;
+  logBinary(`[BINÁRIO] serializePlayerRespawn: id=${id}, pos=(${position.x},${position.y},${position.z}), rot=${rotation}, hp=${hp}, mana=${mana}, level=${level}, xp=${xp}`);
+  return buffer;
+}
+
+function deserializePlayerRespawn(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const id = view.getUint32(offset, true); offset += 4;
+  const x = view.getFloat32(offset, true); offset += 4;
+  const y = view.getFloat32(offset, true); offset += 4;
+  const z = view.getFloat32(offset, true); offset += 4;
+  const rotation = view.getFloat32(offset, true); offset += 4;
+  const hp = view.getUint16(offset, true); offset += 2;
+  const mana = view.getUint16(offset, true); offset += 2;
+  const level = view.getUint8(offset); offset += 1;
+  const xp = view.getUint32(offset, true); offset += 4;
+  logBinary(`[BINÁRIO] deserializePlayerRespawn: id=${id}, pos=(${x},${y},${z}), rot=${rotation}, hp=${hp}, mana=${mana}, level=${level}, xp=${xp}`);
+  return { opcode, id, position: { x, y, z }, rotation, hp, mana, level, xp };
+}
+
+// Serialização binária para player:death (expandido)
+function serializePlayerDeath({ id, killer = 0, reason = 3, lostLevel = 0, lostXP = 0, newLevel = 1, newXP = 0, killerName = '', killerType = 3 }) {
+  const encoder = new TextEncoder();
+  const nameBytes = encoder.encode(killerName || '');
+  const nameLen = Math.min(nameBytes.length, 255);
+  const buffer = new ArrayBuffer(21 + 1 + nameLen + 1); // fixo 21 + killerNameLen + killerType
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset++, 0x14); // opcode
+  view.setUint32(offset, id, true); offset += 4;
+  view.setUint32(offset, killer, true); offset += 4;
+  view.setUint8(offset++, reason);
+  view.setUint8(offset++, lostLevel);
+  view.setUint32(offset, lostXP, true); offset += 4;
+  view.setUint8(offset++, newLevel);
+  view.setUint32(offset, newXP, true); offset += 4;
+  view.setUint8(offset++, nameLen);
+  for (let i = 0; i < nameLen; i++) {
+    view.setUint8(offset++, nameBytes[i]);
+  }
+  view.setUint8(offset++, killerType);
+  // Logging detalhado
+  if (typeof console !== 'undefined' && console.log) {
+    // console.log('[BIN][serializePlayerDeath]', { id, killer, reason, lostLevel, lostXP, newLevel, newXP, killerName, killerType });
+  }
+  return buffer;
+}
+
+function deserializePlayerDeath(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset++);
+  const id = view.getUint32(offset, true); offset += 4;
+  const killer = view.getUint32(offset, true); offset += 4;
+  const reason = view.getUint8(offset++);
+  const lostLevel = view.getUint8(offset++);
+  const lostXP = view.getUint32(offset, true); offset += 4;
+  const newLevel = view.getUint8(offset++);
+  const newXP = view.getUint32(offset, true); offset += 4;
+  const nameLen = view.getUint8(offset++);
+  let killerName = '';
+  if (nameLen > 0) {
+    const nameBytes = new Uint8Array(buffer, offset, nameLen);
+    killerName = new TextDecoder().decode(nameBytes);
+    offset += nameLen;
+  }
+  const killerType = view.getUint8(offset++);
+  // Logging detalhado
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[BIN][deserializePlayerDeath]', { id, killer, reason, lostLevel, lostXP, newLevel, newXP, killerName, killerType });
+  }
+  return {
+    opcode,
+    id,
+    killer,
+    reason,
+    lostLevel,
+    lostXP,
+    newLevel,
+    newXP,
+    killerName,
+    killerType
+  };
+}
+
+// Serialização binária para player:syncResponse (opcode 0x1A)
+function serializePlayerSyncResponse({ playerId, hp, maxHp, mana, maxMana, cooldowns = {}, timestamp }) {
+  const cooldownEntries = Object.entries(cooldowns || {});
+  const N = Math.min(cooldownEntries.length, 255);
+  const buffer = new ArrayBuffer(1 + 4 + 2*4 + 1 + N*5 + 4); // opcode + playerId + hp/maxHp/mana/maxMana + N + (abilityId+cdEnd)*N + timestamp
+  const view = new DataView(buffer);
+  let offset = 0;
+  view.setUint8(offset, 0x1A); offset += 1; // opcode
+  view.setUint32(offset, playerId, true); offset += 4;
+  view.setUint16(offset, hp, true); offset += 2;
+  view.setUint16(offset, maxHp, true); offset += 2;
+  view.setUint16(offset, mana, true); offset += 2;
+  view.setUint16(offset, maxMana, true); offset += 2;
+  view.setUint8(offset, N); offset += 1;
+  for (let i = 0; i < N; i++) {
+    const [abilityId, cdEnd] = cooldownEntries[i];
+    view.setUint8(offset, parseInt(abilityId)); offset += 1;
+    view.setUint32(offset, Math.floor(cdEnd / 1000), true); offset += 4; // timestamp em segundos
+  }
+  view.setUint32(offset, Math.floor(timestamp / 1000), true); offset += 4;
+  logBinary(`[BINÁRIO] serializePlayerSyncResponse: playerId=${playerId}, hp=${hp}, mana=${mana}, N=${N}, timestamp=${timestamp}`);
+  return buffer;
+}
+
+function deserializePlayerSyncResponse(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  let offset = 0;
+  const opcode = view.getUint8(offset); offset += 1;
+  const playerId = view.getUint32(offset, true); offset += 4;
+  const hp = view.getUint16(offset, true); offset += 2;
+  const maxHp = view.getUint16(offset, true); offset += 2;
+  const mana = view.getUint16(offset, true); offset += 2;
+  const maxMana = view.getUint16(offset, true); offset += 2;
+  const N = view.getUint8(offset); offset += 1;
+  const cooldowns = {};
+  for (let i = 0; i < N; i++) {
+    const abilityId = view.getUint8(offset); offset += 1;
+    const cdEnd = view.getUint32(offset, true); offset += 4;
+    cooldowns[abilityId] = cdEnd * 1000; // volta para ms
+  }
+  const timestamp = view.getUint32(offset, true) * 1000; offset += 4;
+  logBinary(`[BINÁRIO] deserializePlayerSyncResponse: playerId=${playerId}, hp=${hp}, mana=${mana}, N=${N}, timestamp=${timestamp}`);
+  return { opcode, playerId, hp, maxHp, mana, maxMana, cooldowns, timestamp };
+}
+
 export {
   serializePlayerMove,
   deserializePlayerMove,
@@ -691,5 +954,15 @@ export {
   serializePlayerRotate,
   deserializePlayerRotate,
   serializePlayerRotated,
-  deserializePlayerRotated
+  deserializePlayerRotated,
+  serializePlayerUseAbility,
+  deserializePlayerUseAbility,
+  serializePlayerAbilityUsed,
+  deserializePlayerAbilityUsed,
+  serializePlayerRespawn,
+  deserializePlayerRespawn,
+  serializePlayerDeath,
+  deserializePlayerDeath,
+  serializePlayerSyncResponse,
+  deserializePlayerSyncResponse
 }; 

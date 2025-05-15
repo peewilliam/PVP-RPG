@@ -241,51 +241,47 @@ export class GameController {
     
     // Uso de habilidades
     this.networkManager.on('onPlayerAbilityUsed', (data) => {
+      console.log('[DEBUG][CLIENT] Evento abilityUsed recebido:', data);
       if (!data || !data.abilityId) return;
-      
       // Processa teleporte, se for o caso
       if (data.teleport && data.teleportPosition) {
-        // Determina qual jogador teleportar
         let targetMesh = null;
-        
-        if (!data.playerId && this.entityManager.localPlayer) {
+        if (data.playerId === this.playerId && this.entityManager.localPlayer) {
           // É o próprio jogador local
           targetMesh = this.entityManager.localPlayer;
-          
-          // Força o teleporte no sistema de predição
           if (this.movementPrediction) {
             this.movementPrediction.forceTeleport(data.teleportPosition);
           } else {
-            // Teleporta o jogador diretamente
             targetMesh.position.set(
               data.teleportPosition.x,
               data.teleportPosition.y || targetMesh.position.y,
               data.teleportPosition.z
             );
           }
-          
-          // Chama o efeito visual de teleporte diretamente do arquivo
           const origin = targetMesh.position.clone();
           const target = new THREE.Vector3(
             data.teleportPosition.x, 
             data.teleportPosition.y || targetMesh.position.y, 
             data.teleportPosition.z
           );
-          
           spawnTeleportEffect(origin, target, this.sceneManager.scene, targetMesh);
-        } 
-        else if (data.playerId) {
+        } else if (data.playerId) {
           // É outro jogador
           targetMesh = this.entityManager.playerPresenter.getPlayer(data.playerId);
           if (targetMesh) {
-            // Teleporta o outro jogador
             targetMesh.position.set(
               data.teleportPosition.x,
               data.teleportPosition.y || targetMesh.position.y,
               data.teleportPosition.z
             );
-            
-            // Adiciona efeito visual
+            // Efeito visual de teleporte para outros jogadores
+            const origin = targetMesh.position.clone();
+            const target = new THREE.Vector3(
+              data.teleportPosition.x,
+              data.teleportPosition.y || targetMesh.position.y,
+              data.teleportPosition.z
+            );
+            spawnTeleportEffect(origin, target, this.sceneManager.scene, targetMesh);
             this.entityManager.floatingTextManager.createFloatingText({
               text: '✨',
               position: data.teleportPosition,
@@ -296,7 +292,6 @@ export class GameController {
             });
           }
         }
-        
         return; // Não processa os outros efeitos para teleporte
       }
       
@@ -378,6 +373,7 @@ export class GameController {
           const btn = document.getElementById('btn-respawn');
           if (btn) {
             btn.onclick = () => {
+              console.log('[DEBUG][CLIENT] Botão de respawn clicado, chamando sendRespawnRequest()');
               this.networkManager.sendRespawnRequest();
             };
           }
@@ -399,26 +395,30 @@ export class GameController {
     
     // Respawn de jogador
     this.networkManager.on('onPlayerRespawn', (data) => {
+      console.log('[DEBUG][CLIENT] Evento onPlayerRespawn recebido:', data);
       if (data.id === this.playerId) {
+        console.log('[DEBUG][CLIENT] Respawn do próprio jogador. Atualizando HUD e inputs.');
         // Desativa a flag de morte
         this.playerDead = false;
-        
         // Remove a modal de morte
         this.hudManager.hideDeathModal();
-        
         // Desbloqueia inputs
         this.blockDeadInputs(false);
-        
         // Restaura visual do jogador
         const localPlayer = this.entityManager.localPlayer;
         if (localPlayer) {
           this.entityManager.removeGrayDeathEffect(localPlayer, 0x0000ff);
+        } else {
+          console.warn('[DEBUG][CLIENT] localPlayer não encontrado ao tentar remover efeito de morte.');
         }
       } else {
+        console.log('[DEBUG][CLIENT] Respawn de outro jogador:', data.id);
         // Outro jogador respawnou
         const playerMesh = this.entityManager.playerPresenter.getPlayer(data.id);
         if (playerMesh) {
           this.entityManager.removeGrayDeathEffect(playerMesh, 0x0000ff);
+        } else {
+          console.warn('[DEBUG][CLIENT] playerMesh não encontrado para id:', data.id);
         }
       }
     });

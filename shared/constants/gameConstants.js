@@ -11,21 +11,20 @@ export const SERVER = {
 // Eventos de rede
 export const EVENTS = {
   PLAYER: {
-    MOVE: 'player:move',
-    MOVED: 'player:moved',
-    DISCONNECTED: 'player:disconnected',
-    JOINED: 'player:joined',    // Notifica quando um novo jogador entra
-    EXISTING: 'player:existing', // Envia informações de jogadores existentes
-    ROTATED: 'player:rotated',  // Confirmação de rotação do jogador
-    USE_ABILITY: 'player:useAbility',
-    ABILITY_USED: 'player:abilityUsed',
-    DAMAGE: 'player:damage',
-    LEVEL_UP: 'player:levelUp',
-    DEATH: 'player:death',     // Quando um jogador morre
-    RESPAWN: 'player:respawn', // Quando um jogador reaparece
-    TARGET: 'player:target',   // Jogador seleciona um alvo
-    SYNC_REQUEST: 'player:syncRequest', // Solicitação de sincronização de cooldowns e mana
-    SYNC_RESPONSE: 'player:syncResponse' // Resposta com dados sincronizados do servidor
+    // MOVE: 'player:move', // Migrado para binário (bin:player:move)
+    // MOVED: 'player:moved', // Migrado para binário (bin:player:moved)
+    // DISCONNECTED: 'player:disconnected', // Migrado para binário (bin:player:disconnected)
+    // JOINED: 'player:joined',    // Migrado para binário (bin:player:joined)
+    // EXISTING: 'player:existing', // Migrado para binário (bin:player:existing)
+    // ROTATED: 'player:rotated',  // Migrado para binário (bin:player:rotated)
+    // USE_ABILITY: 'player:useAbility', // Migrado para binário (bin:player:useAbility)
+    // DAMAGE: 'player:damage', // Migrado para binário (bin:combat:effects)
+    // LEVEL_UP: 'player:levelUp', // (ainda em JSON se existir)
+    // DEATH: 'player:death',     // Migrado para binário (bin:player:death)
+    RESPAWN: 'player:respawn', // Migrado para binário (bin:player:respawn)
+    // SYNC_RESPONSE: 'player:syncResponse', // Migrado para binário (bin:player:syncResponse)
+    SYNC_REQUEST: 'player:syncRequest', // Permanece em JSON (trigger do cliente)
+    // TARGET: 'player:target',   // Jogador seleciona um alvo
   },
   MONSTER: {
     SPAWN: 'monster:spawn',
@@ -94,7 +93,12 @@ export const PLAYER = {
     // e assim por diante...
   },
   // Habilidades do jogador centralizadas
-  ABILITIES: SKILLS
+  ABILITIES: SKILLS,
+  DEATH_PENALTY: {
+    XP_PERCENT: 0.10, // Percentual de XP perdido (0.10 = 10%)
+    LEVELS_LOST: 0,   // Quantidade de níveis perdidos (0 = não perde nível fixo)
+    MIN_LEVEL: 1      // Nível mínimo permitido após penalidade
+  },
 };
 
 // Configurações de monstros
@@ -275,6 +279,11 @@ export const BINARY_EVENTS = {
   PLAYER_EXISTING: 'bin:player:existing', // Novo evento binário para informar jogadores já presentes
   PLAYER_ROTATE: 'bin:player:rotate', // Evento binário para rotação do jogador (opcode 0x14)
   PLAYER_ROTATED: 'bin:player:rotated', // Novo evento binário para confirmação de rotação do jogador (opcode 0x15)
+  PLAYER_USE_ABILITY: 'bin:player:useAbility', // Evento binário para uso de habilidade
+  PLAYER_ABILITY_USED: 'bin:player:abilityUsed', // Evento binário para notificação de habilidade usada
+  PLAYER_RESPAWN: 'bin:player:respawn', // Novo evento binário para respawn do player
+  PLAYER_DEATH: 'bin:player:death',
+  PLAYER_SYNC_RESPONSE: 'bin:player:syncResponse', // Novo evento binário para resposta de sincronização
 };
 
 // Enum para motivos de desconexão de jogador (para uso no campo 'reason' do evento binário)

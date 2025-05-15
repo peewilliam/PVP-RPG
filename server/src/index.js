@@ -19,7 +19,10 @@ import {
   serializePlayerInit,
   serializePlayerDisconnected,
   serializePlayerJoined,
-  serializePlayerExisting
+  serializePlayerExisting,
+  deserializePlayerUseAbility,
+  serializePlayerAbilityUsed,
+  serializePlayerSyncResponse
 } from '../../shared/utils/binarySerializer.js';
 import { logAuditEvent } from './utils/auditLogger.js';
 import fs from 'fs';
@@ -141,12 +144,13 @@ const eventosPermitidosMultiplos = [
   'combat:floatingText',
   'combat:damageDealt',
   'player:abilityUsed',
+  'bin:player:abilityUsed',
+  'bin:player:useAbility',
   'monster:damage',
   'player:damage',
   'monster:attack',
   'monster:attacked',
   'monster:ability',
-  'player:target',
   // Adicione outros eventos de efeito em área ou múltiplos hits
 ];
 
@@ -361,79 +365,52 @@ io.onConnection(channel => {
       }
     });
 
-    // Processa uso de habilidades (action)
-    channel.on(EVENTS.PLAYER.USE_ABILITY, data => {
+    // Processa uso de habilidades (BINÁRIO)
+    channel.on(BINARY_EVENTS.PLAYER_USE_ABILITY, buffer => {
       try {
-        if (!data || !data.abilityId || !data.targetPosition) {
-          console.error('Dados de habilidade inválidos:', data);
-          return;
-        }
-        
+        const data = deserializePlayerUseAbility(buffer);
+        // data: { playerId, skillId, targetId, posX, posY, posZ, extra }
         const player = gameWorld.entityManager.getPlayer(channel.playerId);
         if (!player) return;
-        
-        const ability = player.getAbilityById(data.abilityId);
+        const ability = player.getAbilityById(data.skillId);
         if (!ability) return;
-        
-        // Verifica cooldown e mana no método useAbility
-        if (!player.useAbility(data.abilityId, data.targetPosition)) {
-          return; // Se não puder usar a habilidade, retorna
-        }
-        
-        // Processa a habilidade usando o sistema de combate
-        const result = gameWorld.processAbilityUse(player, data.abilityId, data.targetPosition);
-        
-        // Se a habilidade não teve sucesso, retorna
+        const targetPosition = { x: data.posX, y: data.posY, z: data.posZ };
+        if (!player.useAbility(data.skillId, targetPosition)) return;
+        const result = gameWorld.processAbilityUse(player, data.skillId, targetPosition);
         if (!result.success) return;
-        
         // Notifica o cliente que a habilidade foi usada
-        safeCompressAndSend(channel, EVENTS.PLAYER.ABILITY_USED, {
-          id: player.id,
-          abilityId: data.abilityId,
-          position: player.position,
-          targetPosition: data.targetPosition,
-          teleport: result.teleportPosition ? true : false,
-          teleportPosition: result.teleportPosition,
-          areaEffect: result.areaEffect,
-          cooldownStart: player.abilityCooldowns[data.abilityId],
-          cooldownDuration: ability.COOLDOWN,
-          cooldownEnd: player.abilityCooldowns[data.abilityId] + ability.COOLDOWN,
-          mana: player.stats.mana,
-          maxMana: player.stats.maxMana
-        });
-        
+        const abilityUsedPayload = {
+          playerId: player.id,
+          skillId: data.skillId,
+          posX: player.position.x,
+          posY: player.position.y,
+          posZ: player.position.z,
+          targetId: data.targetId || 0,
+          targetX: data.posX || 0,
+          targetY: data.posY || 0,
+          targetZ: data.posZ || 0,
+          teleport: result.teleportPosition ? 1 : 0,
+          teleportX: result.teleportPosition ? result.teleportPosition.x : 0,
+          teleportY: result.teleportPosition ? result.teleportPosition.y : 0,
+          teleportZ: result.teleportPosition ? result.teleportPosition.z : 0,
+          areaEffect: result.areaEffect ? 1 : 0,
+          extra: '' // Adapte se necessário
+        };
+        // LOG DEBUG TELEPORT
+        // console.log('[DEBUG][SERVER] Teleport result:', result);
+        // console.log('[DEBUG][SERVER] Payload enviado:', abilityUsedPayload);
+        const abilityUsedBuffer = serializePlayerAbilityUsed(abilityUsedPayload);
+        safeCompressAndSend(channel, BINARY_EVENTS.PLAYER_ABILITY_USED, new Uint8Array(abilityUsedBuffer));
         // Notifica outros jogadores sobre a habilidade usada
         for (const otherPlayer of gameWorld.entityManager.players.values()) {
           if (otherPlayer.id !== player.id && otherPlayer.channel && 
               otherPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE) {
-            safeCompressAndSend(otherPlayer.channel, EVENTS.PLAYER.ABILITY_USED, {
-              playerId: player.id,
-              abilityId: data.abilityId,
-              position: player.position,
-              targetPosition: data.targetPosition,
-              teleport: result.teleportPosition ? true : false,
-              teleportPosition: result.teleportPosition,
-              areaEffect: result.areaEffect
-            });
-          }
-        }
-        
-        // Envia resultados do combate para todos os jogadores próximos
-        if (result.hits && result.hits.length > 0) {
-          for (const hit of result.hits) {
-            // Envia informações sobre o hit para jogadores na área
-            for (const nearbyPlayer of gameWorld.entityManager.players.values()) {
-              if (nearbyPlayer.channel && 
-                  (nearbyPlayer.distanceTo(player) < WORLD.SIZE.VISIBLE_RANGE || 
-                   (hit.position && nearbyPlayer.distanceTo({position: hit.position}) < WORLD.SIZE.VISIBLE_RANGE))) {
-                // Evento antigo removido: safeCompressAndSend(nearbyPlayer.channel, EVENTS.COMBAT.DAMAGE_DEALT, {...})
-                // Agora todo o processamento de efeitos de combate é feito via evento binário (bin:combat:effects)
-              }
-            }
+            const otherAbilityUsedBuffer = serializePlayerAbilityUsed(abilityUsedPayload);
+            safeCompressAndSend(otherPlayer.channel, BINARY_EVENTS.PLAYER_ABILITY_USED, new Uint8Array(otherAbilityUsedBuffer));
           }
         }
       } catch (error) {
-        console.error('Erro ao processar uso de habilidade:', error);
+        console.error('Erro ao processar uso de habilidade (binário):', error);
       }
     });
 
@@ -442,7 +419,7 @@ io.onConnection(channel => {
       try {
         const player = gameWorld.entityManager.getPlayer(channel.playerId);
         if (!player) return;
-        // Envia mana e cooldowns atualizados para o cliente
+        // Envia mana e cooldowns atualizados para o cliente (agora em binário)
         const cooldowns = {};
         const now = Date.now();
         for (const abilityId in player.abilityCooldowns) {
@@ -455,14 +432,16 @@ io.onConnection(channel => {
             cooldowns[abilityId] = cooldownEndTime;
           }
         }
-        safeCompressAndSend(channel, EVENTS.PLAYER.SYNC_RESPONSE, {
-          mana: player.stats.mana,
-          maxMana: player.stats.maxMana,
-          hp: player.stats.hp,
-          maxHp: player.stats.maxHp,
-          cooldowns: cooldowns,
+        const binSync = serializePlayerSyncResponse({
+          playerId: player.id,
+          hp: Math.round(player.stats.hp),
+          maxHp: Math.round(player.stats.maxHp),
+          mana: Math.round(player.stats.mana),
+          maxMana: Math.round(player.stats.maxMana),
+          cooldowns,
           timestamp: now
         });
+        safeCompressAndSend(channel, BINARY_EVENTS.PLAYER_SYNC_RESPONSE, new Uint8Array(binSync));
       } catch (error) {
         console.error('Erro ao processar sincronização:', error);
       }
@@ -581,6 +560,7 @@ io.onConnection(channel => {
 
     // Handler para respawn do player
     channel.on(EVENTS.PLAYER.RESPAWN, () => {
+      // console.log('[DEBUG][SERVER] Recebido comando player:respawn do cliente', channel.playerId);
       const player = gameWorld.entityManager.getPlayer(channel.playerId);
       if (!player || !player.dead) return;
       // Se o mapa ativo for DESERT_PATH, respawn fixo no início do caminho
@@ -596,8 +576,8 @@ io.onConnection(channel => {
           z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
         };
       }
-      player.respawn(pos);
-      // (O método respawn já envia o evento de confirmação para o cliente)
+      player.respawn(pos); // O método respawn já envia o evento BINÁRIO para o cliente
+      // (O evento de confirmação de respawn agora é binário: bin:player:respawn)
     });
 
     // Handler para confirmação do cliente após world:init
@@ -612,7 +592,7 @@ io.onConnection(channel => {
       console.log(`[CONFIRMAÇÃO] Recebida confirmação de world:init do jogador ${playerId}`);
     });
 
-    console.log('[DEBUG][SERVER] combatEffectsBuffer para player', player.id, ':', combatEffectsBuffer);
+    // console.log('[DEBUG][SERVER] combatEffectsBuffer para player', player.id, ':', combatEffectsBuffer);
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
   }

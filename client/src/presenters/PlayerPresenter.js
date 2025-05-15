@@ -206,7 +206,7 @@ export class PlayerPresenter {
     }
     // Log para depuração
     // console.log(`[PlayerPresenter] updateExistingPlayer: ${id}`, player.position, player.rotation.y, player.userData.stats);
-    console.log('Players atuais após update:', Array.from(this.players.keys()));
+    // console.log('Players atuais após update:', Array.from(this.players.keys()));
   }
 
   /**
