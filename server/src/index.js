@@ -27,6 +27,7 @@ import {
 import { logAuditEvent } from './utils/auditLogger.js';
 import fs from 'fs';
 import { compressAndSend } from './utils/compressAndSend.js';
+import { MAP_CONFIG } from './mapConfig.js';
 
 const app = express();
 const __dirname = path.resolve();
@@ -593,6 +594,20 @@ io.onConnection(channel => {
     });
 
     // console.log('[DEBUG][SERVER] combatEffectsBuffer para player', player.id, ':', combatEffectsBuffer);
+
+    // Antes do envio:
+    const minimapConfig = {
+      areas: MAP_CONFIG.areas,
+      monsterSpots: MAP_CONFIG.monsterSpots,
+      groundTiles: MAP_CONFIG.groundTiles
+    };
+    // Envie minimapConfig ao invés de MAP_CONFIG
+    channel.emit('world:mapConfig', minimapConfig);
+
+    // No handler do evento 'client:requestMapConfig':
+    channel.on('client:requestMapConfig', () => {
+      channel.emit('world:mapConfig', minimapConfig);
+    });
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);
   }

@@ -6,7 +6,7 @@ import { BINARY_EVENTS } from '../../../../shared/constants/gameConstants.js';
 import { logAuditEvent } from '../../utils/auditLogger.js';
 
 export class BaseMonster extends Entity {
-  constructor(id, type, position = { x: 0, y: 0, z: 0 }, level = 1) {
+  constructor(id, type, position = { x: 0, y: 0, z: 0 }, level = 1, scale = null) {
     super(id, position);
     const monsterType = this.getMonsterTypeConfig(type);
     if (!monsterType) throw new Error(`Tipo de monstro inválido: ${type}`);
@@ -33,6 +33,7 @@ export class BaseMonster extends Entity {
     this.lastStateChange = Date.now();
     this.patrolTimer = 0;
     this.patrolDirection = { x: 0, z: 0 };
+    this.scale = scale ? { ...scale } : null;
   }
 
   getMonsterTypeConfig(type) {
@@ -319,7 +320,8 @@ export class BaseMonster extends Entity {
           hp: this.stats.hp,
           maxHp: this.stats.maxHp
         },
-        level: this.level
+        level: this.level,
+        ...(this.scale ? { scale: { ...this.scale } } : {})
       };
     }
     return {
@@ -330,7 +332,8 @@ export class BaseMonster extends Entity {
         hp: this.stats.hp,
         maxHp: this.stats.maxHp
       },
-      aiState: this.aiState
+      aiState: this.aiState,
+      ...(this.scale ? { scale: { ...this.scale } } : {})
     };
   }
 } 

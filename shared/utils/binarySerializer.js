@@ -264,16 +264,29 @@ function serializeWorldUpdateFull({ monsters, worldObjects, players }) {
   const N = monsters.length;
   const M = worldObjects.length;
   const P = players.length;
-  // Monstro: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 2 hp + 2 maxHp = 12 bytes
+  
+  // Calcula o tamanho adicional para scales de monstros
+  // Scale: 1 byte flag + 2 bytes por componente (x,y,z) = 7 bytes quando scale existe
+  let scaleExtraBytes = 0;
+  for (let i = 0; i < N; i++) {
+    if (monsters[i].scale) {
+      scaleExtraBytes += 7; // 1 (flag) + 2*3 (x,y,z)
+    } else {
+      scaleExtraBytes += 1; // Apenas 1 byte para flag = 0
+    }
+  }
+  
+  // Monstro: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 2 hp + 2 maxHp = 12 bytes (básico) + scale bytes
   // Objeto: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 1 status = 9 bytes
   // Jogador: 12 bytes (igual)
-  const buffer = new ArrayBuffer(1 + 2 + 2 + 2 + (N * 12) + (M * 9) + (P * 12));
+  const buffer = new ArrayBuffer(1 + 2 + 2 + 2 + (N * 12) + scaleExtraBytes + (M * 9) + (P * 12));
   const view = new DataView(buffer);
   let offset = 0;
   view.setUint8(offset, 0x06); offset += 1; // opcode
   view.setUint16(offset, N); offset += 2;
   view.setUint16(offset, M); offset += 2;
   view.setUint16(offset, P); offset += 2;
+  
   // Monstros
   for (let i = 0; i < N; i++) {
     const m = monsters[i];
@@ -286,7 +299,18 @@ function serializeWorldUpdateFull({ monsters, worldObjects, players }) {
     view.setUint8(offset, quantizeRot(m.rotation)); offset += 1;
     view.setUint16(offset, m.stats?.hp ?? 0); offset += 2;
     view.setUint16(offset, m.stats?.maxHp ?? 1); offset += 2;
+    
+    // Adiciona escala, se presente
+    if (m.scale) {
+      view.setUint8(offset, 1); offset += 1; // Flag indicando que tem scale
+      view.setUint16(offset, Math.floor(m.scale.x * 100)); offset += 2;
+      view.setUint16(offset, Math.floor(m.scale.y * 100)); offset += 2;
+      view.setUint16(offset, Math.floor(m.scale.z * 100)); offset += 2;
+    } else {
+      view.setUint8(offset, 0); offset += 1; // Flag indicando que não tem scale
+    }
   }
+  
   // Objetos do mundo
   for (let i = 0; i < M; i++) {
     const o = worldObjects[i];
@@ -299,6 +323,7 @@ function serializeWorldUpdateFull({ monsters, worldObjects, players }) {
     view.setUint8(offset, quantizeRot(o.rotation ?? 0)); offset += 1;
     view.setUint8(offset, o.status ?? 0); offset += 1; // Reservado para flags
   }
+  
   // Jogadores (igual)
   for (let i = 0; i < P; i++) {
     const pl = players[i];
@@ -331,7 +356,25 @@ function deserializeWorldUpdateFull(buffer) {
     const rot = dequantizeRot(view.getUint8(offset)); offset += 1;
     const hp = view.getUint16(offset); offset += 2;
     const maxHp = view.getUint16(offset); offset += 2;
-    monsters.push({ id, monsterType, position: { x: posX, z: posZ }, rotation: rot, stats: { hp, maxHp } });
+    
+    // Lê a escala, se presente
+    const hasScale = view.getUint8(offset); offset += 1;
+    let scale = null;
+    if (hasScale === 1) {
+      const scaleX = view.getUint16(offset) / 100; offset += 2;
+      const scaleY = view.getUint16(offset) / 100; offset += 2;
+      const scaleZ = view.getUint16(offset) / 100; offset += 2;
+      scale = { x: scaleX, y: scaleY, z: scaleZ };
+    }
+    
+    monsters.push({ 
+      id, 
+      monsterType, 
+      position: { x: posX, z: posZ }, 
+      rotation: rot, 
+      stats: { hp, maxHp },
+      ...(scale ? { scale } : {})
+    });
   }
   const worldObjects = [];
   for (let i = 0; i < M; i++) {
@@ -361,17 +404,29 @@ function deserializeWorldUpdateFull(buffer) {
 // Serialização binária para delta de monstros (adicionados/atualizados e removidos)
 // Formato:
 // [opcode][N_add][N_rem][...N_add monstros...][...N_rem ids...]
-// Cada monstro: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 2 hp + 2 maxHp = 12 bytes
+// Cada monstro: 2 id + 1 tipo + 2 x + 2 z + 1 rot + 2 hp + 2 maxHp + scale bytes = 12 bytes (básico) + scale bytes
 // Cada id removido: 2 bytes
 function serializeMonsterDeltaUpdate({ addedOrUpdated, removed }) {
   const N_add = addedOrUpdated.length;
   const N_rem = removed.length;
-  const buffer = new ArrayBuffer(1 + 2 + 2 + (N_add * 12) + (N_rem * 2));
+  
+  // Calcula o tamanho adicional para scales de monstros
+  let scaleExtraBytes = 0;
+  for (let i = 0; i < N_add; i++) {
+    if (addedOrUpdated[i].scale) {
+      scaleExtraBytes += 7; // 1 (flag) + 2*3 (x,y,z)
+    } else {
+      scaleExtraBytes += 1; // Apenas 1 byte para flag = 0
+    }
+  }
+  
+  const buffer = new ArrayBuffer(1 + 2 + 2 + (N_add * 12) + scaleExtraBytes + (N_rem * 2));
   const view = new DataView(buffer);
   let offset = 0;
   view.setUint8(offset, 0x21); offset += 1; // opcode exclusivo para delta de monstros
   view.setUint16(offset, N_add); offset += 2;
   view.setUint16(offset, N_rem); offset += 2;
+  
   // Monstros adicionados/atualizados
   for (let i = 0; i < N_add; i++) {
     const m = addedOrUpdated[i];
@@ -383,7 +438,18 @@ function serializeMonsterDeltaUpdate({ addedOrUpdated, removed }) {
     view.setUint8(offset, quantizeRot(m.rotation)); offset += 1;
     view.setUint16(offset, m.stats?.hp ?? 0); offset += 2;
     view.setUint16(offset, m.stats?.maxHp ?? 1); offset += 2;
+    
+    // Adiciona escala, se presente
+    if (m.scale) {
+      view.setUint8(offset, 1); offset += 1; // Flag indicando que tem scale
+      view.setUint16(offset, Math.floor(m.scale.x * 100)); offset += 2;
+      view.setUint16(offset, Math.floor(m.scale.y * 100)); offset += 2;
+      view.setUint16(offset, Math.floor(m.scale.z * 100)); offset += 2;
+    } else {
+      view.setUint8(offset, 0); offset += 1; // Flag indicando que não tem scale
+    }
   }
+  
   // IDs removidos
   for (let i = 0; i < N_rem; i++) {
     view.setUint16(offset, toEntityId(removed[i])); offset += 2;
@@ -398,6 +464,7 @@ function deserializeMonsterDeltaUpdate(buffer) {
   const opcode = view.getUint8(offset); offset += 1;
   const N_add = view.getUint16(offset); offset += 2;
   const N_rem = view.getUint16(offset); offset += 2;
+  
   const addedOrUpdated = [];
   for (let i = 0; i < N_add; i++) {
     const id = view.getUint16(offset); offset += 2;
@@ -408,12 +475,32 @@ function deserializeMonsterDeltaUpdate(buffer) {
     const rot = dequantizeRot(view.getUint8(offset)); offset += 1;
     const hp = view.getUint16(offset); offset += 2;
     const maxHp = view.getUint16(offset); offset += 2;
-    addedOrUpdated.push({ id: String(id), monsterType, position: { x: posX, z: posZ }, rotation: rot, stats: { hp, maxHp } });
+    
+    // Lê a escala, se presente
+    const hasScale = view.getUint8(offset); offset += 1;
+    let scale = null;
+    if (hasScale === 1) {
+      const scaleX = view.getUint16(offset) / 100; offset += 2;
+      const scaleY = view.getUint16(offset) / 100; offset += 2;
+      const scaleZ = view.getUint16(offset) / 100; offset += 2;
+      scale = { x: scaleX, y: scaleY, z: scaleZ };
+    }
+    
+    addedOrUpdated.push({ 
+      id, 
+      monsterType, 
+      position: { x: posX, z: posZ }, 
+      rotation: rot, 
+      stats: { hp, maxHp },
+      ...(scale ? { scale } : {})
+    });
   }
+  
   const removed = [];
   for (let i = 0; i < N_rem; i++) {
-    removed.push(String(view.getUint16(offset))); offset += 2;
+    removed.push(view.getUint16(offset)); offset += 2;
   }
+  
   return { opcode, addedOrUpdated, removed };
 }
 

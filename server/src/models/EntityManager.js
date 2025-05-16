@@ -44,13 +44,14 @@ export class EntityManager {
    * @param {string} type - Tipo do monstro (ex: 'GOBLIN')
    * @param {Object} position - Posição inicial do monstro
    * @param {number} level - Nível do monstro
+   * @param {Object} scale - Escala do monstro (opcional)
    * @returns {Monster} - Instância do monstro criado
    */
-  createMonster(type, position = { x: 0, y: 0, z: 0 }, level = 1) {
+  createMonster(type, position = { x: 0, y: 0, z: 0 }, level = 1, scale = null) {
     const id = nextMonsterId++;
     const MonsterClass = MonsterTypes[type];
     if (!MonsterClass) throw new Error(`Tipo de monstro desconhecido: ${type}`);
-    const monster = new MonsterClass(id, position, level);
+    const monster = new MonsterClass(id, position, level, scale);
     this.monsters.set(id, monster);
     // console.log('[CLIENT DEBUG] Criando monstro:', id, type);
     return monster;
@@ -346,7 +347,20 @@ export class EntityManager {
     
     for (const monster of this.monsters.values()) {
       if (monster.active) {
-        serialized.push(monster.serialize());
+        // Usa a serialização completa para garantir que todos os atributos importantes, incluindo scale, sejam enviados
+        const monsterData = monster.serialize();
+        
+        // Verifica explicitamente se o monstro tem uma escala definida e a inclui
+        if (monster.scale) {
+          monsterData.scale = { ...monster.scale };
+        }
+        
+        // Registra no console quando um monstro com escala é serializado (para debug)
+        if (monster.scale) {
+          console.log(`[DEBUG] Serializando monstro ${monster.id} (${monster.monsterType}) com escala:`, monster.scale);
+        }
+        
+        serialized.push(monsterData);
       }
     }
     

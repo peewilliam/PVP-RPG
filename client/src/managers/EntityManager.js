@@ -97,29 +97,90 @@ export class EntityManager {
   
   // Cria o jogador local
   createLocalPlayer(position = { x: 0, y: 0.5, z: 0 }) {
-    // Geometria e material para o jogador (temporário: cubo azul para o mago)
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0x0000ff }); // Azul
-    
-    this.localPlayer = new THREE.Mesh(geometry, material);
-    this.scene.add(this.localPlayer);
-    
-    // Posição inicial
-    this.localPlayer.position.set(position.x, position.y, position.z);
-    
-    // Adiciona uma "frente" ao jogador para visualizar melhor a direção
-    const frontGeometry = new THREE.ConeGeometry(0.3, 1.0, 4); // Cone mais longo e mais visível
-    const frontMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); // Verde
+    const body = new THREE.Group();
+  
+    // Cabeça lowpoly (cubo modificado)
+    const headGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+    const headMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xFFCC99, 
+      flatShading: true,
+      shininess: 0
+    });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.set(0, 1.5, 0);
+    body.add(head);
+  
+    // Olhos simplificados
+    const eyeGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.05);
+    const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
+    const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    leftEye.position.set(-0.12, 1.55, 0.25);
+    const rightEye = leftEye.clone();
+    rightEye.position.x = 0.12;
+    body.add(leftEye);
+    body.add(rightEye);
+  
+    // Tronco trapezoidal
+    const torsoGeometry = new THREE.CylinderGeometry(0.4, 0.3, 1.0, 4);
+    const torsoMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x2E5D9E, 
+      flatShading: true
+    });
+    const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+    torso.rotation.z = Math.PI / 2;
+    torso.position.set(0, 0.8, 0);
+    body.add(torso);
+  
+    // Membros angulares
+    const limbGeometry = new THREE.BoxGeometry(0.2, 0.7, 0.2);
+    const limbMaterial = torsoMaterial.clone();
+  
+    // Braços posicionados mais naturalmente
+    const leftArm = new THREE.Mesh(limbGeometry, limbMaterial);
+    leftArm.position.set(-0.35, 1.0, 0);
+    leftArm.rotation.z = 0.3;
+    body.add(leftArm);
+  
+    const rightArm = leftArm.clone();
+    rightArm.position.x = 0.35;
+    rightArm.rotation.z = -0.3;
+    body.add(rightArm);
+  
+    // Pernas mais curtas e largas
+    const legGeometry = new THREE.BoxGeometry(0.25, 0.6, 0.25);
+    const leftLeg = new THREE.Mesh(legGeometry, limbMaterial);
+    leftLeg.position.set(-0.15, 0.1, 0);
+    body.add(leftLeg);
+  
+    const rightLeg = leftLeg.clone();
+    rightLeg.position.x = 0.15;
+    body.add(rightLeg);
+  
+    // Detalhe de ombreira simples
+    const shoulderGeometry = new THREE.BoxGeometry(0.45, 0.15, 0.3);
+    const shoulder = new THREE.Mesh(shoulderGeometry, limbMaterial);
+    shoulder.position.set(0, 1.25, 0);
+    body.add(shoulder);
+  
+    // Indicador de direção mais discreto
+    const frontGeometry = new THREE.ConeGeometry(0.15, 0.4, 3);
+    const frontMaterial = new THREE.MeshPhongMaterial({ color: 0x4CAF50 });
     const front = new THREE.Mesh(frontGeometry, frontMaterial);
-    front.position.set(0, 0, 0.8); // Posiciona mais à frente do cubo
-    front.rotation.x = Math.PI / 2; // Rotaciona para apontar para frente
-    this.localPlayer.add(front); // Adiciona como filho do jogador
-    
-    // Inicializa targetPosition para interpolação
-    this.localPlayer.targetPosition = this.localPlayer.position.clone();
-    
+    front.position.set(0, 1.5, 0.3);
+    front.rotation.x = Math.PI / 2;
+    body.add(front);
+  
+    // Ajustes finais
+    body.position.set(position.x, position.y, position.z);
+    body.scale.set(1.5, 1.5, 1.5); // Personagem mais compacto
+    body.targetPosition = body.position.clone();
+  
+    this.scene.add(body);
+    this.localPlayer = body;
+  
     return this.localPlayer;
   }
+  
   
   // Processa seleção de alvo com clique do mouse
   handleTargetSelection(event, hudManager) {

@@ -37,6 +37,7 @@ export class SpawnSystem {
         maxLevel: spot.level || 1,
         bounds: spot.bounds,
         area: spot.area,
+        scale: spot.scale || null, // Adicionando suporte para escala
       });
     }
   }
@@ -52,6 +53,7 @@ export class SpawnSystem {
    * @param {number} spawnArea.respawnTime - Tempo de respawn em ms
    * @param {number} spawnArea.minLevel - Nível mínimo dos monstros
    * @param {number} spawnArea.maxLevel - Nível máximo dos monstros
+   * @param {Object} spawnArea.scale - Escala do monstro (opcional)
    */
   registerSpawnArea(spawnArea) {
     // Adiciona tempo de respawn padrão se não for especificado
@@ -83,7 +85,8 @@ export class SpawnSystem {
       const monster = this.entityManager.createMonster(
         spawnArea.monsterType,
         position,
-        level
+        level,
+        spawnArea.scale // Passando a escala para o monster
       );
       
       // Adiciona metadata ao monstro para rastreamento
@@ -149,6 +152,7 @@ export class SpawnSystem {
       level: monster.level,
       spawnAreaId: monster.spawnAreaId,
       area: spawnArea.area,
+      scale: monster.scale || spawnArea.scale // Preserva a escala do monstro ou usa a da área
     };
     
     console.log(`Monstro ${monsterId} (${monster.monsterType}) agendado para respawn em ${respawnTime/1000} segundos`);
@@ -157,25 +161,29 @@ export class SpawnSystem {
     this.entityManager.removeMonster(monsterId);
     
     // Agenda o respawn
-    const timerId = setTimeout(() => {
-      // Cria um novo monstro com as mesmas propriedades, mas em uma posição aleatória na área
+    const timer = setTimeout(() => {
+      // Remove da lista de timers
+      this.respawnTimers.delete(monsterId);
+      
+      // console.log(`Respawnando monstro tipo ${spawnInfo.type} em (${spawnInfo.position.x.toFixed(2)}, ${spawnInfo.position.z.toFixed(2)})`);
+      
+      // Cria um novo monstro com os dados salvos
       const newMonster = this.entityManager.createMonster(
         spawnInfo.type,
         spawnInfo.position,
-        spawnInfo.level
+        spawnInfo.level,
+        spawnInfo.scale // Usando a escala preservada
       );
       
-      // Adiciona metadata
+      // Atualiza metadata
       newMonster.spawnAreaId = spawnInfo.spawnAreaId;
       newMonster.area = spawnInfo.area;
       
-      console.log(`Monstro respawnou: ${newMonster.id} (${spawnInfo.type}) em (${spawnInfo.position.x.toFixed(2)}, ${spawnInfo.position.z.toFixed(2)})`);
-      
-      // Remove o timer da lista
-      this.respawnTimers.delete(monsterId);
+      // console.log(`Monstro respawnado: ${newMonster.id} em (${newMonster.position.x.toFixed(2)}, ${newMonster.position.z.toFixed(2)})`);
     }, respawnTime);
     
-    this.respawnTimers.set(monsterId, timerId);
+    // Registra o timer
+    this.respawnTimers.set(monsterId, timer);
   }
   
   /**
@@ -243,7 +251,8 @@ export class SpawnSystem {
             const monster = this.entityManager.createMonster(
               spawnArea.monsterType,
               position,
-              level
+              level,
+              spawnArea.scale // Passando a escala para o monster
             );
             
             // Adiciona metadata ao monstro para rastreamento

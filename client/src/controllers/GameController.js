@@ -48,6 +48,9 @@ export class GameController {
     this.movementPrediction = null;
     this.worldMap = null;
     
+    // Adicione uma propriedade para armazenar o MAP_CONFIG recebido do servidor
+    this.worldConfig = null;
+    
     // Bind dos métodos
     this.onWindowResize = this.onWindowResize.bind(this);
     this.onMouseDown = this.onMouseDown.bind(this);
@@ -130,9 +133,20 @@ export class GameController {
     // Evento de conexão bem-sucedida
     this.networkManager.on('onConnect', () => {
       console.log('Conectado ao servidor!');
-      // Garante que o canal correto está sendo passado para o HUDManager
       this.hudManager.setChannel(this.networkManager.getChannel());
       console.log('[HUD] Canal setado no HUDManager:', this.networkManager.getChannel());
+
+      // Listener do MAP_CONFIG só agora, pois o canal está disponível
+      this.networkManager.getChannel().on('world:mapConfig', (mapConfig) => {
+        console.log('[DEBUG] MAP_CONFIG recebido do servidor:', mapConfig);
+        this.worldConfig = mapConfig;
+        if (this.worldMap) {
+          this._updateWorldMapFromConfig();
+        }
+      });
+
+      // Solicita explicitamente o MAP_CONFIG ao servidor
+      this.networkManager.getChannel().emit('client:requestMapConfig');
     });
     
     // Inicialização do jogador
@@ -708,54 +722,17 @@ export class GameController {
   }
 
   _initWorldMap() {
-    // --- DADOS DO MAPA ---
-    // Áreas/biomas
-    const areas = [];
-    for (const [id, zone] of Object.entries(WORLD.ZONES)) {
-      if (zone.X_MIN !== undefined) {
-        areas.push({
-          id,
-          name: this._getAreaName(id),
-          bounds: { xMin: zone.X_MIN, xMax: zone.X_MAX, zMin: zone.Z_MIN, zMax: zone.Z_MAX },
-          groundColor: this._getAreaColor(id)
-        });
-      }
-    }
-    // Vilas (mock: centro dos bounds das áreas que começam com VILLAGE)
-    const villages = areas.filter(a => a.id.startsWith('VILLAGE')).map(a => ({
-      x: (a.bounds.xMin + a.bounds.xMax) / 2,
-      z: (a.bounds.zMin + a.bounds.zMax) / 2,
-      name: a.name
-    }));
-    // Bosses (mock: spots com id 'boss' ou áreas de boss)
-    const bosses = [];
-    if (WORLD.ZONES.DESERT_PATH && WORLD.ZONES.DESERT_PATH.BOSS) {
-      bosses.push({
-        x: WORLD.ZONES.DESERT_PATH.BOSS.x,
-        z: WORLD.ZONES.DESERT_PATH.BOSS.z,
-        name: 'Boss Final'
-      });
-    }
-    // Grind spots (SPOTS do DESERT_PATH)
-    const spots = (WORLD.ZONES.DESERT_PATH?.SPOTS || []).map(s => ({
-      x: s.x,
-      z: s.z,
-      id: s.id,
-      name: s.id.replace('spot', 'Spot ')
-    }));
-    // Estradas/trilhas (mock: não há no WORLD, mas pode ser expandido depois)
-    const roads = [];
-    // Instancia o WorldMap
+    // Instancia o WorldMap vazio inicialmente
     this.worldMap = new WorldMap({
-      areas,
-      villages,
-      bosses,
-      spots,
-      roads,
+      areas: [],
+      villages: [],
+      bosses: [],
+      spots: [],
+      roads: [],
       playerPosition: { x: 0, z: 0 },
-      onClose: () => { /* opcional: callback ao fechar */ }
+      onClose: () => {}
     });
-    // Atalho da tecla M (respeita chat focado)
+    // Atalho da tecla M
     window.addEventListener('keydown', (e) => {
       if ((e.key === 'm' || e.key === 'M') && !this.inputController.chatFocused) {
         this.worldMap.toggle();
@@ -771,6 +748,60 @@ export class GameController {
         }
       }
     });
+    // Se já recebeu o MAP_CONFIG, popula o mapa
+    if (this.worldConfig) {
+      this._updateWorldMapFromConfig();
+    }
+  }
+
+  // Novo método auxiliar para popular o WorldMap com base no MAP_CONFIG
+  _updateWorldMapFromConfig() {
+    const config = this.worldConfig;
+    if (!config) return;
+    console.log('[DEBUG] Atualizando WorldMap com config:', config);
+    // Áreas/biomas
+    const areas = config.areas.map(a => ({
+      id: a.id,
+      name: a.name,
+      bounds: a.bounds,
+      groundColor: a.groundColor
+    }));
+    console.log('[DEBUG] Áreas:', areas);
+    // Vilas: centro dos bounds das áreas que são vilas
+    const villages = config.areas.filter(a => a.id.startsWith('VILA')).map(a => ({
+      x: (a.bounds.xMin + a.bounds.xMax) / 2,
+      z: (a.bounds.zMin + a.bounds.zMax) / 2,
+      name: a.name
+    }));
+    console.log('[DEBUG] Vilas:', villages);
+    // Bosses: spots de level >= 5
+    const bosses = (config.monsterSpots || []).filter(s => s.level >= 5).map(s => ({
+      x: (s.bounds.xMin + s.bounds.xMax) / 2,
+      z: (s.bounds.zMin + s.bounds.zMax) / 2,
+      name: 'Boss'
+    }));
+    console.log('[DEBUG] Bosses:', bosses);
+    // Grind spots: spots de level < 5
+    const spots = (config.monsterSpots || []).filter(s => s.level < 5).map(s => ({
+      x: (s.bounds.xMin + s.bounds.xMax) / 2,
+      z: (s.bounds.zMin + s.bounds.zMax) / 2,
+      name: s.type
+    }));
+    console.log('[DEBUG] Spots:', spots);
+    // Estradas/trilhas
+    const roads = (config.groundTiles || []).filter(t => t.type === 'road' || t.type === 'trail').map(t => ({
+      from: t.from,
+      to: t.to,
+      color: t.color || '#bfa76a'
+    }));
+    console.log('[DEBUG] Estradas:', roads);
+    // Atualiza o WorldMap
+    this.worldMap.setAreas(areas);
+    this.worldMap.setVillages(villages);
+    this.worldMap.setBosses(bosses);
+    this.worldMap.setSpots(spots);
+    this.worldMap.setRoads(roads);
+    if (this.worldMap.visible) this.worldMap.render();
   }
 
   _getAreaName(id) {

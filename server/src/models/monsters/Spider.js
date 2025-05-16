@@ -25,8 +25,8 @@ import { EVENTS } from '../../../../shared/constants/gameConstants.js';
 import { calculateDamage } from '../../../../shared/progressionSystem.js';
 
 export class Spider extends BaseMonster {
-  constructor(id, position = { x: 0, y: 0, z: 0 }, level = 1) {
-    super(id, 'SPIDER', position, level);
+  constructor(id, position = { x: 0, y: 0, z: 0 }, level = 1, scale = null) {
+    super(id, 'SPIDER', position, level, scale);
     this.lastWebShot = 0;
     this.lastLeap = 0;
     this.webShotCooldown = 3000;

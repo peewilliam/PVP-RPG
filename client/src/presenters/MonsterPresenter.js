@@ -24,25 +24,26 @@ export class MonsterPresenter {
   }
 
   /**
-   * Cria ou atualiza um monstro baseado nos dados recebidos do servidor
-   * @param {Object} monsterData - Dados do monstro vindos do servidor
+   * Atualiza ou cria monstros recebidos do servidor
+   * @param {Object} data - Dados do monstro
    */
-  updateMonster(monsterData) {
-    if (!monsterData || !monsterData.id) {
-      console.error('Dados de monstro inválidos:', monsterData);
+  updateMonster(data) {
+    // Log detalhado para dados de monstros com escala
+    if (data.scale) {
+      console.log(`[CLIENT] Recebendo monstro ${data.id} (${data.monsterType}) com escala:`, data.scale);
+    }
+    
+    // Verifica se o monstro já existe
+    const monster = this.monsters.get(String(data.id));
+    
+    // Se não existir ou se o tipo mudou, cria um novo
+    if (!monster || (data.monsterType && monster.userData.monsterType !== data.monsterType)) {
+      this.createMonster(data.id, data);
       return;
     }
-
-    const monsterId = monsterData.id;
-
-
-    // Se o monstro já existe, apenas atualiza sua posição e rotação
-    if (this.monsters.has(monsterId)) {
-      this.updateExistingMonster(monsterId, monsterData);
-    } else {
-      // Caso contrário, cria uma nova representação visual
-      this.createMonster(monsterId, monsterData);
-    }
+    
+    // Atualiza monstro existente
+    this.updateExistingMonster(data.id, data);
   }
 
   /**
@@ -86,6 +87,16 @@ export class MonsterPresenter {
       Number(position.y) || 0.5, // Um pouco acima do chão
       Number(position.z) || 0
     );
+    // Aplica escala se fornecida
+    if (data.scale && typeof data.scale === 'object') {
+      monster.scale.set(
+        Number(data.scale.x) || 1,
+        Number(data.scale.y) || 1,
+        Number(data.scale.z) || 1
+      );
+    } else {
+      monster.scale.set(1, 1, 1);
+    }
     // Armazena metadados junto com a mesh
     monster.userData = {
       id: id,
@@ -94,7 +105,8 @@ export class MonsterPresenter {
       stats: data.stats || {},
       level: data.level || 1,
       created: Date.now(),
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
+      scale: data.scale || null // Armazena a escala nos metadados para uso futuro
     };
     // Armazena referência ao objeto
     this.monsters.set(id, monster);
@@ -155,6 +167,15 @@ export class MonsterPresenter {
     // Atualiza rotação se fornecida
     if (data.rotation !== undefined) {
       monster.rotation.y = Number(data.rotation) || monster.rotation.y;
+    }
+    // Atualiza escala se fornecida
+    if (data.scale && typeof data.scale === 'object') {
+      monster.scale.set(
+        Number(data.scale.x) || 1,
+        Number(data.scale.y) || 1,
+        Number(data.scale.z) || 1
+      );
+      monster.userData.scale = data.scale; // Atualiza a escala nos metadados
     }
     // Atualiza stats
     if (data.stats) {
