@@ -123,7 +123,7 @@ export class SceneManager {
   
   // Cria o plano do chão
   createGround() {
-    // Shader procedural de areia
+    // Shader procedural de areia com suporte para estradas
     const sandShader = {
       uniforms: {
         uColor1: { value: new THREE.Color(0xE2C290) }, // areia clara
@@ -131,12 +131,19 @@ export class SceneManager {
         uDuneScale: { value: 18.0 },
         uDuneStrength: { value: 0.12 },
         uWindStrength: { value: 0.08 },
-        uTime: { value: 0.0 }
+        uTime: { value: 0.0 },
+        // Novos uniforms para renderizar estradas e trilhas
+        uRoadColors: { value: Array(10).fill().map(() => new THREE.Vector3(1.0, 0.88, 0.51)) }, // Cores das estradas (RGB)
+        uRoadsData: { value: Array(30).fill().map(() => new THREE.Vector4(0, 0, 0, 0)) }, // array de dados para estradas: [x1, z1, x2, z2]
+        uRoadsCount: { value: 0 } // quantidade de estradas
       },
       vertexShader: `
         varying vec2 vUv;
+        varying vec3 vWorldPosition;
+        
         void main() {
           vUv = uv;
+          vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
@@ -147,18 +154,81 @@ export class SceneManager {
         uniform float uDuneStrength;
         uniform float uWindStrength;
         uniform float uTime;
+        
+        // Novos uniforms para estradas
+        uniform vec3 uRoadColors[10]; // Cores individuais para cada estrada (RGB)
+        uniform vec4 uRoadsData[30]; // Array para armazenar dados de até 10 estradas (cada estrada usa 2 slots)
+        uniform int uRoadsCount; // Número de estradas (máximo 10)
+        
         varying vec2 vUv;
+        varying vec3 vWorldPosition;
+        
         float rand(vec2 co) {
           return fract(sin(dot(co.xy, vec2(12.9898,78.233))) * 43758.5453);
         }
+        
+        // Função para verificar se um ponto está perto de uma linha (estrada)
+        float distanceToLine(vec2 p, vec2 a, vec2 b, float width) {
+          vec2 pa = p - a;
+          vec2 ba = b - a;
+          float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+          vec2 closest = a + t * ba;
+          return length(p - closest) / width;
+        }
+        
         void main() {
+          // Calcular cor do terreno base
           float dunes = sin(vUv.x * uDuneScale + uTime * 0.05) * sin(vUv.y * uDuneScale * 0.7 + uTime * 0.03);
           dunes *= uDuneStrength;
           float wind = sin((vUv.x + vUv.y) * 40.0 + uTime * 0.2) * uWindStrength;
           float noise = rand(vUv * 100.0);
           float sand = dunes + wind + noise * 0.04;
-          vec3 color = mix(uColor1, uColor2, vUv.y + sand);
-          gl_FragColor = vec4(color, 1.0);
+          vec3 terrainColor = mix(uColor1, uColor2, vUv.y + sand);
+          
+          // Verificar todas as estradas definidas
+          vec3 finalColor = terrainColor;
+          float closestRoad = 999.0;
+          int closestRoadIndex = -1;
+          
+          for (int i = 0; i < 10; i++) { // Ajustado para o máximo de 10 estradas
+            if (i >= uRoadsCount) break;
+            
+            // Dados da linha da estrada
+            vec2 roadStart = vec2(uRoadsData[i].x, uRoadsData[i].y);
+            vec2 roadEnd = vec2(uRoadsData[i].z, uRoadsData[i].w);
+            
+            // Dados adicionais (largura e tipo)
+            float width = uRoadsData[i+10].x; // Largura da estrada (offset +10)
+            float isTrail = uRoadsData[i+10].y; // Se é trilha (offset +10)
+            
+            float dist = distanceToLine(vec2(vWorldPosition.x, vWorldPosition.z), roadStart, roadEnd, 1.0);
+            
+            // Se estiver perto da estrada e for a mais próxima até agora
+            if (dist < width && dist < closestRoad) {
+              closestRoad = dist;
+              closestRoadIndex = i;
+            }
+          }
+          
+          // Se encontramos uma estrada
+          if (closestRoadIndex >= 0) {
+            // Dados da estrada mais próxima
+            float width = uRoadsData[closestRoadIndex+10].x; 
+            
+            // Cor da estrada com borda suave
+            float edgeFactor = smoothstep(0.0, 1.0, closestRoad / width);
+            
+            // Usa a cor específica desta estrada
+            vec3 roadColor = uRoadColors[closestRoadIndex];
+            
+            // Adicionar um pouco de ruído para não ficar perfeito demais
+            float roadNoise = rand(vec2(vWorldPosition.x * 0.5, vWorldPosition.z * 0.5)) * 0.1;
+            
+            // Misturar com a cor do terreno nas bordas
+            finalColor = mix(roadColor * (0.9 + roadNoise), terrainColor, edgeFactor);
+          }
+          
+          gl_FragColor = vec4(finalColor, 1.0);
         }
       `
     };
@@ -173,10 +243,15 @@ export class SceneManager {
     this.plane.rotation.x = Math.PI / 2;
     this.plane.receiveShadow = true;
     this.scene.add(this.plane);
+    
+    // Guardar referência ao material para atualizações
+    this.groundMaterial = sandMaterial;
+    
     // Atualização do tempo para animação do shader
     this._sandUpdate = (dt) => {
       sandMaterial.uniforms.uTime.value += dt;
     };
+    
     return this.plane;
   }
   
@@ -610,6 +685,83 @@ export class SceneManager {
     this.createGround();
     this.createWorldBoundaries();
     this.setupLighting();
+  }
+  
+  // Converter string de cor hex (#RRGGBB) para vetor RGB (0-1)
+  hexToRgb(hex) {
+    // Remove o # se houver
+    hex = hex.replace('#', '');
+    
+    // Converte para valores RGB
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    
+    return new THREE.Vector3(r, g, b);
+  }
+  
+  // Novo método para atualizar as estradas no shader
+  updateGroundTiles(groundTiles) {
+    if (!this.groundMaterial || !groundTiles || !groundTiles.length) return;
+    
+    // Filtramos apenas os 10 primeiros elementos devido à limitação do shader (máximo 10 estradas)
+    const maxRoads = Math.min(10, groundTiles.length);
+    
+    // Array para armazenar os dados das estradas
+    const roadsData = [];
+    const roadColors = [];
+    
+    console.log('[DEBUG] Atualizando chão com groundTiles:', groundTiles.slice(0, maxRoads));
+    
+    // Pré-inicializa o array com Vector4 vazios
+    for (let i = 0; i < 30; i++) {
+      roadsData.push(new THREE.Vector4(0, 0, 0, 0));
+    }
+    
+    // Pré-inicializa cores com padrão
+    for (let i = 0; i < 10; i++) {
+      // Padrão: estrada (#FFE082) e trilha (#BFA76A)
+      roadColors.push(this.hexToRgb('#FFE082'));
+    }
+    
+    // Preenche os dados das estradas (posições)
+    for (let i = 0; i < maxRoads; i++) {
+      const road = groundTiles[i];
+      if (road && road.from && road.to) {
+        // Dados da estrada: posição inicial e final
+        roadsData[i].set(
+          road.from.x, 
+          road.from.z,
+          road.to.x,
+          road.to.z
+        );
+        
+        // Dados extras: largura e tipo (armazenados em posições offset)
+        // Estes são armazenados 10 posições depois para manter o layout claro
+        roadsData[i + 10].set(
+          road.type === 'road' ? 3.0 : 1.5, // Estradas são mais largas que trilhas
+          road.type === 'trail' ? 1.0 : 0.0, // Trilha = 1, Estrada = 0
+          0,
+          0
+        );
+        
+        // Definir a cor INDIVIDUAL para cada estrada/trilha
+        if (road.color) {
+          // Converte a cor hex para vetor RGB
+          roadColors[i] = this.hexToRgb(road.color);
+        } else {
+          // Usa cor padrão com base no tipo
+          roadColors[i] = this.hexToRgb(road.type === 'road' ? '#FFE082' : '#BFA76A');
+        }
+      }
+    }
+    
+    // Atualizamos os uniforms com os arrays
+    this.groundMaterial.uniforms.uRoadsData.value = roadsData;
+    this.groundMaterial.uniforms.uRoadColors.value = roadColors;
+    this.groundMaterial.uniforms.uRoadsCount.value = maxRoads;
+    
+    console.log(`[DEBUG] Shader atualizado com ${maxRoads} estradas/trilhas`);
   }
 }
 

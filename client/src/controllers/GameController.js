@@ -140,12 +140,15 @@ export class GameController {
       this.networkManager.getChannel().on('world:mapConfig', (mapConfig) => {
         console.log('[DEBUG] MAP_CONFIG recebido do servidor:', mapConfig);
         this.worldConfig = mapConfig;
+        
+        // Atualizamos imediatamente o mapa
         if (this.worldMap) {
           this._updateWorldMapFromConfig();
         }
       });
 
       // Solicita explicitamente o MAP_CONFIG ao servidor
+      console.log('[DEBUG] Solicitando MAP_CONFIG ao servidor');
       this.networkManager.getChannel().emit('client:requestMapConfig');
     });
     
@@ -792,9 +795,16 @@ export class GameController {
     const roads = (config.groundTiles || []).filter(t => t.type === 'road' || t.type === 'trail').map(t => ({
       from: t.from,
       to: t.to,
-      color: t.color || '#bfa76a'
+      color: t.color || '#bfa76a',
+      type: t.type
     }));
     console.log('[DEBUG] Estradas:', roads);
+    
+    // Atualiza o terreno 3D com as estradas e trilhas
+    if (this.sceneManager && roads.length > 0) {
+      this.sceneManager.updateGroundTiles(roads);
+    }
+    
     // Atualiza o WorldMap
     this.worldMap.setAreas(areas);
     this.worldMap.setVillages(villages);
