@@ -5,6 +5,10 @@ import { createBush } from '../world/assets/Bush.js';
 import { createBone } from '../world/assets/Bone.js';
 import { createRuin } from '../world/assets/Ruin.js';
 import { createCactus } from '../world/assets/Cactus.js';
+import { createTrunk } from '../world/assets/Trunk.js';
+import { createFlower } from '../world/assets/Flower.js';
+import { createMushroom } from '../world/assets/Mushroom.js';
+import { createWaterPuddle } from '../world/assets/WaterPuddle.js';
 import { GroundLabelManager } from './GroundLabelManager.js';
 
 /**
@@ -523,6 +527,14 @@ export class WorldObjectPresenter {
         obj = createRuin(); break;
       case 'CACTUS':
         obj = createCactus(); break;
+      case 'TRUNK':
+        obj = createTrunk(); break;
+      case 'FLOWER':
+        obj = createFlower(); break;
+      case 'MUSHROOM':
+        obj = createMushroom(); break;
+      case 'WATER_PUDDLE':
+        obj = createWaterPuddle(); break;
       default:
         obj = createPrimitiveObject(type); break;
     }
@@ -724,6 +736,14 @@ function createPrimitiveObject(objectType) {
       return createRuin();
     case 'CACTUS':
       return createCactus();
+    case 'TRUNK':
+      return createTrunk();
+    case 'FLOWER':
+      return createFlower();
+    case 'MUSHROOM':
+      return createMushroom();
+    case 'WATER_PUDDLE':
+      return createWaterPuddle();
     default:
       let geometry, material;
       let worldObject;

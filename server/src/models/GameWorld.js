@@ -4,6 +4,7 @@ import { SpawnSystem } from '../systems/SpawnSystem.js';
 import { CollisionSystem } from '../systems/CollisionSystem.js';
 import { CombatSystem } from '../systems/CombatSystem.js';
 import { WORLD } from '../../../shared/constants/gameConstants.js';
+import { MAP_CONFIG } from '../mapConfig.js';
 
 /**
  * Classe principal que coordena todos os sistemas do jogo
@@ -72,30 +73,39 @@ export class GameWorld {
   }
   
   /**
-   * Adiciona um novo jogador ao mundo
+   * Adiciona um novo jogador ao mundo usando playerSpawns do MAP_CONFIG
    * @param {Object} channel - Canal de comunicação geckos.io
    * @returns {Player} - Jogador criado
    */
   addPlayer(channel) {
-    // Se o mapa ativo for DESERT_PATH, spawnar o player sempre em { x: 0, y: 0, z: -95 } (início do caminho)
-    const isDesertPath = !!WORLD.ZONES.DESERT_PATH;
-    let position;
-    if (isDesertPath) {
-      // Ponto inicial do caminho desértico
-      position = { x: 0, y: 0, z: -95 };
-    } else {
-      // Posição inicial aleatória dentro da zona de spawn padrão
-      const spawnZone = WORLD.ZONES.SPAWN;
-      position = {
-        x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
-        y: 0,
-        z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
-      };
+    // Seleciona um spawn aleatório dentre os definidos
+    const spawns = MAP_CONFIG.playerSpawns;
+    if (!spawns || spawns.length === 0) {
+      throw new Error('Nenhum ponto de spawn de jogador definido em MAP_CONFIG.playerSpawns');
     }
+    // Sorteia um dos spawns
+    const spawn = spawns[Math.floor(Math.random() * spawns.length)];
+    // Busca área correspondente
+    const area = MAP_CONFIG.areas.find(a => a.id === spawn.area);
+    if (!area) {
+      throw new Error(`Área de spawn '${spawn.area}' não encontrada em MAP_CONFIG.areas`);
+    }
+    // Sorteia posição dentro do range da área
+    const range = spawn.range || 5;
+    const x = this.getRandomInRange(area.bounds.xMin + range, area.bounds.xMax - range);
+    const z = this.getRandomInRange(area.bounds.zMin + range, area.bounds.zMax - range);
+    const position = { x, y: 0, z };
     // Cria o jogador
     const player = this.entityManager.createPlayer(channel, position);
     console.log(`[SPAWN] Jogador ${player.id} adicionado em (${position.x.toFixed(2)}, ${position.z.toFixed(2)})`);
     return player;
+  }
+  
+  /**
+   * Gera um número aleatório dentro de um intervalo
+   */
+  getRandomInRange(min, max) {
+    return min + Math.random() * (max - min);
   }
   
   /**

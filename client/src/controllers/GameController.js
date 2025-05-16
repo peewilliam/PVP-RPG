@@ -10,6 +10,8 @@ import { NetworkManager } from '../services/NetworkManager.js';
 import { MovementPrediction } from '../systems/MovementPrediction.js';
 import { SkillManager } from '../skills/SkillManager.js';
 import { HUDManager } from '../ui/HUDManager.js';
+import { WORLD } from '../../../shared/constants/gameConstants.js';
+import WorldMap from '../ui/WorldMap.js';
 
 // Importa as funções de habilidades diretamente dos seus arquivos
 import { spawnFireballEffect } from '../skills/FireballSkill.js';
@@ -44,6 +46,7 @@ export class GameController {
     this.hudManager = null;
     this.skillManager = null;
     this.movementPrediction = null;
+    this.worldMap = null;
     
     // Bind dos métodos
     this.onWindowResize = this.onWindowResize.bind(this);
@@ -101,6 +104,9 @@ export class GameController {
     // --- Configuração de callbacks e eventos ---
     this.setupNetworkCallbacks();
     this.setupInputCallbacks();
+    
+    // --- INTEGRAÇÃO DO MINIMAPA/MAPA-MÚNDI ---
+    this._initWorldMap();
     
     return this;
   }
@@ -699,5 +705,108 @@ export class GameController {
     if (this.networkManager && this.playerId) {
       this.networkManager.requestServerSync();
     }
+  }
+
+  _initWorldMap() {
+    // --- DADOS DO MAPA ---
+    // Áreas/biomas
+    const areas = [];
+    for (const [id, zone] of Object.entries(WORLD.ZONES)) {
+      if (zone.X_MIN !== undefined) {
+        areas.push({
+          id,
+          name: this._getAreaName(id),
+          bounds: { xMin: zone.X_MIN, xMax: zone.X_MAX, zMin: zone.Z_MIN, zMax: zone.Z_MAX },
+          groundColor: this._getAreaColor(id)
+        });
+      }
+    }
+    // Vilas (mock: centro dos bounds das áreas que começam com VILLAGE)
+    const villages = areas.filter(a => a.id.startsWith('VILLAGE')).map(a => ({
+      x: (a.bounds.xMin + a.bounds.xMax) / 2,
+      z: (a.bounds.zMin + a.bounds.zMax) / 2,
+      name: a.name
+    }));
+    // Bosses (mock: spots com id 'boss' ou áreas de boss)
+    const bosses = [];
+    if (WORLD.ZONES.DESERT_PATH && WORLD.ZONES.DESERT_PATH.BOSS) {
+      bosses.push({
+        x: WORLD.ZONES.DESERT_PATH.BOSS.x,
+        z: WORLD.ZONES.DESERT_PATH.BOSS.z,
+        name: 'Boss Final'
+      });
+    }
+    // Grind spots (SPOTS do DESERT_PATH)
+    const spots = (WORLD.ZONES.DESERT_PATH?.SPOTS || []).map(s => ({
+      x: s.x,
+      z: s.z,
+      id: s.id,
+      name: s.id.replace('spot', 'Spot ')
+    }));
+    // Estradas/trilhas (mock: não há no WORLD, mas pode ser expandido depois)
+    const roads = [];
+    // Instancia o WorldMap
+    this.worldMap = new WorldMap({
+      areas,
+      villages,
+      bosses,
+      spots,
+      roads,
+      playerPosition: { x: 0, z: 0 },
+      onClose: () => { /* opcional: callback ao fechar */ }
+    });
+    // Atalho da tecla M (respeita chat focado)
+    window.addEventListener('keydown', (e) => {
+      if ((e.key === 'm' || e.key === 'M') && !this.inputController.chatFocused) {
+        this.worldMap.toggle();
+        if (this.worldMap.visible) this.worldMap.render();
+      }
+    });
+    // Atualiza posição do player no mapa a cada frame
+    this.renderManager.addUpdateSystem({
+      update: () => {
+        const player = this.entityManager.localPlayer;
+        if (player) {
+          this.worldMap.setPlayerPosition({ x: player.position.x, z: player.position.z });
+        }
+      }
+    });
+  }
+
+  _getAreaName(id) {
+    // Nomes PT-BR para áreas conhecidas
+    const nomes = {
+      SPAWN: 'Spawn',
+      FOREST_NORTH: 'Floresta Norte',
+      FOREST_WEST: 'Floresta Oeste',
+      MOUNTAINS: 'Montanhas',
+      PLAINS: 'Planícies',
+      SWAMP: 'Pântano',
+      RUINS: 'Ruínas',
+      DESERT_PATH: 'Caminho do Deserto',
+      VILLAGE_NW: 'Vila dos Lenhadores',
+      VILLAGE_NE: 'Vila Mineira',
+      VILLAGE_SW: 'Vila Abandonada',
+      VILLAGE_SE: 'Oásis do Sul'
+    };
+    return nomes[id] || id;
+  }
+  _getAreaColor(id) {
+    // Cores distintas para biomas
+    const cores = {
+      SPAWN: '#e2c290',
+      FOREST_NORTH: '#b6e2a1',
+      FOREST_WEST: '#a1d99b',
+      MOUNTAINS: '#bfc9c9',
+      PLAINS: '#e2e2a1',
+      SWAMP: '#7a8c6e',
+      RUINS: '#bdbdbd',
+      DESERT_PATH: '#e2d6b8',
+      VILLAGE_NW: '#e2c290',
+      VILLAGE_NE: '#e2c290',
+      VILLAGE_SW: '#e2c290',
+      VILLAGE_SE: '#e2c290'
+    };
+    return cores[id] || '#fff';
   }
 } 

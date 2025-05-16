@@ -5,10 +5,10 @@ import * as THREE from 'three';
 export class CameraController {
   constructor() {
     // Parâmetros da câmera
-    this.cameraSize = 15;
-    this.cameraDistance = 28;
+    this.cameraSize = 13;
+    this.cameraDistance = 24;
     this.cameraHeightAngle = Math.PI / 4.7; // ~38°
-    this.cameraLerpSpeed = 0.15; // Suavidade da interpolação
+    this.cameraLerpSpeed = 0.13; // Suavidade da interpolação
     
     // Referências
     this.camera = null;

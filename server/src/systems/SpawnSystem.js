@@ -1,6 +1,8 @@
 /**
  * Sistema de spawn que gerencia a criação e respawn de entidades no mundo
  */
+import { MAP_CONFIG } from '../mapConfig.js';
+
 export class SpawnSystem {
   /**
    * @param {EntityManager} entityManager - Gerenciador de entidades
@@ -14,6 +16,29 @@ export class SpawnSystem {
     
     // Tempos de respawn em ms
     this.defaultRespawnTime = 30000; // 30 segundos
+  }
+  
+  /**
+   * Inicializa áreas de spawn a partir do MAP_CONFIG.monsterSpots
+   */
+  initializeDefaultSpawnAreas() {
+    // Limpa áreas anteriores
+    this.spawnAreas = [];
+    // Cria áreas de spawn conforme configuração
+    for (const spot of MAP_CONFIG.monsterSpots) {
+      this.registerSpawnArea({
+        id: `${spot.area}-${spot.type}-${Math.random().toString(36).substr(2, 5)}`,
+        monsterType: spot.type,
+        position: this.getRandomPositionInBounds(spot.bounds),
+        radius: this.getRadiusFromBounds(spot.bounds),
+        maxMonsters: spot.count,
+        respawnTime: (spot.respawnTime || 30) * 1000, // segundos para ms
+        minLevel: spot.level || 1,
+        maxLevel: spot.level || 1,
+        bounds: spot.bounds,
+        area: spot.area,
+      });
+    }
   }
   
   /**
@@ -49,10 +74,7 @@ export class SpawnSystem {
     
     for (let i = 0; i < spawnArea.maxMonsters; i++) {
       // Gera uma posição aleatória dentro da área
-      const position = this.getRandomPositionInCircle(
-        spawnArea.position,
-        spawnArea.radius
-      );
+      const position = this.getRandomPositionInBounds(spawnArea.bounds);
       
       // Gera um nível aleatório
       const level = this.getRandomInt(spawnArea.minLevel, spawnArea.maxLevel);
@@ -66,6 +88,7 @@ export class SpawnSystem {
       
       // Adiciona metadata ao monstro para rastreamento
       monster.spawnAreaId = spawnArea.id;
+      monster.area = spawnArea.area;
       
       // console.log(`Monstro inicial criado: ${monster.id} (${spawnArea.monsterType}) em (${position.x}, ${position.z})`);
     }
@@ -117,14 +140,15 @@ export class SpawnSystem {
     const respawnTime = delayMs || spawnArea.respawnTime || this.defaultRespawnTime;
     
     // Gera uma nova posição aleatória dentro da área de spawn
-    const newPosition = this.getRandomPositionInCircle(spawnArea.position, spawnArea.radius);
+    const newPosition = this.getRandomPositionInBounds(spawnArea.bounds);
     
     // Salva as informações relevantes para o respawn
     const spawnInfo = {
       type: monster.monsterType,
       position: newPosition,
       level: monster.level,
-      spawnAreaId: monster.spawnAreaId
+      spawnAreaId: monster.spawnAreaId,
+      area: spawnArea.area,
     };
     
     console.log(`Monstro ${monsterId} (${monster.monsterType}) agendado para respawn em ${respawnTime/1000} segundos`);
@@ -143,6 +167,7 @@ export class SpawnSystem {
       
       // Adiciona metadata
       newMonster.spawnAreaId = spawnInfo.spawnAreaId;
+      newMonster.area = spawnInfo.area;
       
       console.log(`Monstro respawnou: ${newMonster.id} (${spawnInfo.type}) em (${spawnInfo.position.x.toFixed(2)}, ${spawnInfo.position.z.toFixed(2)})`);
       
@@ -154,24 +179,23 @@ export class SpawnSystem {
   }
   
   /**
-   * Gera uma posição aleatória dentro de um círculo
-   * @param {Object} center - Posição central {x, y, z}
-   * @param {number} radius - Raio do círculo
-   * @returns {Object} - Posição aleatória {x, y, z}
+   * Gera uma posição aleatória dentro dos bounds
    */
-  getRandomPositionInCircle(center, radius) {
-    // Ângulo aleatório
-    const angle = Math.random() * Math.PI * 2;
-    
-    // Distância aleatória (raiz quadrada para distribuição uniforme)
-    const distance = Math.sqrt(Math.random()) * radius;
-    
-    // Calcula posição
+  getRandomPositionInBounds(bounds) {
     return {
-      x: center.x + Math.cos(angle) * distance,
-      y: center.y,
-      z: center.z + Math.sin(angle) * distance
+      x: bounds.xMin + Math.random() * (bounds.xMax - bounds.xMin),
+      y: 0,
+      z: bounds.zMin + Math.random() * (bounds.zMax - bounds.zMin),
     };
+  }
+  
+  /**
+   * Calcula um "raio" aproximado para a área de spawn (usado para compatibilidade)
+   */
+  getRadiusFromBounds(bounds) {
+    const dx = bounds.xMax - bounds.xMin;
+    const dz = bounds.zMax - bounds.zMin;
+    return Math.max(dx, dz) / 2;
   }
   
   /**
@@ -184,174 +208,6 @@ export class SpawnSystem {
     min = Math.ceil(min);
     max = Math.floor(max);
     return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
-  
-  /**
-   * Inicializa áreas de spawn padrão para o mundo
-   */
-  initializeDefaultSpawnAreas() {
-    // Se for o mapa desértico, usar spots e boss do novo layout
-    const desert = (typeof WORLD !== 'undefined' && WORLD.ZONES && WORLD.ZONES.DESERT_PATH) ? WORLD.ZONES.DESERT_PATH : null;
-    if (desert) {
-      // Spots de combate
-      for (const spot of desert.SPOTS) {
-        this.registerSpawnArea({
-          id: `desert-spot-${spot.id}`,
-          monsterType: 'BLACK_MIST_ZOMBIE', // Pode variar depois
-          position: { x: spot.x, y: 0, z: spot.z },
-          radius: 6,
-          maxMonsters: 4,
-          respawnTime: 20000,
-          minLevel: 1,
-          maxLevel: 3
-        });
-      }
-      // Boss
-      const boss = desert.BOSS;
-      this.registerSpawnArea({
-        id: 'desert-boss',
-        monsterType: 'SPIDER', // Exemplo de boss
-        position: { x: boss.x, y: 0, z: boss.z },
-        radius: boss.radius,
-        maxMonsters: 1,
-        respawnTime: 60000, // 1 minuto para respawn do boss
-        minLevel: 5,
-        maxLevel: 7
-      });
-      return;
-    }
-    // Área 1: Zumbis da Névoa Negra perto do spawn (pequeno grupo)
-    this.registerSpawnArea({
-      id: 'spawn-blackmistzombies',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: 10, y: 0, z: 10 },
-      radius: 5,
-      maxMonsters: 3, // Reduzido para não sobrecarregar a área inicial
-      respawnTime: 20000, // 20 segundos para respawn
-      minLevel: 1,
-      maxLevel: 1
-    });
-    
-    // Área 2: Floresta Norte (grupo médio de zumbis)
-    this.registerSpawnArea({
-      id: 'forest-north-blackmistzombies-1',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: -40, y: 0, z: -60 },
-      radius: 15,
-      maxMonsters: 8,
-      respawnTime: 15000, // 15 segundos para respawn
-      minLevel: 1,
-      maxLevel: 2
-    });
-    
-    // Área 3: Floresta Norte (segundo grupo)
-    this.registerSpawnArea({
-      id: 'forest-north-blackmistzombies-2',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: 30, y: 0, z: -70 },
-      radius: 12,
-      maxMonsters: 6,
-      respawnTime: 15000,
-      minLevel: 2,
-      maxLevel: 3
-    });
-    
-    // Área 4: Floresta Oeste (grupo denso)
-    this.registerSpawnArea({
-      id: 'forest-west-blackmistzombies',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: -70, y: 0, z: 0 },
-      radius: 20,
-      maxMonsters: 10,
-      respawnTime: 25000, // 25 segundos
-      minLevel: 2,
-      maxLevel: 3
-    });
-    
-    // Área 5: Montanhas (zumbis mais fortes)
-    this.registerSpawnArea({
-      id: 'mountain-blackmistzombies',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: 80, y: 0, z: 20 },
-      radius: 25,
-      maxMonsters: 12,
-      respawnTime: 30000, // 30 segundos
-      minLevel: 3,
-      maxLevel: 4
-    });
-    
-    // Área 6: Planícies (grupo pequeno espalhado)
-    this.registerSpawnArea({
-      id: 'plains-blackmistzombies',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: 0, y: 0, z: 70 },
-      radius: 30, // Mais espalhados
-      maxMonsters: 7,
-      respawnTime: 20000,
-      minLevel: 2,
-      maxLevel: 3
-    });
-    
-    // Área 7: Pântano (grupo médio)
-    this.registerSpawnArea({
-      id: 'swamp-blackmistzombies',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: 60, y: 0, z: 85 },
-      radius: 15,
-      maxMonsters: 8,
-      respawnTime: 25000,
-      minLevel: 3,
-      maxLevel: 4
-    });
-    
-    // Área 8: Ruínas (zumbis mais fortes)
-    this.registerSpawnArea({
-      id: 'ruins-blackmistzombies',
-      monsterType: 'BLACK_MIST_ZOMBIE',
-      position: { x: 70, y: 0, z: -70 },
-      radius: 18,
-      maxMonsters: 10,
-      respawnTime: 30000,
-      minLevel: 4,
-      maxLevel: 5
-    });
-    
-    // Áreas de spawn para aranhas (SPIDER)
-    // Área 1: Aranhas na Floresta Oeste (pequena área)
-    this.registerSpawnArea({
-      id: 'forest-west-spiders',
-      monsterType: 'SPIDER',
-      position: { x: -60, y: 0, z: 20 },
-      radius: 10,
-      maxMonsters: 4,
-      respawnTime: 18000, // 18 segundos
-      minLevel: 1,
-      maxLevel: 2
-    });
-    
-    // Área 2: Aranhas no Pântano (área média)
-    this.registerSpawnArea({
-      id: 'swamp-spiders',
-      monsterType: 'SPIDER',
-      position: { x: 60, y: 0, z: 80 },
-      radius: 15,
-      maxMonsters: 7,
-      respawnTime: 22000, // 22 segundos
-      minLevel: 2,
-      maxLevel: 3
-    });
-    
-    // Área 3: Aranhas nas Ruínas (área grande com aranhas mais fortes)
-    this.registerSpawnArea({
-      id: 'ruins-spiders',
-      monsterType: 'SPIDER',
-      position: { x: 70, y: 0, z: -70 },
-      radius: 18,
-      maxMonsters: 9,
-      respawnTime: 25000, // 25 segundos
-      minLevel: 3,
-      maxLevel: 4
-    });
   }
   
   /**
@@ -378,10 +234,7 @@ export class SpawnSystem {
           
           for (let i = 0; i < monstersToCreate; i++) {
             // Gera uma posição aleatória dentro da área
-            const position = this.getRandomPositionInCircle(
-              spawnArea.position,
-              spawnArea.radius
-            );
+            const position = this.getRandomPositionInBounds(spawnArea.bounds);
             
             // Gera um nível aleatório
             const level = this.getRandomInt(spawnArea.minLevel, spawnArea.maxLevel);
@@ -395,6 +248,7 @@ export class SpawnSystem {
             
             // Adiciona metadata ao monstro para rastreamento
             monster.spawnAreaId = spawnArea.id;
+            monster.area = spawnArea.area;
             
             // console.log(`Monstro adicional criado: ${monster.id} (${spawnArea.monsterType}) em (${position.x.toFixed(2)}, ${position.z.toFixed(2)})`);
           }

@@ -170,6 +170,66 @@ export const WORLD_OBJECTS = {
     IS_COLLIDABLE: true,
     COLLISION_RADIUS: 0.6
   },
+  TRUNK: {
+    ID: 7,
+    NAME: 'Tronco',
+    IS_COLLIDABLE: true,
+    COLLISION_RADIUS: 0.7
+  },
+  FLOWER: {
+    ID: 8,
+    NAME: 'Flor',
+    IS_COLLIDABLE: false,
+    COLLISION_RADIUS: 0.2
+  },
+  MUSHROOM: {
+    ID: 9,
+    NAME: 'Cogumelo',
+    IS_COLLIDABLE: false,
+    COLLISION_RADIUS: 0.2
+  },
+  WATER_PUDDLE: {
+    ID: 10,
+    NAME: 'Poça d\'Água',
+    IS_COLLIDABLE: false,
+    COLLISION_RADIUS: 0.4
+  },
+  DEAD_TREE: {
+    ID: 11,
+    NAME: 'Árvore Morta',
+    IS_COLLIDABLE: true,
+    COLLISION_RADIUS: 0.8
+  },
+  BONE: {
+    ID: 12,
+    NAME: 'Ossada',
+    IS_COLLIDABLE: false,
+    COLLISION_RADIUS: 0.3
+  },
+  RUIN: {
+    ID: 13,
+    NAME: 'Ruína',
+    IS_COLLIDABLE: true,
+    COLLISION_RADIUS: 1.0
+  },
+  BOSS_PLACEHOLDER: {
+    ID: 14,
+    NAME: 'Boss Placeholder',
+    IS_COLLIDABLE: true,
+    COLLISION_RADIUS: 2.0
+  },
+  WALL: {
+    ID: 15,
+    NAME: 'Parede',
+    IS_COLLIDABLE: true,
+    COLLISION_RADIUS: 1.0
+  },
+  NPC_PLACEHOLDER: {
+    ID: 16,
+    NAME: 'NPC Placeholder',
+    IS_COLLIDABLE: false,
+    COLLISION_RADIUS: 0.7
+  }
 };
 
 // Configurações do mundo
@@ -178,7 +238,7 @@ export const WORLD = {
   SIZE: {
     WIDTH: 200,    // Largura do mundo (eixo X) - Aumentado de 100 para 200
     HEIGHT: 200,   // Altura do mundo (eixo Z) - Aumentado de 100 para 200
-    VISIBLE_RANGE: 40  // Distância máxima para sincronização de entidades com o cliente - Aumentado de 30 para 40
+    VISIBLE_RANGE: 30  // Distância máxima para sincronização de entidades com o cliente - Aumentado de 30 para 40
   },
   // Zonas do mundo
   ZONES: {
@@ -313,8 +373,17 @@ export const WORLD_OBJECT_TYPE_INDEX = {
   BUSH: 2,
   HOUSE: 3,
   FENCE: 4,
-  CACTUS: 5
-  // Adicione outros tipos conforme necessário
+  CACTUS: 5,
+  TRUNK: 6,
+  FLOWER: 7,
+  MUSHROOM: 8,
+  WATER_PUDDLE: 9,
+  DEAD_TREE: 10,
+  BONE: 11,
+  RUIN: 12,
+  BOSS_PLACEHOLDER: 13,
+  WALL: 14,
+  NPC_PLACEHOLDER: 15
 };
 export const WORLD_OBJECT_TYPE_BY_INDEX = [
   'TREE',
@@ -322,8 +391,17 @@ export const WORLD_OBJECT_TYPE_BY_INDEX = [
   'BUSH',
   'HOUSE',
   'FENCE',
-  'CACTUS'
-  // Adicione outros tipos conforme necessário
+  'CACTUS',
+  'TRUNK',
+  'FLOWER',
+  'MUSHROOM',
+  'WATER_PUDDLE',
+  'DEAD_TREE',
+  'BONE',
+  'RUIN',
+  'BOSS_PLACEHOLDER',
+  'WALL',
+  'NPC_PLACEHOLDER'
 ];
 
 // Tipos padronizados de evento para logging e auditoria
