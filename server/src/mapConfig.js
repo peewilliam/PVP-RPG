@@ -378,4 +378,74 @@ console.log('TOTAL OBJECTS:', MAP_CONFIG.objects.length);
 // Povoa todas as vilas com casas, muralhas, cercas, NPCs e decoração
 // =========================
 
+// =========================
+// Exemplo de casa central na arena segura
+MAP_CONFIG.objects.push({
+  type: "HOUSE",
+  position: { x: 0, y: 0, z: 100 },
+  area: "SAFE_ARENA",
+  scale: { x: 6, y: 5, z: 6 },
+  rotation: Math.PI / 4 // 45 graus para alinhar com a grade isométrica
+});
+// Exemplo de parede horizontal
+MAP_CONFIG.objects.push({
+  type: "WALL",
+  position: { x: 10, y: 0, z: 100 },
+  area: "SAFE_ARENA",
+  scale: { x: 8, y: 2.5, z: 1 },
+  rotation: 0
+});
+// Exemplo de parede vertical
+MAP_CONFIG.objects.push({
+  type: "WALL",
+  position: { x: 0, y: 0, z: 110 },
+  area: "SAFE_ARENA",
+  scale: { x: 8, y: 2.5, z: 1 },
+  rotation: Math.PI / 2
+});
+// Exemplo de cerca
+MAP_CONFIG.objects.push({
+  type: "FENCE",
+  position: { x: -10, y: 0, z: 100 },
+  area: "SAFE_ARENA",
+  scale: { x: 4, y: 1, z: 0.3 },
+  rotation: 0
+});
+// Exemplo de NPC
+MAP_CONFIG.objects.push({
+  type: "NPC_PLACEHOLDER",
+  position: { x: 5, y: 0, z: 105 },
+  area: "SAFE_ARENA",
+  scale: { x: 1, y: 1.8, z: 1 },
+});
+// Exemplo de árvore
+MAP_CONFIG.objects.push({
+  type: "TREE",
+  position: { x: -5, y: 0, z: 95 },
+  area: "SAFE_ARENA",
+  scale: { x: 2, y: 4, z: 2 },
+});
+// Exemplo de rocha
+MAP_CONFIG.objects.push({
+  type: "ROCK",
+  position: { x: 8, y: 0, z: 98 },
+  area: "SAFE_ARENA",
+  scale: { x: 1.5, y: 1, z: 1.5 },
+});
+// Exemplo de flor
+MAP_CONFIG.objects.push({
+  type: "FLOWER",
+  position: { x: 2, y: 0, z: 102 },
+  area: "SAFE_ARENA",
+  scale: { x: 0.4, y: 0.4, z: 0.4 },
+});
+// Exemplo de cogumelo
+MAP_CONFIG.objects.push({
+  type: "MUSHROOM",
+  position: { x: -2, y: 0, z: 98 },
+  area: "SAFE_ARENA",
+  scale: { x: 0.3, y: 0.3, z: 0.3 },
+});
+// Repita para as vilas, ajustando posição e área.
+
 // ========================= 

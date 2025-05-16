@@ -9,6 +9,10 @@ import { createTrunk } from '../world/assets/Trunk.js';
 import { createFlower } from '../world/assets/Flower.js';
 import { createMushroom } from '../world/assets/Mushroom.js';
 import { createWaterPuddle } from '../world/assets/WaterPuddle.js';
+import { createHouse } from '../world/assets/House.js';
+import { createWall } from '../world/assets/Wall.js';
+import { createFence } from '../world/assets/Fence.js';
+import { createNpcPlaceholder } from '../world/assets/NpcPlaceholder.js';
 import { GroundLabelManager } from './GroundLabelManager.js';
 
 /**
@@ -535,6 +539,14 @@ export class WorldObjectPresenter {
         obj = createMushroom(); break;
       case 'WATER_PUDDLE':
         obj = createWaterPuddle(); break;
+      case 'HOUSE':
+        obj = createHouse(); break;
+      case 'WALL':
+        obj = createWall(); break;
+      case 'FENCE':
+        obj = createFence(); break;
+      case 'NPC_PLACEHOLDER':
+        obj = createNpcPlaceholder(); break;
       default:
         obj = createPrimitiveObject(type); break;
     }
@@ -722,29 +734,37 @@ export class WorldObjectPresenter {
 }
 
 // Função auxiliar para criar objetos primitivos quando não há modelo
-function createPrimitiveObject(objectType) {
+function createPrimitiveObject(objectType, params = {}) {
   switch (objectType) {
     case 'TREE':
-      return createTree();
+      return createTree(params);
     case 'ROCK':
-      return createRock();
+      return createRock(params);
     case 'BUSH':
-      return createBush();
+      return createBush(params);
     case 'BONE':
-      return createBone();
+      return createBone(params);
     case 'RUIN':
-      return createRuin();
+      return createRuin(params);
     case 'CACTUS':
-      return createCactus();
+      return createCactus(params);
     case 'TRUNK':
-      return createTrunk();
+      return createTrunk(params);
     case 'FLOWER':
-      return createFlower();
+      return createFlower(params);
     case 'MUSHROOM':
-      return createMushroom();
+      return createMushroom(params);
     case 'WATER_PUDDLE':
-      return createWaterPuddle();
-    default:
+      return createWaterPuddle(params);
+    case 'HOUSE':
+      return createHouse(params);
+    case 'WALL':
+      return createWall(params);
+    case 'FENCE':
+      return createFence(params);
+    case 'NPC_PLACEHOLDER':
+      return createNpcPlaceholder(params);
+    default: {
       let geometry, material;
       let worldObject;
       geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -753,5 +773,6 @@ function createPrimitiveObject(objectType) {
       worldObject.castShadow = true;
       worldObject.receiveShadow = true;
       return worldObject;
+    }
   }
 } 
