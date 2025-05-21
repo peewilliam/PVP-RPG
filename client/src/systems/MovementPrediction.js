@@ -29,6 +29,7 @@ export class MovementPrediction {
     this.lastInputDirection = { dirX: 0, dirZ: 0 };
     this.lastPlayerSpeed = 0.1; // Velocidade padrão
     this.lastPredictionPing = 0; // Ping de predição (ms)
+    this.moveToPoint = null; // Novo: destino de movimentação
   }
   
   // Atualiza o estado de slow
@@ -312,5 +313,34 @@ export class MovementPrediction {
       slowValue: this.slowValue,
       bufferSize: this.inputBuffer.length
     };
+  }
+
+  setMoveToPoint(dest) {
+    console.log('[DEBUG] MovementPrediction.setMoveToPoint chamado com:', dest);
+    if (!dest) return;
+    this.moveToPoint = { x: dest.x, y: dest.y, z: dest.z };
+  }
+
+  update(deltaTime) {
+    if (!this.player) return;
+    if (this.moveToPoint) {
+      const dx = this.moveToPoint.x - this.player.position.x;
+      const dz = this.moveToPoint.z - this.player.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const stopDist = 0.2;
+      if (dist > stopDist) {
+        let moveSpeed = this.lastPlayerSpeed || 0.4;
+        // Normaliza direção
+        const dirX = dx / dist;
+        const dirZ = dz / dist;
+        // Atualiza posição prevista
+        this.player.targetPosition.x += dirX * moveSpeed * (deltaTime * 1000 / 50);
+        this.player.targetPosition.z += dirZ * moveSpeed * (deltaTime * 1000 / 50);
+        // Rotaciona para o destino
+        this.player.rotation.y = Math.atan2(-dirZ, -dirX);
+      } else {
+        this.moveToPoint = null;
+      }
+    }
   }
 } 

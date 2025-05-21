@@ -360,4 +360,22 @@ export class NetworkManager {
   isConnected() {
     return this.connected;
   }
+  
+  // Adicionar método para enviar destino de movimentação
+  sendMoveToPoint(position) {
+    console.log('[DEBUG] Enviando destino ao servidor:', position);
+    if (!this.connected || !this.channel) return;
+    try {
+      // Enviar como { x, y, z }
+      const buffer = new ArrayBuffer(13);
+      const view = new DataView(buffer);
+      view.setUint8(0, 0x50); // opcode customizado para moveToPoint
+      view.setFloat32(1, position.x, true);
+      view.setFloat32(5, position.y, true);
+      view.setFloat32(9, position.z, true);
+      this.channel.emit(this.serverConfig.BINARY_EVENTS.PLAYER_MOVE_TO_POINT || 'bin:player:moveToPoint', new Uint8Array(buffer));
+    } catch (error) {
+      console.error('Erro ao enviar destino de movimentação (binário):', error);
+    }
+  }
 } 

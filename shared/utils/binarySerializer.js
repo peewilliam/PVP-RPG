@@ -1007,6 +1007,27 @@ function deserializePlayerSyncResponse(buffer) {
   return { opcode, playerId, hp, maxHp, mana, maxMana, cooldowns, timestamp };
 }
 
+// Serialização binária para player:moveToPoint
+function serializePlayerMoveToPoint({ x, y, z }) {
+  const buffer = new ArrayBuffer(13);
+  const view = new DataView(buffer);
+  view.setUint8(0, 0x50); // opcode customizado
+  view.setFloat32(1, x, true);
+  view.setFloat32(5, y, true);
+  view.setFloat32(9, z, true);
+  return buffer;
+}
+function deserializePlayerMoveToPoint(buffer) {
+  buffer = toArrayBuffer(buffer);
+  const view = new DataView(buffer);
+  return {
+    opcode: view.getUint8(0),
+    x: view.getFloat32(1, true),
+    y: view.getFloat32(5, true),
+    z: view.getFloat32(9, true)
+  };
+}
+
 export {
   serializePlayerMove,
   deserializePlayerMove,
@@ -1051,5 +1072,7 @@ export {
   serializePlayerDeath,
   deserializePlayerDeath,
   serializePlayerSyncResponse,
-  deserializePlayerSyncResponse
+  deserializePlayerSyncResponse,
+  serializePlayerMoveToPoint,
+  deserializePlayerMoveToPoint
 }; 

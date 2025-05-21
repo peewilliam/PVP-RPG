@@ -76,6 +76,7 @@ export class GameController {
     
     // 3. Input Controller
     this.inputController = new InputController();
+    this.inputController.setMoveToPointCallback(this.onMoveToPoint.bind(this));
     
     // 4. Camera Controller
     this.cameraController = new CameraController();
@@ -849,5 +850,56 @@ export class GameController {
       VILLAGE_SE: '#e2c290'
     };
     return cores[id] || '#fff';
+  }
+
+  onMoveToPoint(event) {
+    // Primeiro, verifica se clicou em uma entidade
+    const selection = this.entityManager.handleTargetSelection(event, this.hudManager);
+    if (selection) {
+      // Selecionou uma entidade, não move o player
+      return;
+    }
+    // Raycast para obter posição no chão
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, this.cameraController.camera);
+    // Assume que o chão está no plano y=0
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const intersectPoint = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, intersectPoint);
+    console.log('[DEBUG] Destino clicado:', intersectPoint);
+    if (!intersectPoint) return;
+    // Feedback visual: círculo discreto
+    this.showMoveCircle(intersectPoint);
+    // Envia destino ao servidor
+    this.networkManager.sendMoveToPoint(intersectPoint);
+    // Predição local
+    if (this.movementPrediction) {
+      console.log('[DEBUG] Chamando predição local setMoveToPoint', intersectPoint);
+      this.movementPrediction.setMoveToPoint(intersectPoint);
+    }
+  }
+
+  showMoveCircle(position) {
+    // Cria um círculo discreto no chão usando Three.js
+    const geometry = new THREE.RingGeometry(0.4, 0.5, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0x00ff99,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide
+    });
+    const circle = new THREE.Mesh(geometry, material);
+    circle.position.copy(position);
+    circle.position.y += 0.05; // levemente acima do chão
+    circle.rotation.x = -Math.PI / 2;
+    this.sceneManager.scene.add(circle);
+    setTimeout(() => {
+      this.sceneManager.scene.remove(circle);
+      geometry.dispose();
+      material.dispose();
+    }, 500);
   }
 } 

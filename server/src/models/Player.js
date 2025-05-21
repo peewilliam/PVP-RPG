@@ -65,6 +65,8 @@ export class Player extends Entity {
       3: 0,
       4: 0
     };
+    
+    this.moveToPoint = null; // Novo: destino de movimentação
   }
   
   /**
@@ -72,8 +74,35 @@ export class Player extends Entity {
    * @param {number} deltaTime - Tempo desde a última atualização
    */
   update(deltaTime) {
-    // Calcula a velocidade baseada nos inputs e modificadores
-    this.calculateVelocity();
+    // Se existe destino, calcular direção e mover
+    if (this.moveToPoint) {
+      const dx = this.moveToPoint.x - this.position.x;
+      const dz = this.moveToPoint.z - this.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const stopDist = 0.2; // Distância para parar
+      if (dist > stopDist) {
+        let moveSpeed = PLAYER.SPEED * this.speedModifier;
+        if (this.status && this.status.slowedUntil && this.status.slowedUntil > Date.now()) {
+          moveSpeed *= (this.lastSlowValue || 0.4);
+        }
+        // Normaliza direção
+        const dirX = dx / dist;
+        const dirZ = dz / dist;
+        this.velocity.x = dirX * moveSpeed;
+        this.velocity.z = dirZ * moveSpeed;
+        // Rotaciona para o destino
+        this.rotation = Math.atan2(-dirZ, -dirX);
+      } else {
+        // Chegou ao destino
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+        this.moveToPoint = null;
+      }
+    } else {
+      // Se não há destino, para
+      this.velocity.x = 0;
+      this.velocity.z = 0;
+    }
     
     // Chama o método da classe pai para atualizar a posição
     super.update(deltaTime);
@@ -609,5 +638,10 @@ export class Player extends Entity {
       xp: this.xp,
       nextLevelXp: this.nextLevelXp
     };
+  }
+
+  setMoveToPoint(dest) {
+    if (!dest) return;
+    this.moveToPoint = { x: dest.x, y: dest.y, z: dest.z };
   }
 } 

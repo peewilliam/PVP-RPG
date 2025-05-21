@@ -325,25 +325,26 @@ export const WORLD = {
 };
 
 export const BINARY_EVENTS = {
-  PLAYER_MOVE: 'bin:player:move', // Evento de movimento do jogador (funcionando 100% e unico)
-  PLAYER_MOVED: 'bin:player:moved', // Evento de movimento do jogador confirmado (funcionando 100% e unico)
+  PLAYER_MOVE: 'bin:player:move',
+  PLAYER_MOVED: 'bin:player:moved',
   MONSTER_DEATH: 'bin:monster:death',
-  WORLD_UPDATE: 'bin:world:update', // Evento de atualização do mundo
-  PLAYER_STATUS: 'bin:player:status', // Evento de status do jogador (funcionando 100% e unico)
+  WORLD_UPDATE: 'bin:world:update',
+  PLAYER_STATUS: 'bin:player:status',
   MONSTER_DELTA_UPDATE: 'bin:monster:delta',
-  COMBAT_EFFECTS: 'bin:combat:effects', // Evento binário de efeitos de combate (dano, status, etc)
-  WORLD_INIT: 'bin:world:init', // Novo evento binário para payload inicial do mundo
-  PLAYER_INIT: 'bin:player:init', // Novo evento binário para inicialização do player
-  PLAYER_DISCONNECTED: 'bin:player:disconnected', // Novo evento binário para desconexão do player
-  PLAYER_JOINED: 'bin:player:joined', // Novo evento binário para notificação de novo jogador
-  PLAYER_EXISTING: 'bin:player:existing', // Novo evento binário para informar jogadores já presentes
-  PLAYER_ROTATE: 'bin:player:rotate', // Evento binário para rotação do jogador (opcode 0x14)
-  PLAYER_ROTATED: 'bin:player:rotated', // Novo evento binário para confirmação de rotação do jogador (opcode 0x15)
-  PLAYER_USE_ABILITY: 'bin:player:useAbility', // Evento binário para uso de habilidade
-  PLAYER_ABILITY_USED: 'bin:player:abilityUsed', // Evento binário para notificação de habilidade usada
-  PLAYER_RESPAWN: 'bin:player:respawn', // Novo evento binário para respawn do player
+  COMBAT_EFFECTS: 'bin:combat:effects',
+  WORLD_INIT: 'bin:world:init',
+  PLAYER_INIT: 'bin:player:init',
+  PLAYER_DISCONNECTED: 'bin:player:disconnected',
+  PLAYER_JOINED: 'bin:player:joined',
+  PLAYER_EXISTING: 'bin:player:existing',
+  PLAYER_ROTATE: 'bin:player:rotate',
+  PLAYER_ROTATED: 'bin:player:rotated',
+  PLAYER_USE_ABILITY: 'bin:player:useAbility',
+  PLAYER_ABILITY_USED: 'bin:player:abilityUsed',
+  PLAYER_RESPAWN: 'bin:player:respawn',
   PLAYER_DEATH: 'bin:player:death',
-  PLAYER_SYNC_RESPONSE: 'bin:player:syncResponse', // Novo evento binário para resposta de sincronização
+  PLAYER_SYNC_RESPONSE: 'bin:player:syncResponse',
+  PLAYER_MOVE_TO_POINT: 'bin:player:moveToPoint',
 };
 
 // Enum para motivos de desconexão de jogador (para uso no campo 'reason' do evento binário)

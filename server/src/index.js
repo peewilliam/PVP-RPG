@@ -22,7 +22,8 @@ import {
   serializePlayerExisting,
   deserializePlayerUseAbility,
   serializePlayerAbilityUsed,
-  serializePlayerSyncResponse
+  serializePlayerSyncResponse,
+  deserializePlayerMoveToPoint
 } from '../../shared/utils/binarySerializer.js';
 import { logAuditEvent } from './utils/auditLogger.js';
 import fs from 'fs';
@@ -607,6 +608,19 @@ io.onConnection(channel => {
     // No handler do evento 'client:requestMapConfig':
     channel.on('client:requestMapConfig', () => {
       channel.emit('world:mapConfig', minimapConfig);
+    });
+
+    // Handler para movimentação por destino (point & click)
+    channel.on(BINARY_EVENTS.PLAYER_MOVE_TO_POINT, buffer => {
+      try {
+        console.log('[SERVER] Recebido bin:player:moveToPoint', buffer);
+        const { x, y, z } = deserializePlayerMoveToPoint(buffer);
+        const player = gameWorld.entityManager.getPlayer(channel.playerId);
+        if (!player) return;
+        player.setMoveToPoint({ x, y, z });
+      } catch (error) {
+        console.error('Erro ao processar moveToPoint (binário):', error);
+      }
     });
   } catch (error) {
     console.error('Erro na conexão de jogador:', error);

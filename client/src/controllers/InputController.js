@@ -3,32 +3,16 @@
 
 export class InputController {
   constructor() {
-    // Estado das teclas
-    this.keys = {
-      w: false,
-      a: false,
-      s: false,
-      d: false
-    };
-
-    // Estado anterior das teclas para detectar mudanças
-    this.prevKeys = {
-      w: false,
-      a: false,
-      s: false,
-      d: false
-    };
-
     // Posição do mouse normalizada (-1 a 1)
     this.mousePosition = { x: 0, y: 0 };
+    this.onMoveToPoint = null; // Novo callback para movimentação por clique
+    this.chatFocused = false;
     
     // Callbacks para outros sistemas
     this.onMovementChanged = null;
-    this.chatFocused = false;
     
     // Bind dos métodos
-    this.onKeyDown = this.onKeyDown.bind(this);
-    this.onKeyUp = this.onKeyUp.bind(this);
+    this.onMouseDown = this.onMouseDown.bind(this);
     this.onMouseMove = this.onMouseMove.bind(this);
     
     // Inicializar event listeners
@@ -36,9 +20,10 @@ export class InputController {
   }
 
   initEventListeners() {
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('mousedown', this.onMouseDown);
     window.addEventListener('mousemove', this.onMouseMove);
+    // Impede o menu de contexto padrão ao clicar com o botão direito
+    window.addEventListener('contextmenu', e => e.preventDefault());
     
     // Eventos de chat
     window.addEventListener('chat:focus', () => { this.chatFocused = true; });
@@ -46,24 +31,18 @@ export class InputController {
   }
 
   removeEventListeners() {
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('mousedown', this.onMouseDown);
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('chat:focus', () => { this.chatFocused = true; });
     window.removeEventListener('chat:blur', () => { this.chatFocused = false; });
   }
 
-  onKeyDown(e) {
-    const keyChanged = this.updateKey(e.key, true);
-    if (keyChanged && this.onMovementChanged) {
-      this.onMovementChanged(this.keys);
-    }
-  }
-
-  onKeyUp(e) {
-    const keyChanged = this.updateKey(e.key, false);
-    if (keyChanged && this.onMovementChanged) {
-      this.onMovementChanged(this.keys);
+  onMouseDown(event) {
+    // Botão direito (2) OU esquerdo (0)
+    if ((event.button === 2 || event.button === 0) && !this.chatFocused) {
+      if (this.onMoveToPoint) {
+        this.onMoveToPoint(event);
+      }
     }
   }
 
@@ -75,85 +54,6 @@ export class InputController {
     };
   }
 
-  // Atualiza estado da tecla e retorna se houve mudança
-  updateKey(key, isDown) {
-    let changed = false;
-    
-    if (key === 'w' || key === 'W') {
-      changed = this.keys.w !== isDown;
-      this.keys.w = isDown;
-    }
-    else if (key === 'a' || key === 'A') {
-      changed = this.keys.a !== isDown;
-      this.keys.a = isDown;
-    }
-    else if (key === 's' || key === 'S') {
-      changed = this.keys.s !== isDown;
-      this.keys.s = isDown;
-    }
-    else if (key === 'd' || key === 'D') {
-      changed = this.keys.d !== isDown;
-      this.keys.d = isDown;
-    }
-    
-    // Atualiza o estado anterior para a próxima comparação se houve mudança
-    if (changed) {
-      this.prevKeys = { ...this.keys };
-    }
-    
-    return changed;
-  }
-
-  // Retorna a direção do movimento baseada nos inputs atuais
-  getMovementDirection() {
-    let dirX = 0;
-    let dirZ = 0;
-    
-    if (this.keys.w) {
-      dirX -= 1;
-      dirZ -= 1;
-    }
-    if (this.keys.s) {
-      dirX += 1;
-      dirZ += 1;
-    }
-    if (this.keys.a) {
-      dirX -= 1;
-      dirZ += 1;
-    }
-    if (this.keys.d) {
-      dirX += 1;
-      dirZ -= 1;
-    }
-    
-    return { dirX, dirZ };
-  }
-
-  // Verifica se alguma tecla de movimento está pressionada
-  isMoving() {
-    return this.keys.w || this.keys.a || this.keys.s || this.keys.d;
-  }
-
-  // Verifica se as entradas mudaram desde a última verificação
-  hasChanged() {
-    return (
-      this.prevKeys.w !== this.keys.w || 
-      this.prevKeys.a !== this.keys.a || 
-      this.prevKeys.s !== this.keys.s || 
-      this.prevKeys.d !== this.keys.d
-    );
-  }
-
-  // Converte as teclas pressionadas em um objeto de input para o servidor
-  getCameraRelativeInput() {
-    return {
-      forward: this.keys.w,
-      backward: this.keys.s,
-      left: this.keys.a,
-      right: this.keys.d
-    };
-  }
-  
   // Permite configurar um callback para quando o movimento mudar
   setMovementChangedCallback(callback) {
     this.onMovementChanged = callback;
@@ -192,5 +92,9 @@ export class InputController {
         if (options.onF10Pressed) options.onF10Pressed();
       }
     });
+  }
+
+  setMoveToPointCallback(callback) {
+    this.onMoveToPoint = callback;
   }
 } 
