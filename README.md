@@ -151,3 +151,28 @@ Foi corrigido o problema com os efeitos visuais de dano que estavam piscando e p
 - Implementar efeitos visuais dedicados para FROST_SPIKES (atualmente usando um efeito genérico)
 - Adicionar suporte a dano ao longo do tempo para habilidades como METEOR_STORM
 - Balancear os valores de dano das habilidades 
+
+
+
+
+Olá! Vamos continuar o desenvolvimento do MVP.
+Instruções Críticas:
+Leia TODO o memory-bank:
+É fundamental que você leia e compreenda completamente todos os arquivos principais dentro do diretório memory-bank/ antes de prosseguir. Meu estado é resetado, e dependo totalmente desses arquivos.
+Os arquivos principais são:
+projectbrief.md
+productContext.md
+systemPatterns.md
+techContext.md
+activeContext.md
+progress.md
+Leia também o arquivo de referência de mapas modulares:
+Sempre leia e utilize como referência o arquivo mapas-modulares-plano.md dentro do memory-bank, pois ele contém o plano detalhado, padrões, pipeline e próximos passos para a adoção de mapas modulares GLB no projeto.
+Idioma:
+Responda sempre em Português do Brasil (pt-br).
+Contexto Atual (Resumo):
+A estrutura do projeto utiliza Javascript puro, Three.js, MCP, Node.js e Geckos.io.
+Consulte activeContext.md e progress.md para detalhes sobre o estado atual e os próximos passos que estávamos considerando.
+Consulte mapas-modulares-plano.md para garantir que todas as decisões, padrões e etapas relacionadas a mapas modulares estejam sendo seguidas e evoluídas.
+Próxima Ação:
+(Descreva aqui o que deseja fazer ou qual etapa do plano deseja avançar, detalhar ou implementar.)
