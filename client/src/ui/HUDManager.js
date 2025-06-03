@@ -1123,10 +1123,11 @@ export class HUDManager {
   // Função utilitária para traduzir killerType em texto amigável
   getKillerTypeLabel(killerType) {
     switch (killerType) {
-      case 0: return 'Monstro';
-      case 1: return 'Jogador';
-      case 2: return 'Ambiente';
-      default: return '';
+      case 0: return 'Jogador';
+      case 1: return 'Monstro';
+      case 2: return 'NPC'; // Mapeado para NPC, anteriormente Ambiente
+      case 3: return 'Ambiente'; // Mapeado para Ambiente
+      default: return 'Desconhecido'; // Adicionado um default para tipos inesperados
     }
   }
 } 

@@ -380,6 +380,11 @@ export class GameController {
         // Ativa a flag de morte
         this.playerDead = true;
         
+        // Cancela qualquer movimento por clique em andamento
+        if (this.movementPrediction) {
+          this.movementPrediction.cancelMoveToPoint();
+        }
+        
         // Adiciona mensagem de morte à HUD
         this.hudManager.showDeathModal(data);
         
@@ -424,6 +429,20 @@ export class GameController {
         console.log('[DEBUG][CLIENT] Respawn do próprio jogador. Atualizando HUD e inputs.');
         // Desativa a flag de morte
         this.playerDead = false;
+        
+        // Cancela qualquer movimento pendente
+        if (this.movementPrediction) {
+          this.movementPrediction.cancelMoveToPoint();
+          
+          // Atualiza posição imediatamente se houver dados de posição
+          if (data.position) {
+            this.movementPrediction.forceTeleport({
+              x: data.position.x,
+              z: data.position.z
+            });
+          }
+        }
+        
         // Remove a modal de morte
         this.hudManager.hideDeathModal();
         // Desbloqueia inputs
@@ -853,32 +872,243 @@ export class GameController {
   }
 
   onMoveToPoint(event) {
-    // Primeiro, verifica se clicou em uma entidade
+    // PASSO 1: Ignorar cliques quando o jogador estiver morto ou o chat estiver ativo
+    if (this.playerDead || this.inputController.chatFocused) {
+      return;
+    }
+
+    // PASSO 2: Verificar se o clique foi em um elemento da UI usando método melhorado
+    if (this.isUIElementRobust(event.target)) {
+      console.log('[DEBUG] Clique na UI ignorado para movimento');
+      return;
+    }
+    
+    // PASSO 3: Verificar se clicou em uma entidade (alvo)
     const selection = this.entityManager.handleTargetSelection(event, this.hudManager);
     if (selection) {
       // Selecionou uma entidade, não move o player
       return;
     }
-    // Raycast para obter posição no chão
+    
+    // PASSO 4: Raycast para obter posição no chão
     const mouse = new THREE.Vector2();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, this.cameraController.camera);
-    // Assume que o chão está no plano y=0
+    
+    // Plano do chão no nível y=0
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const intersectPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, intersectPoint);
-    console.log('[DEBUG] Destino clicado:', intersectPoint);
-    if (!intersectPoint) return;
+    const didIntersect = raycaster.ray.intersectPlane(plane, intersectPoint);
+    
+    // PASSO 5: Verificar se o ponto intersectado é válido e está dentro dos limites do mundo
+    if (!didIntersect) {
+      console.log('[DEBUG] Raycaster não intersectou com o plano do mundo');
+      return;
+    }
+    
+    if (!this.isPointInWorldBounds(intersectPoint)) {
+      console.log('[DEBUG] Clique fora dos limites do mundo ignorado');
+      // Feedback visual negativo para o jogador - círculo vermelho
+      this.showInvalidMoveCircle(intersectPoint);
+      
+      // Opcional: mostrar mensagem flutuante para o jogador
+      if (this.entityManager && this.entityManager.floatingTextManager) {
+        // Posição no mundo para o texto flutuante
+        const position = { ...intersectPoint };
+        position.y += 1.0; // Acima do chão
+        
+        this.entityManager.floatingTextManager.createFloatingText({
+          text: 'Não é possível se mover para fora do mundo',
+          position: position,
+          color: '#ff3333',
+          size: 1.0,
+          duration: 2000,
+          type: 'error'
+        });
+      }
+      return;
+    }
+    
+    // PASSO 6: Verificar distância máxima de clique para evitar cliques muito distantes
+    const localPlayer = this.entityManager.localPlayer;
+    if (localPlayer) {
+      const clickDistance = localPlayer.position.distanceTo(intersectPoint);
+      const maxClickDistance = 100; // Distância máxima permitida para clique (ajuste conforme necessário)
+      
+      if (clickDistance > maxClickDistance) {
+        console.log(`[DEBUG] Clique muito distante ignorado (${clickDistance.toFixed(2)} > ${maxClickDistance})`);
+        // Feedback visual negativo para o jogador - círculo vermelho com X
+        this.showTooFarMoveCircle(intersectPoint);
+        
+        // Opcional: mostrar mensagem flutuante para o jogador
+        if (this.entityManager && this.entityManager.floatingTextManager) {
+          const position = { ...intersectPoint };
+          position.y += 1.0; // Acima do chão
+          
+          this.entityManager.floatingTextManager.createFloatingText({
+            text: 'Destino muito distante',
+            position: position,
+            color: '#ff9933',
+            size: 1.0,
+            duration: 2000,
+            type: 'warning'
+          });
+        }
+        return;
+      }
+    }
+    
+    // PASSO 7: Tudo verificado, podemos seguir com o movimento
+    console.log('[DEBUG] Destino clicado válido:', intersectPoint);
+    
     // Feedback visual: círculo discreto
     this.showMoveCircle(intersectPoint);
+    
     // Envia destino ao servidor
     this.networkManager.sendMoveToPoint(intersectPoint);
+    
     // Predição local
     if (this.movementPrediction) {
       console.log('[DEBUG] Chamando predição local setMoveToPoint', intersectPoint);
       this.movementPrediction.setMoveToPoint(intersectPoint);
+    }
+  }
+
+  // Método para mostrar feedback visual quando o clique é fora dos limites do mundo
+  showInvalidMoveCircle(position) {
+    // Cria um círculo vermelho no chão
+    const geometry = new THREE.RingGeometry(0.4, 0.5, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff3333,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide
+    });
+    const circle = new THREE.Mesh(geometry, material);
+    circle.position.copy(position);
+    circle.position.y += 0.05; // levemente acima do chão
+    circle.rotation.x = -Math.PI / 2;
+    
+    // Adiciona um X vermelho no centro (duas linhas cruzadas)
+    const xGroup = new THREE.Group();
+    
+    const line1Geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.3, 0, 0),
+      new THREE.Vector3(0.3, 0, 0)
+    ]);
+    const line2Geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, -0.3),
+      new THREE.Vector3(0, 0, 0.3)
+    ]);
+    
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff3333 });
+    const line1 = new THREE.Line(line1Geo, lineMaterial);
+    const line2 = new THREE.Line(line2Geo, lineMaterial);
+    line1.rotation.x = Math.PI / 2;
+    line2.rotation.z = Math.PI / 2;
+    line2.rotation.x = Math.PI / 2;
+    
+    xGroup.add(line1);
+    xGroup.add(line2);
+    xGroup.position.copy(position);
+    xGroup.position.y += 0.1; // Acima do círculo
+    
+    this.sceneManager.scene.add(circle);
+    this.sceneManager.scene.add(xGroup);
+    
+    // Animação de pulsação para o círculo
+    const startTime = Date.now();
+    const duration = 1000; // 1 segundo
+    const animate = () => {
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime < duration) {
+        const scale = 1 + 0.3 * Math.sin(elapsedTime / 100);
+        circle.scale.set(scale, scale, scale);
+        
+        requestAnimationFrame(animate);
+      } else {
+        this.sceneManager.scene.remove(circle);
+        this.sceneManager.scene.remove(xGroup);
+        geometry.dispose();
+        material.dispose();
+        line1Geo.dispose();
+        line2Geo.dispose();
+        lineMaterial.dispose();
+      }
+    };
+    
+    animate();
+  }
+  
+  // Método para mostrar feedback visual quando o clique é muito distante
+  showTooFarMoveCircle(position) {
+    // Cria um círculo laranja no chão
+    const geometry = new THREE.RingGeometry(0.4, 0.5, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff9933,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide
+    });
+    const circle = new THREE.Mesh(geometry, material);
+    circle.position.copy(position);
+    circle.position.y += 0.05; // levemente acima do chão
+    circle.rotation.x = -Math.PI / 2;
+    
+    // Adiciona seta apontando para o jogador
+    const localPlayer = this.entityManager.localPlayer;
+    if (localPlayer) {
+      const direction = new THREE.Vector3()
+        .subVectors(localPlayer.position, position)
+        .normalize();
+        
+      const arrowLength = 1.5;
+      const arrowHeadLength = 0.4;
+      const arrowHeadWidth = 0.3;
+      
+      const arrowHelper = new THREE.ArrowHelper(
+        direction, 
+        position,
+        arrowLength,
+        0xff9933, // mesma cor do círculo
+        arrowHeadLength,
+        arrowHeadWidth
+      );
+      
+      arrowHelper.position.y += 0.5; // Um pouco acima do chão
+      
+      this.sceneManager.scene.add(circle);
+      this.sceneManager.scene.add(arrowHelper);
+      
+      // Animação de desaparecimento gradual
+      const startTime = Date.now();
+      const duration = 1500; // 1.5 segundos
+      const animate = () => {
+        const elapsedTime = Date.now() - startTime;
+        if (elapsedTime < duration) {
+          const opacity = 0.7 * (1 - elapsedTime / duration);
+          material.opacity = opacity;
+          
+          requestAnimationFrame(animate);
+        } else {
+          this.sceneManager.scene.remove(circle);
+          this.sceneManager.scene.remove(arrowHelper);
+          geometry.dispose();
+          material.dispose();
+        }
+      };
+      
+      animate();
+    } else {
+      // Sem jogador local, só mostra o círculo brevemente
+      this.sceneManager.scene.add(circle);
+      setTimeout(() => {
+        this.sceneManager.scene.remove(circle);
+        geometry.dispose();
+        material.dispose();
+      }, 1000);
     }
   }
 
@@ -901,5 +1131,145 @@ export class GameController {
       geometry.dispose();
       material.dispose();
     }, 500);
+  }
+
+  // Método para verificar se um ponto está dentro dos limites do mundo
+  isPointInWorldBounds(point) {
+    // Usa as mesmas constantes que a lógica do servidor
+    const halfWidth = this.worldSize.WIDTH / 2;
+    const halfHeight = this.worldSize.HEIGHT / 2;
+    const borderWidth = this.worldBoundaries.BORDER_WIDTH;
+    
+    // Limites em X (largura do mundo)
+    const minX = -halfWidth + borderWidth;
+    const maxX = halfWidth - borderWidth;
+    
+    // Limites em Z (altura do mundo)
+    const minZ = -halfHeight + borderWidth;
+    const maxZ = halfHeight - borderWidth;
+    
+    // Verifica se o ponto está dentro dos limites
+    return (
+      point.x >= minX && 
+      point.x <= maxX && 
+      point.z >= minZ && 
+      point.z <= maxZ
+    );
+  }
+
+  // Método auxiliar aprimorado para verificar se um elemento é parte da UI
+  isUIElementRobust(element) {
+    // Se não há elemento (clique no canvas vazio), não é UI
+    if (!element) return false;
+    
+    // 1. Verificação de tagName para elementos intrinsecamente de UI
+    const uiTags = ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A', 'LABEL', 'DIALOG'];
+    if (uiTags.includes(element.tagName)) {
+      return true;
+    }
+    
+    // 2. Verificação de atributos de interação
+    if (element.getAttribute('role') === 'button' || 
+        element.getAttribute('tabindex') !== null ||
+        element.getAttribute('contenteditable') === 'true') {
+      return true;
+    }
+    
+    // 3. Verificação completa de IDs e classes conhecidos de UI
+    const uiSelectors = [
+      // Elementos principais da UI
+      '#hud', '.target-ui', '#hud-tooltip', '#performance-panel', '#prediction-panel',
+      '#settings-button', '#settings-menu', '#death-modal', '#chat-container',
+      '.hud-slot', '#world-map', '#world-map-canvas',
+      
+      // Elementos específicos do HUD
+      '#hud-slots', '#hud-barrow', '#hud-center-diamond', '#hud-hp-wrap', '#hud-mp-wrap',
+      '#hud-level', '#hud-hp', '#hud-hp-text', '#hud-mp', '#hud-mp-text', '#hud-xp-border',
+      
+      // Elementos de chat
+      '#chat-input', '.chat-message', '.chat-tab', '#chat-container',
+      
+      // Elementos da target UI
+      '.target-header', '.target-bars', '.hp-bar', '.mana-bar', '.target-status',
+      '.hp-fill', '.mana-fill', '.hp-text', '.mana-text',
+      
+      // Outros elementos de UI conhecidos
+      '.floating-text', '.cooldown-overlay', '.tooltip', '.card', '.menu',
+      '.dialog', '.modal', '.notification', '.settings'
+    ];
+    
+    // Função para verificar se o elemento corresponde a qualquer um dos seletores
+    const matchesSelectors = (el) => {
+      if (!el || !el.classList || !el.id) return false;
+      
+      return uiSelectors.some(selector => {
+        if (selector.startsWith('#')) {
+          return el.id === selector.substring(1);
+        } else if (selector.startsWith('.')) {
+          return el.classList.contains(selector.substring(1));
+        }
+        return false;
+      });
+    };
+    
+    // 4. Verificação por correspondência parcial para IDs/classes que seguem padrões
+    const partialUIPatterns = ['hud-', 'ui-', 'menu-', 'tooltip-', 'btn-', 'modal-', 'chat-', 'slot-'];
+    
+    const matchesPartialPatterns = (el) => {
+      if (!el) return false;
+      
+      // Verificar ID
+      if (el.id && partialUIPatterns.some(pattern => el.id.includes(pattern))) {
+        return true;
+      }
+      
+      // Verificar classes
+      if (el.classList) {
+        for (let i = 0; i < el.classList.length; i++) {
+          if (partialUIPatterns.some(pattern => el.classList[i].includes(pattern))) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    };
+    
+    // 5. Verificação por atributos de estilo que geralmente indicam elementos de UI
+    const hasUIStyles = (el) => {
+      if (!el || !el.style) return false;
+      
+      // Elementos com posição fixed ou absolute geralmente são UI
+      if (window.getComputedStyle(el).position === 'fixed' || 
+          window.getComputedStyle(el).position === 'absolute') {
+        return true;
+      }
+      
+      // Elementos com z-index alto geralmente são UI
+      const zIndex = parseInt(window.getComputedStyle(el).zIndex);
+      if (!isNaN(zIndex) && zIndex > 100) {
+        return true;
+      }
+      
+      return false;
+    };
+    
+    // Verifica o elemento e seus ancestrais
+    let currentElement = element;
+    while (currentElement) {
+      if (matchesSelectors(currentElement) || 
+          matchesPartialPatterns(currentElement) || 
+          hasUIStyles(currentElement)) {
+        return true;
+      }
+      currentElement = currentElement.parentElement;
+    }
+    
+    return false;
+  }
+
+  // Método antigo mantido para compatibilidade
+  isUIElement(element) {
+    return this.isUIElementRobust(element);
   }
 } 

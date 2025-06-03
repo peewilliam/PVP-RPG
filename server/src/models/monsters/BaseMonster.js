@@ -11,6 +11,7 @@ export class BaseMonster extends Entity {
     const monsterType = this.getMonsterTypeConfig(type);
     if (!monsterType) throw new Error(`Tipo de monstro inválido: ${type}`);
     this.monsterType = type;
+    this.name = monsterType.NAME;
     this.type = 'monster';
     this.collisionRadius = 0.6;
     this.level = level;

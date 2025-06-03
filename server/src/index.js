@@ -358,6 +358,12 @@ io.onConnection(channel => {
           console.error(`Jogador não encontrado para ID: ${channel.playerId}`);
           return;
         }
+        
+        // Se qualquer tecla de movimento for pressionada, cancela o movimento por clique
+        if (input.forward || input.backward || input.left || input.right) {
+          player.moveToPoint = null;
+        }
+        
         player.movementState.forward = input.forward || false;
         player.movementState.backward = input.backward || false;
         player.movementState.left = input.left || false;
@@ -562,24 +568,42 @@ io.onConnection(channel => {
 
     // Handler para respawn do player
     channel.on(EVENTS.PLAYER.RESPAWN, () => {
-      // console.log('[DEBUG][SERVER] Recebido comando player:respawn do cliente', channel.playerId);
-      const player = gameWorld.entityManager.getPlayer(channel.playerId);
-      if (!player || !player.dead) return;
-      // Se o mapa ativo for DESERT_PATH, respawn fixo no início do caminho
-      const isDesertPath = !!WORLD.ZONES.DESERT_PATH;
-      let pos;
-      if (isDesertPath) {
-        pos = { x: 0, y: 0, z: -95 };
-      } else {
-        const spawnZone = WORLD.ZONES.SPAWN;
-        pos = {
-          x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
-          y: 0,
-          z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
-        };
+      try {
+        console.log('[DEBUG][SERVER] Recebido comando player:respawn do cliente', channel.playerId);
+        // Verificar se o player existe
+        const player = gameWorld.entityManager.getPlayer(channel.playerId);
+        if (!player) {
+          console.error(`[RESPAWN] Jogador não encontrado: ${channel.playerId}`);
+          return;
+        }
+        
+        // Verificar se o player está morto
+        if (!player.dead) {
+          console.log(`[RESPAWN] Jogador ${channel.playerId} não está morto, ignorando pedido de respawn`);
+          return;
+        }
+        
+        // Definir posição de respawn
+        let pos;
+        // Se o mapa ativo for DESERT_PATH, respawn fixo no início do caminho
+        if (WORLD.ZONES.DESERT_PATH) {
+          pos = { x: 0, y: 0, z: -95 };
+        } else {
+          // Usar a zona de spawn definida ou valores padrão
+          const spawnZone = WORLD.ZONES.SPAWN || { X_MIN: -15, X_MAX: 15, Z_MIN: -15, Z_MAX: 15 };
+          pos = {
+            x: spawnZone.X_MIN + Math.random() * (spawnZone.X_MAX - spawnZone.X_MIN),
+            y: 0,
+            z: spawnZone.Z_MIN + Math.random() * (spawnZone.Z_MAX - spawnZone.Z_MIN)
+          };
+        }
+        
+        // Chamar a função de respawn com tratamento de erros
+        console.log(`[RESPAWN] Fazendo respawn do jogador ${channel.playerId} na posição (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)})`);
+        player.respawn(pos); // O método respawn já envia o evento BINÁRIO para o cliente
+      } catch (error) {
+        console.error('[RESPAWN] Erro ao processar respawn:', error);
       }
-      player.respawn(pos); // O método respawn já envia o evento BINÁRIO para o cliente
-      // (O evento de confirmação de respawn agora é binário: bin:player:respawn)
     });
 
     // Handler para confirmação do cliente após world:init
@@ -614,10 +638,10 @@ io.onConnection(channel => {
     channel.on(BINARY_EVENTS.PLAYER_MOVE_TO_POINT, buffer => {
       try {
         console.log('[SERVER] Recebido bin:player:moveToPoint', buffer);
-        const { x, y, z } = deserializePlayerMoveToPoint(buffer);
+        const { x, y, z, continuous } = deserializePlayerMoveToPoint(buffer);
         const player = gameWorld.entityManager.getPlayer(channel.playerId);
         if (!player) return;
-        player.setMoveToPoint({ x, y, z });
+        player.setMoveToPoint({ x, y, z }, continuous);
       } catch (error) {
         console.error('Erro ao processar moveToPoint (binário):', error);
       }

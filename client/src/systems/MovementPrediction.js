@@ -262,6 +262,9 @@ export class MovementPrediction {
   forceTeleport(position) {
     if (!this.player) return;
     
+    // Cancela qualquer movimento por clique em progresso
+    this.cancelMoveToPoint();
+    
     // Atualiza diretamente sem interpolação
     this.player.position.set(position.x, 0.5, position.z);
     this.player.targetPosition.set(position.x, 0.5, position.z);
@@ -275,6 +278,19 @@ export class MovementPrediction {
     
     // Armazena como última posição do servidor para evitar reconciliação
     this.lastServerPosition = new THREE.Vector3(position.x, 0.5, position.z);
+    
+    // Limpa estados de direção para evitar movimento residual
+    this.lastInputDirection = { dirX: 0, dirZ: 0 };
+    
+    console.log('[DEBUG] Teleporte forçado para:', position);
+  }
+  
+  // Cancela o movimento por clique em andamento
+  cancelMoveToPoint() {
+    if (this.moveToPoint) {
+      console.log('[DEBUG] Cancelando movimento por clique');
+      this.moveToPoint = null;
+    }
   }
   
   // Alternar o sistema de predição (ativo/inativo)

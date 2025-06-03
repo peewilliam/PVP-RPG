@@ -179,7 +179,7 @@ export class NetworkManager {
     this.channel.on(BINARY_EVENTS.PLAYER_DEATH, buffer => {
       try {
         const data = deserializePlayerDeath(buffer);
-        console.log('[CLIENT] Recebido evento: bin:player:death', data);
+        console.log('[CLIENT DEATH DEBUG] Received player:death data:', JSON.stringify(data));
         this.callbacks.onPlayerDeath.forEach(callback => callback(data));
       } catch (error) {
         console.error('Erro ao processar bin:player:death:', error);

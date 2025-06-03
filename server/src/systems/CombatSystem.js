@@ -71,9 +71,11 @@ export class CombatSystem {
         targetPosition.z = origin.z + dz * factor;
       }
       
-      // Teleporta o jogador para a posição alvo
-      player.position.x = targetPosition.x;
-      player.position.z = targetPosition.z;
+      // Usar o método teleport que já cancela o movimento por clique
+      player.teleport({
+        x: targetPosition.x,
+        z: targetPosition.z
+      });
       
       result.teleportPosition = { ...targetPosition };
       // console.log(`Jogador ${player.id} teleportado para (${targetPosition.x.toFixed(2)}, ${targetPosition.z.toFixed(2)})`);

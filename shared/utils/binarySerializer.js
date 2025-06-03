@@ -895,31 +895,38 @@ function deserializePlayerRespawn(buffer) {
   return { opcode, id, position: { x, y, z }, rotation, hp, mana, level, xp };
 }
 
-// Serialização binária para player:death (expandido)
+// Serialização binária para player:death (evento binário)
+// Campos: id, killer(id), reason, lostLevel, lostXP, newLevel, newXP, killerName, killerType
 function serializePlayerDeath({ id, killer = 0, reason = 3, lostLevel = 0, lostXP = 0, newLevel = 1, newXP = 0, killerName = '', killerType = 3 }) {
-  const encoder = new TextEncoder();
-  const nameBytes = encoder.encode(killerName || '');
-  const nameLen = Math.min(nameBytes.length, 255);
-  const buffer = new ArrayBuffer(21 + 1 + nameLen + 1); // fixo 21 + killerNameLen + killerType
+  // killerName já vem truncado (agora para 31) do Player.js
+  // Buffer size: opcode(1) + id(2) + killerId(2) + reason(1) + lostLvl(1) + lostXP(4) + newLvl(1) + newXP(4) + killerType(1) + nameLen(1) + name(31) = 49 bytes
+  const buffer = new ArrayBuffer(49);
   const view = new DataView(buffer);
   let offset = 0;
-  view.setUint8(offset++, 0x14); // opcode
-  view.setUint32(offset, id, true); offset += 4;
-  view.setUint32(offset, killer, true); offset += 4;
-  view.setUint8(offset++, reason);
-  view.setUint8(offset++, lostLevel);
-  view.setUint32(offset, lostXP, true); offset += 4;
-  view.setUint8(offset++, newLevel);
-  view.setUint32(offset, newXP, true); offset += 4;
-  view.setUint8(offset++, nameLen);
-  for (let i = 0; i < nameLen; i++) {
-    view.setUint8(offset++, nameBytes[i]);
+
+  view.setUint8(offset, 0x21); offset += 1;  // Opcode para player:death
+  view.setUint16(offset, toEntityId(id)); offset += 2;
+  view.setUint16(offset, toEntityId(killer)); offset += 2; // killer ID
+  view.setUint8(offset, reason); offset += 1;
+  view.setUint8(offset, lostLevel); offset += 1;
+  view.setUint32(offset, lostXP); offset += 4;
+  view.setUint8(offset, newLevel); offset += 1;
+  view.setUint32(offset, newXP); offset += 4;
+  view.setUint8(offset, killerType); offset += 1; // killerType
+
+  // killerName (string, max 31 chars payload)
+  const nameEncoder = new TextEncoder();
+  const nameBytes = nameEncoder.encode(killerName);
+  const nameLengthToWrite = Math.min(nameBytes.length, 31); // Escrever no máximo 31 bytes de nome
+
+  view.setUint8(offset, nameLengthToWrite); offset += 1; // nameLength
+
+  for (let i = 0; i < nameLengthToWrite; i++) {
+    view.setUint8(offset + i, nameBytes[i]); // Escreve os bytes do nome
   }
-  view.setUint8(offset++, killerType);
-  // Logging detalhado
-  if (typeof console !== 'undefined' && console.log) {
-    // console.log('[BIN][serializePlayerDeath]', { id, killer, reason, lostLevel, lostXP, newLevel, newXP, killerName, killerType });
-  }
+  // O offset não precisa ser incrementado aqui após o loop, pois o buffer tem tamanho fixo
+  // e os bytes restantes (se nameLengthToWrite < 31) ficarão como 0.
+
   return buffer;
 }
 
@@ -927,30 +934,29 @@ function deserializePlayerDeath(buffer) {
   buffer = toArrayBuffer(buffer);
   const view = new DataView(buffer);
   let offset = 0;
-  const opcode = view.getUint8(offset++);
-  const id = view.getUint32(offset, true); offset += 4;
-  const killer = view.getUint32(offset, true); offset += 4;
-  const reason = view.getUint8(offset++);
-  const lostLevel = view.getUint8(offset++);
-  const lostXP = view.getUint32(offset, true); offset += 4;
-  const newLevel = view.getUint8(offset++);
-  const newXP = view.getUint32(offset, true); offset += 4;
-  const nameLen = view.getUint8(offset++);
-  let killerName = '';
-  if (nameLen > 0) {
-    const nameBytes = new Uint8Array(buffer, offset, nameLen);
-    killerName = new TextDecoder().decode(nameBytes);
-    offset += nameLen;
-  }
-  const killerType = view.getUint8(offset++);
-  // Logging detalhado
-  if (typeof console !== 'undefined' && console.log) {
-    console.log('[BIN][deserializePlayerDeath]', { id, killer, reason, lostLevel, lostXP, newLevel, newXP, killerName, killerType });
-  }
+
+  const opcode = view.getUint8(offset); offset += 1;
+  const id = view.getUint16(offset); offset += 2;
+  const killer = view.getUint16(offset); offset += 2;
+  const reason = view.getUint8(offset); offset += 1;
+  const lostLevel = view.getUint8(offset); offset += 1;
+  const lostXP = view.getUint32(offset); offset += 4;
+  const newLevel = view.getUint8(offset); offset += 1;
+  const newXP = view.getUint32(offset); offset += 4;
+  const killerType = view.getUint8(offset); offset += 1; // killerType
+
+  // killerName
+  const nameActualLength = view.getUint8(offset); offset += 1; // nameLength
+
+  // Lê nameActualLength bytes a partir do offset atual
+  const nameBytes = new Uint8Array(buffer.slice(offset, offset + nameActualLength));
+  const killerName = new TextDecoder().decode(nameBytes);
+  // O offset não precisa ser incrementado aqui pois é o último campo variável lido explicitamente.
+
   return {
     opcode,
     id,
-    killer,
+    killer, // Este é o killerId
     reason,
     lostLevel,
     lostXP,
@@ -961,7 +967,7 @@ function deserializePlayerDeath(buffer) {
   };
 }
 
-// Serialização binária para player:syncResponse (opcode 0x1A)
+// Serialização binária para player:syncResponse (telemetria para o painel)
 function serializePlayerSyncResponse({ playerId, hp, maxHp, mana, maxMana, cooldowns = {}, timestamp }) {
   const cooldownEntries = Object.entries(cooldowns || {});
   const N = Math.min(cooldownEntries.length, 255);

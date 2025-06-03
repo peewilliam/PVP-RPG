@@ -97,7 +97,8 @@ export const PLAYER = {
   DEATH_PENALTY: {
     XP_PERCENT: 0.10, // Percentual de XP perdido (0.10 = 10%)
     LEVELS_LOST: 0,   // Quantidade de níveis perdidos (0 = não perde nível fixo)
-    MIN_LEVEL: 1      // Nível mínimo permitido após penalidade
+    MIN_LEVEL: 1,     // Nível mínimo permitido após penalidade
+    RESPAWN_TIME: 5000 // Tempo de respawn em milissegundos (5 segundos)
   },
 };
 
