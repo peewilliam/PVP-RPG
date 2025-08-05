@@ -335,28 +335,61 @@ export class MovementPrediction {
     console.log('[DEBUG] MovementPrediction.setMoveToPoint chamado com:', dest);
     if (!dest) return;
     this.moveToPoint = { x: dest.x, y: dest.y, z: dest.z };
+    
+    // Calcula e define a rotação imediatamente para feedback visual instantâneo
+    if (this.player) {
+      const dx = dest.x - this.player.position.x;
+      const dz = dest.z - this.player.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      
+      if (dist > 0.1) {
+        const dirX = dx / dist;
+        const dirZ = dz / dist;
+        // Rotação instantânea para melhor feedback visual
+        this.player.rotation.y = Math.atan2(-dirZ, -dirX);
+      }
+    }
   }
 
   update(deltaTime) {
     if (!this.player) return;
+    
     if (this.moveToPoint) {
       const dx = this.moveToPoint.x - this.player.position.x;
       const dz = this.moveToPoint.z - this.player.position.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      const stopDist = 0.2;
+      const stopDist = 0.3; // Mesmo threshold do servidor
+      
       if (dist > stopDist) {
-        let moveSpeed = this.lastPlayerSpeed || 0.4;
+        // Usa velocidade constante igual ao servidor (PLAYER.SPEED = 0.4)
+        const moveSpeed = 0.4 * this.speedModifier;
+        
         // Normaliza direção
         const dirX = dx / dist;
         const dirZ = dz / dist;
-        // Atualiza posição prevista
-        this.player.targetPosition.x += dirX * moveSpeed * (deltaTime * 1000 / 50);
-        this.player.targetPosition.z += dirZ * moveSpeed * (deltaTime * 1000 / 50);
-        // Rotaciona para o destino
+        
+        // Calcula movimento baseado no tick rate do servidor (50ms)
+        const normalizedDelta = deltaTime * 1000 / 50;
+        const moveX = dirX * moveSpeed * normalizedDelta;
+        const moveZ = dirZ * moveSpeed * normalizedDelta;
+        
+        // Atualiza posição prevista de forma consistente
+        if (this.player.targetPosition) {
+          this.player.targetPosition.x += moveX;
+          this.player.targetPosition.z += moveZ;
+        } else {
+          // Fallback para position se targetPosition não existir
+          this.player.position.x += moveX;
+          this.player.position.z += moveZ;
+        }
+        
+        // Mantém rotação atualizada durante o movimento
         this.player.rotation.y = Math.atan2(-dirZ, -dirX);
       } else {
+        // Chegou ao destino, para o movimento
         this.moveToPoint = null;
+        console.log('[DEBUG] MovementPrediction: Chegou ao destino');
       }
     }
   }
-} 
+}

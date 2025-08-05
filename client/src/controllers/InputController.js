@@ -14,6 +14,7 @@ export class InputController {
     this.mouseDownTime = 0;
     this.mouseDownPosition = { x: 0, y: 0 };
     this.isDragging = false;
+    this.lastDragMoveTime = 0;
     
     // Callbacks para outros sistemas
     this.onMovementChanged = null;
@@ -91,12 +92,17 @@ export class InputController {
     this.mouseDownPosition = { x: event.clientX, y: event.clientY };
     this.isDragging = false;
     
-    // Não processamos o clique aqui, apenas no mouseUp
-    // para distinguir entre clique e drag
+    // Movimento imediato no mouseDown para responsividade
+    if (!this.chatFocused && !this.uiInteractionActive) {
+      if (event.button === 0 || event.button === 2) { // Botão esquerdo ou direito
+        if (this.onMoveToPoint) {
+          this.onMoveToPoint(event);
+        }
+      }
+    }
   }
   
   onMouseMove(event) {
-    // Calcula a posição do mouse normalizada (-1 a 1)
     this.mousePosition = {
       x: (event.clientX / window.innerWidth) * 2 - 1,
       y: -(event.clientY / window.innerHeight) * 2 + 1
@@ -108,9 +114,19 @@ export class InputController {
       const dy = event.clientY - this.mouseDownPosition.y;
       const dragDistance = Math.sqrt(dx * dx + dy * dy);
       
-      // Se o mouse se moveu mais que o limiar, é um arrasto e não um clique
+      // Se o mouse se moveu mais que o limiar, é um arrasto
       if (dragDistance > 5) { // 5 pixels é um limiar razoável
         this.isDragging = true;
+        
+        // Movimento contínuo durante o arrasto para fluidez
+        if (!this.chatFocused && !this.uiInteractionActive && this.onMoveToPoint) {
+          // Throttle para evitar spam de eventos (máximo a cada 50ms)
+          const now = Date.now();
+          if (!this.lastDragMoveTime || now - this.lastDragMoveTime > 50) {
+            this.lastDragMoveTime = now;
+            this.onMoveToPoint(event);
+          }
+        }
       }
     }
   }
@@ -283,4 +299,4 @@ export class InputController {
   setUIInteractionActive(active) {
     this.uiInteractionActive = active;
   }
-} 
+}

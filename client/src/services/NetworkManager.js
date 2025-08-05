@@ -1,7 +1,7 @@
 // NetworkManager.js
 // Gerencia a comunicação com o servidor usando geckos.io
 import geckos from '@geckos.io/client';
-import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects, deserializePlayerInit, deserializePlayerDisconnected, deserializePlayerJoined, deserializePlayerExisting, serializePlayerUseAbility, deserializePlayerAbilityUsed, deserializePlayerRespawn, deserializePlayerDeath, deserializePlayerSyncResponse } from '../../../shared/utils/binarySerializer.js';
+import { deserializePlayerMoved, deserializeWorldUpdate, deserializePlayerStatus, serializePlayerMoveInput, deserializeMonsterDeath, deserializeWorldUpdateFull, deserializeMonsterDeltaUpdate, deserializeCombatEffects, deserializePlayerInit, deserializePlayerDisconnected, deserializePlayerJoined, deserializePlayerExisting, deserializePlayerRotated, deserializePlayerUseAbility, serializePlayerUseAbility, deserializePlayerAbilityUsed, deserializePlayerDeath, deserializePlayerRespawn, deserializePlayerSyncResponse, serializePlayerMoveToPoint } from '../../../shared/utils/binarySerializer.js';
 import pako from 'pako';
 import { BINARY_EVENTS } from '../../../shared/constants/gameConstants.js';
 
@@ -366,16 +366,15 @@ export class NetworkManager {
     console.log('[DEBUG] Enviando destino ao servidor:', position);
     if (!this.connected || !this.channel) return;
     try {
-      // Enviar como { x, y, z }
-      const buffer = new ArrayBuffer(13);
-      const view = new DataView(buffer);
-      view.setUint8(0, 0x50); // opcode customizado para moveToPoint
-      view.setFloat32(1, position.x, true);
-      view.setFloat32(5, position.y, true);
-      view.setFloat32(9, position.z, true);
+      // Usar a função de serialização correta do binarySerializer
+      const buffer = serializePlayerMoveToPoint({
+        x: position.x,
+        y: position.y,
+        z: position.z
+      });
       this.channel.emit(this.serverConfig.BINARY_EVENTS.PLAYER_MOVE_TO_POINT || 'bin:player:moveToPoint', new Uint8Array(buffer));
     } catch (error) {
       console.error('Erro ao enviar destino de movimentação (binário):', error);
     }
   }
-} 
+}

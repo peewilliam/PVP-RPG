@@ -361,7 +361,14 @@ io.onConnection(channel => {
         
         // Se qualquer tecla de movimento for pressionada, cancela o movimento por clique
         if (input.forward || input.backward || input.left || input.right) {
-          player.moveToPoint = null;
+          if (player.moveToPoint) {
+            console.log(`[SERVER] Player ${player.id} cancelou movimento por clique devido ao WASD`);
+            player.moveToPoint = null;
+            player.continuousMove = false;
+            // Zerar velocidade para evitar conflitos
+            player.velocity.x = 0;
+            player.velocity.z = 0;
+          }
         }
         
         player.movementState.forward = input.forward || false;
@@ -861,4 +868,4 @@ app.get('/audit/logs', (req, res) => {
 app.use('/audit-panel', express.static(path.join(__dirname, 'server/src/audit-panel')));
 app.get('/audit', (req, res) => {
   res.sendFile(path.join(__dirname, 'server/src/audit-panel/index.html'));
-}); 
+});

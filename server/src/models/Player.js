@@ -95,10 +95,12 @@ export class Player extends Entity {
         this.moveToPoint = null;
         this.continuousMove = false;
         console.log(`[SERVER] Player ${this.id} chegou ao destino.`);
-      } else {
-        // Se ainda não chegou, atualiza a direção (caso o jogador tenha sido empurrado)
+      } else if (distance > 0.1) { // Evita divisão por zero
+        // Normaliza direção
         const dirX = dx / distance;
         const dirZ = dz / distance;
+        
+        // Usa velocidade constante para movimento suave
         const moveSpeed = PLAYER.SPEED * this.speedModifier;
         
         // Aplica efeito de slow, se houver
@@ -109,6 +111,10 @@ export class Player extends Entity {
           this.velocity.x = dirX * moveSpeed;
           this.velocity.z = dirZ * moveSpeed;
         }
+        
+        // Atualiza rotação de forma consistente
+        const angle = Math.atan2(-dirZ, -dirX);
+        this.rotation = angle < 0 ? angle + 2 * Math.PI : angle;
       }
     }
     
@@ -242,7 +248,10 @@ export class Player extends Entity {
     const distance = Math.sqrt(dx * dx + dz * dz);
     
     // Se a distância for muito pequena, ignorar
-    if (distance < 0.1) return;
+    if (distance < 0.1) {
+      console.log(`[SERVER] Player ${this.id} destino muito próximo, ignorando.`);
+      return;
+    }
     
     // Normalizar direção
     const dirX = dx / distance;
@@ -252,7 +261,7 @@ export class Player extends Entity {
     const angle = Math.atan2(-dirZ, -dirX);
     this.rotation = angle < 0 ? angle + 2 * Math.PI : angle;
     
-    // Atualizar velocidade
+    // Aplicar velocidade constante imediatamente
     const moveSpeed = PLAYER.SPEED * this.speedModifier;
     this.velocity.x = dirX * moveSpeed;
     this.velocity.z = dirZ * moveSpeed;
@@ -260,6 +269,12 @@ export class Player extends Entity {
     // Salvar o ponto de destino e o modo contínuo
     this.moveToPoint = { ...point };
     this.continuousMove = continuous;
+    
+    console.log(`[SERVER] Player ${this.id} velocidade definida:`, {
+      velocity: { x: this.velocity.x, z: this.velocity.z },
+      speed: moveSpeed,
+      distance: distance.toFixed(2)
+    });
   }
   
   /**
@@ -803,4 +818,4 @@ export class Player extends Entity {
       console.error(`[PLAYER] Erro ao resetar cooldowns para jogador ${this.id}:`, error);
     }
   }
-} 
+}
